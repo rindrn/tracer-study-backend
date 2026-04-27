@@ -7,6 +7,10 @@ use App\Http\Controllers\Api\Transactional\ProgramController;
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
 // use App\Http\Controllers\Api\Transactional\QuestionnaireController;
 
+// Form Submission & Fetch Tracer Study
+use App\Http\Controllers\Api\Transactional\TracerStudySubmitController;
+use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
+
 // Controllers — Dashboard (OLAP page config)
 // use App\Http\Controllers\Api\Dashboard\OverviewController;
 // use App\Http\Controllers\Api\Dashboard\EmploymentController;
@@ -32,6 +36,9 @@ Route::prefix('auth')->group(function () {
 // ═══════════════════════════════════════════════════════════
 // PROTECTED — wajib login (Sanctum token)
 // ═══════════════════════════════════════════════════════════
+Route::get('tracer-study/forms', [QuestionnaireFetchController::class, 'getActiveForms']); // Endpoint penarik soal untuk frontend UI
+Route::post('tracer-study/submit', [TracerStudySubmitController::class, 'store']); // Bisa dibuat public atau diproteksi sanctum sesuai policy. Disini diset public dahulu krn blm ada kepastian login as alumni.
+
 Route::middleware("auth:sanctum")->group(function () {
  
     // Auth
