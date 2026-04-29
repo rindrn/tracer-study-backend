@@ -67,6 +67,9 @@ Route::middleware("auth:sanctum")->group(function () {
         // PUT    /api/thresholds/{id}       -> update
         // DELETE /api/thresholds/{id}       -> destroy
     });
+
+    // ── Manajemen Alumni (Admin & Prodi & P2MPP) ─────
+    Route::apiResource('admin/alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
  
     // ── ETL — hanya admin ───────────────────────────────────
     // Route::middleware("role:admin")->group(function () {
