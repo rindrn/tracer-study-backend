@@ -18,6 +18,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             ProgramSeeder::class,   // ← harus duluan (FK target)
             UserSeeder::class,
+            QuestionnaireSeeder::class,
+            AlumniProfileSeeder::class,
+            ResponseSeeder::class,
         ]);
     }
 
