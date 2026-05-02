@@ -70,6 +70,9 @@ Route::middleware("auth:sanctum")->group(function () {
 
     // ── Manajemen Alumni (Admin & Prodi & P2MPP) ─────
     Route::apiResource('admin/alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
+
+    // ── Reports (Laporan / Unduhan) ──────────────────
+    Route::get('admin/reports/export-alumni', [\App\Http\Controllers\Api\Admin\ReportController::class, 'exportAlumniResponses']);
  
     // ── ETL — hanya admin ───────────────────────────────────
     // Route::middleware("role:admin")->group(function () {
