@@ -68,10 +68,10 @@ class QuestionnaireSeeder extends Seeder
         // Opsi untuk f8
         $f8Id = DB::connection('oltp')->table('questionnaire_questions')->where('code', 'f8')->first()->id;
         DB::connection('oltp')->table('questionnaire_options')->insert([
-            ['question_id' => $f8Id, 'option_code' => '1', 'option_text' => 'Bekerja (full time/part time)', 'order_no' => 1],
-            ['question_id' => $f8Id, 'option_code' => '3', 'option_text' => 'Wiraswasta', 'order_no' => 2],
-            ['question_id' => $f8Id, 'option_code' => '4', 'option_text' => 'Melanjutkan Pendidikan', 'order_no' => 3],
-            ['question_id' => $f8Id, 'option_code' => '5', 'option_text' => 'Tidak Bekerja / Sedang Mencari Kerja', 'order_no' => 4],
+            ['question_id' => $f8Id, 'option_code' => '1', 'option_label' => 'Bekerja (full time/part time)', 'order_no' => 1],
+            ['question_id' => $f8Id, 'option_code' => '3', 'option_label' => 'Wiraswasta', 'order_no' => 2],
+            ['question_id' => $f8Id, 'option_code' => '4', 'option_label' => 'Melanjutkan Pendidikan', 'order_no' => 3],
+            ['question_id' => $f8Id, 'option_code' => '5', 'option_label' => 'Tidak Bekerja / Sedang Mencari Kerja', 'order_no' => 4],
         ]);
 
         // 4. Buat Pertanyaan Lokal (Prodi TI)
