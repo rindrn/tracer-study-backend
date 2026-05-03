@@ -59,12 +59,13 @@ class ResponseSeeder extends Seeder
                 // Menyuntikkan data ke tabel employment_records agar grafik di Frontend (OLAP) bisa menyala
                 DB::connection('oltp')->table('employment_records')->insert([
                     'alumni_id' => $alumni->id,
+                    'questionnaire_id' => $qGlobal->id,
+                    'employment_status' => $statusKerja == '1' ? 'employed' : 'entrepreneur',
                     'company_name' => $faker->company,
                     'job_title' => $faker->jobTitle,
-                    'monthly_salary' => $salary,
-                    'job_type' => $statusKerja == '1' ? 'full_time' : 'wiraswasta',
-                    'start_date' => $faker->dateTimeBetween('-1 years', 'now')->format('Y-m-d'),
-                    'is_current' => true,
+                    'salary_current' => $salary,
+                    'first_job_started_at' => $faker->dateTimeBetween('-1 years', 'now')->format('Y-m-d'),
+                    'waiting_months' => $faker->randomFloat(2, 0, 6),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
@@ -74,11 +75,12 @@ class ResponseSeeder extends Seeder
             if ($statusKerja == '4') {
                 DB::connection('oltp')->table('education_records')->insert([
                     'alumni_id' => $alumni->id,
+                    'questionnaire_id' => $qGlobal->id,
+                    'is_further_study' => true,
                     'institution_name' => 'Universitas ' . $faker->city,
                     'degree' => 'S2',
                     'major' => 'Manajemen/Teknik',
-                    'start_date' => $faker->dateTimeBetween('-6 months', 'now')->format('Y-m-d'),
-                    'is_current' => true,
+                    'start_year' => 2026,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
