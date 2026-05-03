@@ -46,13 +46,42 @@ class ResponseSeeder extends Seeder
             ];
 
             if ($statusKerja == '1' || $statusKerja == '3') {
+                $salary = $faker->numberBetween(3000000, 15000000);
                 $answers[] = [
                     'response_id' => $responseId,
                     'question_code' => 'f502',
-                    'answer_text' => (string) $faker->numberBetween(3000000, 15000000), // Gaji
+                    'answer_text' => (string) $salary, 
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
+
+                // --- DATA DASHBOARD FE ---
+                // Menyuntikkan data ke tabel employment_records agar grafik di Frontend (OLAP) bisa menyala
+                DB::connection('oltp')->table('employment_records')->insert([
+                    'alumni_id' => $alumni->id,
+                    'company_name' => $faker->company,
+                    'job_title' => $faker->jobTitle,
+                    'monthly_salary' => $salary,
+                    'job_type' => $statusKerja == '1' ? 'full_time' : 'wiraswasta',
+                    'start_date' => $faker->dateTimeBetween('-1 years', 'now')->format('Y-m-d'),
+                    'is_current' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            // Jika status kerja adalah Melanjutkan Pendidikan
+            if ($statusKerja == '4') {
+                DB::connection('oltp')->table('education_records')->insert([
+                    'alumni_id' => $alumni->id,
+                    'institution_name' => 'Universitas ' . $faker->city,
+                    'degree' => 'S2',
+                    'major' => 'Manajemen/Teknik',
+                    'start_date' => $faker->dateTimeBetween('-6 months', 'now')->format('Y-m-d'),
+                    'is_current' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
             }
 
             // 3. Simulasi Jawaban Prodi (Jika dia anak Teknik Informatika)
