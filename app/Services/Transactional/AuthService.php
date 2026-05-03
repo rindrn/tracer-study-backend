@@ -8,6 +8,28 @@ use Illuminate\Validation\ValidationException;
  
 class AuthService
 {
+    public function demoAccounts(): array
+    {
+        return User::query()
+            ->select(['id', 'name', 'email', 'role', 'program_id'])
+            ->with('program:id,name,code,degree')
+            ->orderBy('role')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'program_id' => $user->program_id,
+                'program_name' => $user->program?->name,
+                'program_code' => $user->program?->code,
+                'program_degree' => $user->program?->degree,
+                'password_hint' => 'password123',
+            ])
+            ->all();
+    }
+
     public function login(string $email, string $password): ResponseAuthDTO
     {
         $user = User::where('email', $email)->first();

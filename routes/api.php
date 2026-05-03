@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
 // PUBLIC — tidak butuh autentikasi
 // ═══════════════════════════════════════════════════════════
 Route::prefix('auth')->group(function () {
+    Route::get('demo-accounts', [AuthController::class, 'demoAccounts']);
     Route::post('login', [AuthController::class, 'login']);
 });
  

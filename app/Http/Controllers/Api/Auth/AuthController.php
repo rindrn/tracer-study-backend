@@ -12,6 +12,15 @@ class AuthController extends Controller
         private readonly AuthService $service,
     ) {}
  
+    // GET /api/auth/demo-accounts
+    public function demoAccounts(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->demoAccounts(),
+        ]);
+    }
+
     // POST auth/login
     public function login(Request $request): JsonResponse
     {
