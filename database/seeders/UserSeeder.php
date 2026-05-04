@@ -11,6 +11,7 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        // Akun demo ini dipakai FE dan hanya berasal dari tabel users.
         // Ambil ID prodi dari DB untuk foreign key
         $ti = Program::where('code', 'TI')->first();
         $si = Program::where('code', 'SI')->first();
