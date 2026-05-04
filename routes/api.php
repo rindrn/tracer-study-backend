@@ -2,6 +2,7 @@
  
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\Auth\AlumniAuthController;
 use App\Http\Controllers\Api\Transactional\ThresholdController;
 use App\Http\Controllers\Api\Transactional\ProgramController; 
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
 // ═══════════════════════════════════════════════════════════
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
+    Route::post('alumni-login', [AlumniAuthController::class, 'login']);  // Login alumni untuk isi kuesioner
 });
  
 // ═══════════════════════════════════════════════════════════
