@@ -38,7 +38,7 @@ class QuestionnaireController extends Controller
         if (! $questionnaire) {
             return response()->json([
                 'success' => false,
-                'message' => 'Formulir tidak ditemukan.',
+                'message' => 'Kuisioner tidak ditemukan.',
             ], 404);
         }
 
@@ -82,7 +82,7 @@ class QuestionnaireController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Formulir berhasil disimpan.',
+            'message' => 'Kuisioner berhasil disimpan.',
             'data' => $this->loadQuestionnaire((int) $questionnaireId),
         ], 201);
     }
@@ -128,13 +128,13 @@ class QuestionnaireController extends Controller
         if (! $updated) {
             return response()->json([
                 'success' => false,
-                'message' => 'Formulir tidak ditemukan.',
+                'message' => 'Kuisioner tidak ditemukan.',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Formulir berhasil diperbarui.',
+            'message' => 'Kuisioner berhasil diperbarui.',
             'data' => $this->loadQuestionnaire((int) $id),
         ]);
     }
@@ -146,13 +146,13 @@ class QuestionnaireController extends Controller
         if (! $deleted) {
             return response()->json([
                 'success' => false,
-                'message' => 'Formulir tidak ditemukan.',
+                'message' => 'Kuisioner tidak ditemukan.',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Formulir berhasil dihapus.',
+            'message' => 'Kuisioner berhasil dihapus.',
         ]);
     }
 

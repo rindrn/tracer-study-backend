@@ -55,8 +55,8 @@ class QuestionnaireValidator
             'sections.*.questions.*.options.*.value' => ['nullable', 'string', 'max:255'],
             'sections.*.questions.*.options.*.code' => ['nullable', 'string', 'max:80'],
         ], [
-            'title.required' => 'Judul formulir wajib diisi.',
-            'status.required' => 'Status formulir wajib diisi.',
+            'title.required' => 'Judul kuisioner wajib diisi.',
+            'status.required' => 'Status kuisioner wajib diisi.',
             'sections.required' => 'Minimal 1 section harus diisi.',
             'sections.min' => 'Minimal 1 section harus diisi.',
             'sections.*.title.required' => 'Judul section wajib diisi.',

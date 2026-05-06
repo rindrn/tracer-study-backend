@@ -33,7 +33,7 @@ class MinistrySheetExport implements FromCollection, WithHeadings, WithTitle, Wi
                 'Telepon'       => $alumni->phone,
                 'Tahun Lulus'   => $alumni->graduation_year,
                 'Program Studi' => $alumni->program_name ?? '-',
-                'Jurusan'       => $alumni->department_name ?? '-',
+                'Jurusan'       => $alumni->jurusan_name ?? '-',
                 'NIK'           => $alumni->nik,
                 'NPWP'          => $alumni->npwp,
             ];

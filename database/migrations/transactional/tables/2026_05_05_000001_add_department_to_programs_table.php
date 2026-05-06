@@ -11,14 +11,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::connection('oltp')->table('programs', function (Blueprint $table) {
-            $table->string('department', 100)->nullable()->after('name');
+            $table->string('jurusan', 100)->nullable()->after('name');
         });
     }
 
     public function down(): void
     {
         Schema::connection('oltp')->table('programs', function (Blueprint $table) {
-            $table->dropColumn('department');
+            $table->dropColumn('jurusan');
         });
     }
 };

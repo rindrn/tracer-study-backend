@@ -19,7 +19,11 @@ class AlumniController extends Controller
         
         $query = DB::connection('oltp')->table('alumni_profiles')
             ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-            ->select('alumni_profiles.*', 'programs.name as program_name');
+            ->select(
+                'alumni_profiles.*',
+                'programs.name as program_name',
+                'programs.jurusan as jurusan_name'
+            );
 
         // ROLE CHECK: Jika prodi, paksa filter hanya untuk prodinya saja
         if ($user->isProdi()) {
@@ -82,7 +86,15 @@ class AlumniController extends Controller
     {
         $user = $request->user();
 
-        $alumni = DB::connection('oltp')->table('alumni_profiles')->where('id', $id)->first();
+        $alumni = DB::connection('oltp')->table('alumni_profiles')
+            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+            ->select(
+                'alumni_profiles.*',
+                'programs.name as program_name',
+                'programs.jurusan as jurusan_name'
+            )
+            ->where('alumni_profiles.id', $id)
+            ->first();
 
         if (!$alumni) {
             return response()->json(['message' => 'Alumni tidak ditemukan.'], 404);
@@ -111,7 +123,11 @@ class AlumniController extends Controller
             return response()->json(['message' => 'P2MPP tidak diizinkan mengubah data alumni.'], 403);
         }
 
-        $alumni = DB::connection('oltp')->table('alumni_profiles')->where('id', $id)->first();
+        $alumni = DB::connection('oltp')->table('alumni_profiles')
+            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+            ->select('alumni_profiles.*', 'programs.name as program_name', 'programs.jurusan as jurusan_name')
+            ->where('alumni_profiles.id', $id)
+            ->first();
 
         if (!$alumni) {
             return response()->json(['message' => 'Alumni tidak ditemukan.'], 404);
@@ -150,7 +166,11 @@ class AlumniController extends Controller
             return response()->json(['message' => 'P2MPP tidak diizinkan menghapus data alumni.'], 403);
         }
 
-        $alumni = DB::connection('oltp')->table('alumni_profiles')->where('id', $id)->first();
+        $alumni = DB::connection('oltp')->table('alumni_profiles')
+            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+            ->select('alumni_profiles.*', 'programs.name as program_name', 'programs.jurusan as jurusan_name')
+            ->where('alumni_profiles.id', $id)
+            ->first();
 
         if (!$alumni) {
             return response()->json(['message' => 'Alumni tidak ditemukan.'], 404);

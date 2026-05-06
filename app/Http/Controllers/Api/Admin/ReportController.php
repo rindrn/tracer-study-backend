@@ -23,7 +23,7 @@ class ReportController extends Controller
                 'alumni_profiles.*',
                 'responses.id as response_id',
                 'programs.name as program_name',
-                'programs.department as department_name'
+                'programs.jurusan as jurusan_name'
             );
 
         if ($user->isProdi()) {
