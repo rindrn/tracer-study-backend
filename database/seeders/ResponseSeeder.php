@@ -13,99 +13,175 @@ class ResponseSeeder extends Seeder
     {
         $faker = Faker::create('id_ID');
         $now = Carbon::now();
+        $conn = DB::connection('oltp');
 
-        $alumniList = DB::connection('oltp')->table('alumni_profiles')->get();
-        $qGlobal = DB::connection('oltp')->table('questionnaires')->whereNull('program_id')->first();
+        $alumniList = $conn->table('alumni_profiles')->get();
+        $qGlobal = $conn->table('questionnaires')->whereNull('program_id')->first();
+        $tiProgram = $conn->table('programs')->where('code', 'TI')->first();
 
         if (!$qGlobal || $alumniList->isEmpty()) return;
 
-        foreach ($alumniList as $index => $alumni) {
-            // Hanya 20 orang yang seolah-olah sudah mengisi kuesioner
-            if ($index >= 20) break; 
+        $provinces = ['Jawa Barat', 'DKI Jakarta', 'Jawa Tengah', 'Jawa Timur', 'Banten', 'Sumatera Utara', 'Bali'];
+        $cities    = ['Bandung', 'Jakarta Selatan', 'Bekasi', 'Semarang', 'Surabaya', 'Tangerang', 'Denpasar'];
+        $companies = ['PT Telkom Indonesia', 'PT Pertamina', 'PT Astra International', 'Tokopedia', 'GoTo', 'PT PLN', 'Bank BCA', 'Shopee Indonesia', 'Traveloka', 'PT Krakatau Steel'];
+        $universities = ['Universitas Indonesia', 'Institut Teknologi Bandung', 'Universitas Gadjah Mada', 'Universitas Padjadjaran', 'Universitas Brawijaya'];
 
+        foreach ($alumniList as $alumni) {
             // 1. Buat Header Response
-            $responseId = DB::connection('oltp')->table('responses')->insertGetId([
+            $responseId = $conn->table('responses')->insertGetId([
                 'questionnaire_id' => $qGlobal->id,
-                'alumni_id' => $alumni->id,
-                'status' => 'submitted',
-                'submitted_at' => $now,
-                'created_at' => $now,
-                'updated_at' => $now,
+                'alumni_id'        => $alumni->id,
+                'status'           => 'submitted',
+                'submitted_at'     => $now,
+                'created_at'       => $now,
+                'updated_at'       => $now,
             ]);
 
             $answers = [];
 
-            // 2. Simulasi Jawaban Kementrian
-            $statusKerja = $faker->randomElement(['1', '3', '4', '5']); // 1:Kerja, 3:Wiraswasta, 4:Studi, 5:Nganggur
-            $answers[] = [
-                'response_id' => $responseId,
-                'question_code' => 'f8',
-                'answer_text' => $statusKerja,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
+            // ── Q1: f8 — Status saat ini ─────────────────────
+            $statusKerja = $faker->randomElement([1, 1, 1, 3, 3, 4, 5, 2]); // weighted: more bekerja
+            $answers[] = $this->answer($responseId, 'f8', (string)$statusKerja, $now);
 
-            if ($statusKerja == '1' || $statusKerja == '3') {
-                $salary = $faker->numberBetween(3000000, 15000000);
-                $answers[] = [
-                    'response_id' => $responseId,
-                    'question_code' => 'f502',
-                    'answer_text' => (string) $salary, 
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
+            // ── Conditional: Bekerja(1) / Wiraswasta(3) ──────
+            if (in_array($statusKerja, [1, 3])) {
+                $salary = $faker->numberBetween(3000000, 20000000);
+                $waitingMonths = $faker->numberBetween(0, 12);
 
-                // --- DATA DASHBOARD FE ---
-                // Menyuntikkan data ke tabel employment_records agar grafik di Frontend (OLAP) bisa menyala
-                DB::connection('oltp')->table('employment_records')->insert([
-                    'alumni_id' => $alumni->id,
-                    'questionnaire_id' => $qGlobal->id,
-                    'employment_status' => $statusKerja == '1' ? 'employed' : 'entrepreneur',
-                    'company_name' => $faker->company,
-                    'job_title' => $faker->jobTitle,
-                    'salary_current' => $salary,
-                    'first_job_started_at' => $faker->dateTimeBetween('-1 years', 'now')->format('Y-m-d'),
-                    'waiting_months' => $faker->randomFloat(2, 0, 6),
-                    'created_at' => $now,
-                    'updated_at' => $now,
+                $answers[] = $this->answer($responseId, 'f502', (string)$waitingMonths, $now);
+                $answers[] = $this->answer($responseId, 'f505', (string)$salary, $now);
+                $answers[] = $this->answer($responseId, 'f5a1', $faker->randomElement($provinces), $now);
+                $answers[] = $this->answer($responseId, 'f5a2', $faker->randomElement($cities), $now);
+                $answers[] = $this->answer($responseId, 'f5d', (string)$faker->numberBetween(1, 3), $now);
+
+                if ($statusKerja == 1) {
+                    $f1101 = $faker->randomElement([1, 2, 3, 3, 3, 4, 6, 7]);
+                    $answers[] = $this->answer($responseId, 'f1101', (string)$f1101, $now);
+                    if ($f1101 == 5) {
+                        $answers[] = $this->answer($responseId, 'f1102', 'Perusahaan Rintisan/Startup', $now);
+                    }
+                    $answers[] = $this->answer($responseId, 'f5b', $faker->randomElement($companies), $now);
+                    $answers[] = $this->answer($responseId, 'f14', (string)$faker->numberBetween(1, 5), $now);
+                    $answers[] = $this->answer($responseId, 'f15', (string)$faker->numberBetween(1, 4), $now);
+                }
+
+                if ($statusKerja == 3) {
+                    $answers[] = $this->answer($responseId, 'f5c', (string)$faker->numberBetween(1, 3), $now);
+                }
+
+                // Employment record
+                $conn->table('employment_records')->insert([
+                    'alumni_id'         => $alumni->id,
+                    'questionnaire_id'  => $qGlobal->id,
+                    'employment_status' => $statusKerja == 1 ? 'employed' : 'entrepreneur',
+                    'company_name'      => $statusKerja == 1 ? $faker->randomElement($companies) : 'Usaha Sendiri',
+                    'job_title'         => $faker->jobTitle,
+                    'salary_current'    => $salary,
+                    'waiting_months'    => $waitingMonths,
+                    'work_city'         => $faker->randomElement($cities),
+                    'first_job_started_at' => $faker->dateTimeBetween('-2 years', 'now')->format('Y-m-d'),
+                    'created_at'        => $now,
+                    'updated_at'        => $now,
                 ]);
             }
 
-            // Jika status kerja adalah Melanjutkan Pendidikan
-            if ($statusKerja == '4') {
-                DB::connection('oltp')->table('education_records')->insert([
-                    'alumni_id' => $alumni->id,
+            // ── Conditional: Studi Lanjut (4) ────────────────
+            if ($statusKerja == 4) {
+                $answers[] = $this->answer($responseId, 'f18a', (string)$faker->numberBetween(1, 4), $now);
+                $answers[] = $this->answer($responseId, 'f18b', $faker->randomElement($universities), $now);
+                $answers[] = $this->answer($responseId, 'f18c', 'Magister Teknik/' . $faker->word, $now);
+                $answers[] = $this->answer($responseId, 'f18d', $faker->dateTimeBetween('-1 year', 'now')->format('Y-m-d'), $now);
+
+                $conn->table('education_records')->insert([
+                    'alumni_id'        => $alumni->id,
                     'questionnaire_id' => $qGlobal->id,
                     'is_further_study' => true,
-                    'institution_name' => 'Universitas ' . $faker->city,
-                    'degree' => 'S2',
-                    'major' => 'Manajemen/Teknik',
-                    'start_year' => 2026,
-                    'created_at' => $now,
-                    'updated_at' => $now,
+                    'institution_name' => $faker->randomElement($universities),
+                    'degree'           => 'S2',
+                    'major'            => 'Magister Teknik',
+                    'start_year'       => 2025,
+                    'created_at'       => $now,
+                    'updated_at'       => $now,
                 ]);
             }
 
-            // 3. Simulasi Jawaban Prodi (Jika dia anak Teknik Informatika)
-            $tiProgram = DB::connection('oltp')->table('programs')->where('code', 'TI')->first();
-            if ($tiProgram && $alumni->program_id == $tiProgram->id) {
-                $answers[] = [
-                    'response_id' => $responseId,
-                    'question_code' => 'q_framework',
-                    'answer_text' => $faker->randomElement(['Laravel', 'React', 'Vue', 'Spring Boot', 'Express']),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-                $answers[] = [
-                    'response_id' => $responseId,
-                    'question_code' => 'q_sertifikasi',
-                    'answer_text' => $faker->randomElement(['1', '0']),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
+            // ── Q10: f1201 — Sumber dana kuliah (wajib) ──────
+            $f1201 = $faker->randomElement([1, 1, 1, 3, 4, 6]);
+            $answers[] = $this->answer($responseId, 'f1201', (string)$f1201, $now);
+            if ($f1201 == 7) {
+                $answers[] = $this->answer($responseId, 'f1202', 'Beasiswa Daerah', $now);
             }
 
-            DB::connection('oltp')->table('response_answers')->insert($answers);
+            // ── Q13: Kompetensi f1761-f1774 (wajib) ──────────
+            foreach (['f1761','f1762','f1763','f1764','f1765','f1766','f1767','f1768','f1769','f1770','f1771','f1772','f1773','f1774'] as $fCode) {
+                $answers[] = $this->answer($responseId, $fCode, (string)$faker->numberBetween(1, 5), $now);
+            }
+
+            // ── Q14: Metode Pembelajaran f21-f27 (wajib) ─────
+            foreach (['f21','f22','f23','f24','f25','f26','f27'] as $fCode) {
+                $answers[] = $this->answer($responseId, $fCode, (string)$faker->numberBetween(1, 5), $now);
+            }
+
+            // ── Q15: Pencarian Kerja f301 (wajib) ────────────
+            $f301 = $faker->randomElement([1, 2, 3]);
+            $answers[] = $this->answer($responseId, 'f301', (string)$f301, $now);
+            if ($f301 == 1) {
+                $answers[] = $this->answer($responseId, 'f302', (string)$faker->numberBetween(1, 6), $now);
+            } elseif ($f301 == 2) {
+                $answers[] = $this->answer($responseId, 'f303', (string)$faker->numberBetween(1, 12), $now);
+            }
+
+            // ── Q16: Cara mencari kerja f401-f415 ────────────
+            foreach (['f401','f402','f403','f404','f405','f406','f407','f408','f409','f410','f411','f412','f413','f414','f415'] as $fCode) {
+                $val = $faker->boolean(30) ? '1' : '0';
+                $answers[] = $this->answer($responseId, $fCode, $val, $now);
+            }
+
+            // ── Q17-19: Statistik lamaran ────────────────────
+            $f6 = $faker->numberBetween(1, 20);
+            $f7 = $faker->numberBetween(1, max(1, $f6));
+            $f7a = $faker->numberBetween(1, max(1, $f7));
+            $answers[] = $this->answer($responseId, 'f6', (string)$f6, $now);
+            $answers[] = $this->answer($responseId, 'f7', (string)$f7, $now);
+            $answers[] = $this->answer($responseId, 'f7a', (string)$f7a, $now);
+
+            // ── Q20: f1001 — Aktivitas cari kerja (wajib) ────
+            $f1001 = $faker->randomElement([1, 2, 3, 4]);
+            $answers[] = $this->answer($responseId, 'f1001', (string)$f1001, $now);
+            if ($f1001 == 5) {
+                $answers[] = $this->answer($responseId, 'f1002', 'Freelance/remote work', $now);
+            }
+
+            // ── Q21: f1601-f1613 — Alasan pekerjaan ──────────
+            foreach (['f1601','f1602','f1603','f1604','f1605','f1606','f1607','f1608','f1609','f1610','f1611','f1612','f1613'] as $fCode) {
+                $val = $faker->boolean(25) ? '1' : '0';
+                $answers[] = $this->answer($responseId, $fCode, $val, $now);
+            }
+
+            // ── Pertanyaan Prodi TI (lokal) ──────────────────
+            if ($tiProgram && $alumni->program_id == $tiProgram->id) {
+                $answers[] = $this->answer($responseId, 'q_framework', $faker->randomElement(['Laravel', 'React', 'Vue', 'Spring Boot', 'Express', 'Django', 'Flutter']), $now);
+                $answers[] = $this->answer($responseId, 'q_sertifikasi', $faker->randomElement(['1', '0']), $now);
+            }
+
+            // Bulk insert answers
+            foreach (array_chunk($answers, 50) as $chunk) {
+                $conn->table('response_answers')->insert($chunk);
+            }
         }
+    }
+
+    /**
+     * Helper untuk membuat array jawaban.
+     */
+    private function answer(int $responseId, string $code, string $value, Carbon $now): array
+    {
+        return [
+            'response_id'   => $responseId,
+            'question_code' => $code,
+            'answer_text'   => $value,
+            'created_at'    => $now,
+            'updated_at'    => $now,
+        ];
     }
 }

@@ -70,24 +70,40 @@ class QuestionnaireFetchController extends Controller
             ->get()
             ->groupBy('question_id');
 
-        // Menyusun (mapping) Object JSON agar Frontend mudah melooping
+        // Menyusun (mapping) Object JSON — normalisasi nama field agar sesuai kontrak FE
         $mappedQuestions = $questions->map(function ($q) use ($options) {
-            $q->options = $options->get($q->id, []);
-            if ($q->metadata) {
-                $q->metadata = json_decode($q->metadata);
-            }
-            return $q;
+            $rawOptions = $options->get($q->id, collect());
+            $metadata = $q->metadata ? json_decode($q->metadata) : null;
+
+            return (object) [
+                'id'               => $q->id,
+                'questionnaire_id' => $q->questionnaire_id,
+                'question_code'    => $q->code,           // FE expects "question_code"
+                'question_text'    => $q->question_text,
+                'question_type'    => $q->question_type,
+                'is_required'      => $q->is_required,
+                'order_no'         => $q->order_no,
+                'metadata'         => $metadata,
+                'options'          => $rawOptions->map(function ($o) {
+                    return [
+                        'id'    => $o->id,
+                        'code'  => $o->option_code,       // e.g. "1", "2", "3"
+                        'label' => $o->option_label,       // FE expects "label"
+                        'value' => $o->option_code,        // FE uses value as answer key — use option_code
+                    ];
+                })->values(),
+            ];
         })->groupBy('questionnaire_id');
 
         $result = $questionnaires->map(function ($qnr) use ($mappedQuestions) {
             $qnr->is_global = is_null($qnr->program_id);
-            $qnr->questions = $mappedQuestions->get($qnr->id, []);
+            $qnr->questions = $mappedQuestions->get($qnr->id, collect())->values();
             return $qnr;
         });
 
         return response()->json([
             'success' => true,
-            'data' => $result
+            'data' => $result->values()
         ]);
     }
 }

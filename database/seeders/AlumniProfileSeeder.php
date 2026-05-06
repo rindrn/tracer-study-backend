@@ -14,34 +14,41 @@ class AlumniProfileSeeder extends Seeder
         $faker = Faker::create('id_ID');
         $now = Carbon::now();
 
-        $programs = DB::connection('oltp')->table('programs')->pluck('id')->toArray();
-        if (empty($programs)) return;
+        $programs = DB::connection('oltp')->table('programs')->get();
+        if ($programs->isEmpty()) return;
 
         $alumniData = [];
+        $nimCounter = 1;
 
-        // Membuat 30 Data Alumni dengan nama Indonesia yang realistis
-        for ($i = 0; $i < 30; $i++) {
-            $tahunLulus = $faker->numberBetween(2022, 2025);
-            $tahunMasuk = $tahunLulus - 4;
+        // 3 alumni per program studi
+        foreach ($programs as $program) {
+            for ($i = 0; $i < 3; $i++) {
+                $tahunLulus = $faker->numberBetween(2023, 2025);
+                $tahunMasuk = $tahunLulus - ($program->degree === 'D3' ? 3 : 4);
 
-            $alumniData[] = [
-                'program_id' => $faker->randomElement($programs),
-                'nim' => $tahunMasuk . $faker->numerify('##########'), // Format NIM realistis
-                'name' => $faker->name, // Nama Indonesia (Budi, Siti, dll)
-                'email' => $faker->unique()->safeEmail,
-                'phone' => $faker->phoneNumber,
-                'entry_year' => $tahunMasuk,
-                'graduation_year' => $tahunLulus,
-                'gpa' => $faker->randomFloat(2, 2.7, 4.0),
-                'nik' => $faker->numerify('################'), // 16 digit NIK
-                'npwp' => $faker->numerify('####################'), // 20 digit NPWP
-                'kode_pt' => '001001',
-                'is_active' => true,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
+                $alumniData[] = [
+                    'program_id'      => $program->id,
+                    'nim'             => $tahunMasuk . str_pad($nimCounter, 10, '0', STR_PAD_LEFT),
+                    'name'            => $faker->name,
+                    'email'           => $faker->unique()->safeEmail,
+                    'phone'           => $faker->phoneNumber,
+                    'entry_year'      => $tahunMasuk,
+                    'graduation_year' => $tahunLulus,
+                    'gpa'             => $faker->randomFloat(2, 2.7, 4.0),
+                    'nik'             => $faker->numerify('################'),
+                    'npwp'            => $faker->numerify('####################'),
+                    'kode_pt'         => '001001',
+                    'is_active'       => true,
+                    'created_at'      => $now,
+                    'updated_at'      => $now,
+                ];
+                $nimCounter++;
+            }
         }
 
-        DB::connection('oltp')->table('alumni_profiles')->insert($alumniData);
+        // Insert in chunks to avoid memory issues
+        foreach (array_chunk($alumniData, 50) as $chunk) {
+            DB::connection('oltp')->table('alumni_profiles')->insert($chunk);
+        }
     }
 }
