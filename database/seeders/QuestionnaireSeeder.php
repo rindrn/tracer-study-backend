@@ -261,7 +261,7 @@ class QuestionnaireSeeder extends Seeder
         // f303
         $insertQuestion(7, 'f303', 'Kira-kira berapa bulan sesudah lulus Anda mulai mencari pekerjaan?', 'number', false, ['show_if' => ['f301' => [2]]]);
 
-        // Q16 — f401-f416 (Cara mencari pekerjaan — multi-select booleans)
+        // Q16 — f401-f415 (Cara mencari pekerjaan — grouped checkbox)
         $jobSearchMethods = [
             ['f401', 'Melalui iklan di koran/majalah, brosur'],
             ['f402', 'Melamar ke perusahaan tanpa mengetahui lowongan yang ada'],
@@ -279,11 +279,17 @@ class QuestionnaireSeeder extends Seeder
             ['f414', 'Bekerja di tempat yang sama dengan tempat kerja semasa kuliah'],
             ['f415', 'Lainnya'],
         ];
-
-        foreach ($jobSearchMethods as $jsm) {
+        foreach ($jobSearchMethods as $i => $jsm) {
+            $meta = [
+                'group_code'  => 'q16_cara_cari_kerja',
+                'group_label' => $jsm[1],
+            ];
+            if ($i === 0) {
+                $meta['group_title'] = 'Bagaimana Anda mencari pekerjaan tersebut? Jawaban bisa lebih dari satu.';
+            }
             $insertQuestion(7, $jsm[0],
                 "Bagaimana Anda mencari pekerjaan tersebut? — {$jsm[1]}",
-                'boolean', false);
+                'boolean', false, $meta);
         }
 
         // f416
@@ -335,10 +341,18 @@ class QuestionnaireSeeder extends Seeder
             ['f1613', 'Lainnya'],
         ];
 
-        foreach ($mismatchReasons as $mr) {
+        // Q21 — f1601-f1614 (Alasan pekerjaan tidak sesuai — grouped checkbox)
+        foreach ($mismatchReasons as $i => $mr) {
+            $meta = [
+                'group_code'  => 'q21_alasan_tidak_sesuai',
+                'group_label' => $mr[1],
+            ];
+            if ($i === 0) {
+                $meta['group_title'] = 'Jika menurut Anda pekerjaan saat ini tidak sesuai dengan pendidikan, mengapa Anda mengambilnya? Jawaban bisa lebih dari satu.';
+            }
             $insertQuestion(9, $mr[0],
                 "Jika menurut Anda pekerjaan saat ini tidak sesuai dengan pendidikan, mengapa Anda mengambilnya? — {$mr[1]}",
-                'boolean', false);
+                'boolean', false, $meta);
         }
 
         // f1614

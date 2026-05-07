@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             QuestionnaireSeeder::class,
             AlumniProfileSeeder::class,
             ResponseSeeder::class,
+            OlapSeeder::class,      // ← sync OLTP → OLAP data warehouse
         ]);
     }
 

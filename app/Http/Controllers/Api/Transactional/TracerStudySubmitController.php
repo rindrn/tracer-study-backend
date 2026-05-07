@@ -79,9 +79,19 @@ class TracerStudySubmitController extends Controller
 
             // 4. Raw Dump to response_answers
             $answerRecords = [];
-            // Gunakan $request->all() alih-alih $validated untuk mendapatkan key kuesioner dinamis (template jurusan)
-            // yang tidak dideklarasikan statis di FormRequest.
-            foreach ($request->all() as $key => $value) {
+            // Expand grouped checkbox answers (q16_cara_cari_kerja, q21_alasan_tidak_sesuai)
+            // into individual f401-f415 and f1601-f1613 booleans.
+            $answerData = $request->all();
+            foreach (['q16_cara_cari_kerja' => range(401, 415), 'q21_alasan_tidak_sesuai' => range(1601, 1613)] as $groupKey => $codes) {
+                if (isset($answerData[$groupKey]) && is_array($answerData[$groupKey])) {
+                    $selected = array_map('strval', $answerData[$groupKey]);
+                    foreach ($codes as $code) {
+                        $answerData['f' . $code] = in_array('f' . $code, $selected) ? '1' : '0';
+                    }
+                    unset($answerData[$groupKey]);
+                }
+            }
+            foreach ($answerData as $key => $value) {
                 // Kecualikan key yang sudah pasti milik tabel identitas
                 $identityKeys = ['nim', 'name', 'email', 'phone', 'tahun_lulus', 'kdpstmsmh', 'kode_pt', 'nik', 'npwp'];
                 if (!in_array($key, $identityKeys) && $value !== null) {

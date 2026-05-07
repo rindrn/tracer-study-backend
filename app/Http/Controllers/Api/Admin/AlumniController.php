@@ -19,10 +19,20 @@ class AlumniController extends Controller
         
         $query = DB::connection('oltp')->table('alumni_profiles')
             ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+            ->leftJoin('employment_records', 'alumni_profiles.id', '=', 'employment_records.alumni_id')
+            ->leftJoin('education_records', 'alumni_profiles.id', '=', 'education_records.alumni_id')
             ->select(
                 'alumni_profiles.*',
                 'programs.name as program_name',
-                'programs.jurusan as jurusan_name'
+                'programs.jurusan as jurusan_name',
+                'employment_records.employment_status',
+                'employment_records.waiting_months',
+                'employment_records.salary_current',
+                'employment_records.company_name',
+                'employment_records.job_title',
+                'employment_records.work_city',
+                'education_records.is_further_study',
+                'education_records.institution_name'
             );
 
         // ROLE CHECK: Jika prodi, paksa filter hanya untuk prodinya saja

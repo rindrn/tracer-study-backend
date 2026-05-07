@@ -112,6 +112,12 @@ class SubmitTracerStudyRequest extends FormRequest
             'f1001' => ['required', 'integer', 'in:1,2,3,4,5'],
             'f1002' => ['required_if:f1001,5', 'nullable', 'string'],
 
+            // Grouped boolean questions (array of selected codes)
+            'q16_cara_cari_kerja'   => ['nullable', 'array'],
+            'q16_cara_cari_kerja.*' => ['nullable', 'string'],
+            'q21_alasan_tidak_sesuai' => ['nullable', 'array'],
+            'q21_alasan_tidak_sesuai.*' => ['nullable', 'string'],
+
             // Mengapa mengambil pekerjaan tidak relevan
             'f1601' => ['nullable', 'boolean'],
             'f1602' => ['nullable', 'boolean'],
