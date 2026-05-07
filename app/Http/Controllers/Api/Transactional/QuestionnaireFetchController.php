@@ -55,6 +55,13 @@ class QuestionnaireFetchController extends Controller
 
         $questionnaireIds = $questionnaires->pluck('id')->toArray();
 
+        // Ambil sections
+        $sections = DB::connection('oltp')->table('questionnaire_sections')
+            ->whereIn('questionnaire_id', $questionnaireIds)
+            ->orderBy('order_no')
+            ->get()
+            ->groupBy('questionnaire_id');
+
         // Mengambil daftar pertanyaan yang masuk dalam form terkait
         $questions = DB::connection('oltp')->table('questionnaire_questions')
             ->whereIn('questionnaire_id', $questionnaireIds)
@@ -70,8 +77,11 @@ class QuestionnaireFetchController extends Controller
             ->get()
             ->groupBy('question_id');
 
-        // Menyusun (mapping) Object JSON — normalisasi nama field agar sesuai kontrak FE
-        $mappedQuestions = $questions->map(function ($q) use ($options) {
+        // Group questions by section_id
+        $questionsBySection = $questions->groupBy('section_id');
+
+        // Map individual questions
+        $mapQuestion = function ($q) use ($options) {
             $rawOptions = $options->get($q->id, collect());
             $metadata = $q->metadata ? json_decode($q->metadata) : null;
 
@@ -93,11 +103,38 @@ class QuestionnaireFetchController extends Controller
                     ];
                 })->values(),
             ];
-        })->groupBy('questionnaire_id');
+        };
 
-        $result = $questionnaires->map(function ($qnr) use ($mappedQuestions) {
+        $result = $questionnaires->map(function ($qnr) use ($sections, $questionsBySection, $mapQuestion, $questions, $options) {
             $qnr->is_global = is_null($qnr->program_id);
-            $qnr->questions = $mappedQuestions->get($qnr->id, collect())->values();
+
+            $qnrSections = $sections->get($qnr->id, collect());
+
+            if ($qnrSections->isNotEmpty()) {
+                // Return as array of section objects with nested questions
+                $qnr->sections = $qnrSections->map(function ($sec) use ($questionsBySection, $mapQuestion) {
+                    $secQuestions = $questionsBySection->get($sec->id, collect());
+                    return (object) [
+                        'id'          => $sec->id,
+                        'title'       => $sec->title,
+                        'description' => $sec->description ?? null,
+                        'questions'   => $secQuestions->map($mapQuestion)->values(),
+                    ];
+                })->values();
+                // Also keep flat questions for backward compatibility
+                $allQuestionsFlat = collect();
+                foreach ($qnrSections as $sec) {
+                    $secQuestions = $questionsBySection->get($sec->id, collect());
+                    $allQuestionsFlat = $allQuestionsFlat->merge($secQuestions->map($mapQuestion));
+                }
+                $qnr->questions = $allQuestionsFlat->values();
+            } else {
+                // Fallback: no sections — return flat like before
+                $qnrQuestions = $questions->where('questionnaire_id', $qnr->id);
+                $qnr->questions = $qnrQuestions->map($mapQuestion)->values();
+                $qnr->sections = [];
+            }
+
             return $qnr;
         });
 

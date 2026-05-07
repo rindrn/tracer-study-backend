@@ -13,11 +13,13 @@ class ProdiSheetExport implements FromCollection, WithHeadings, WithTitle, WithS
 {
     protected $data;
     protected $questions; // Array of ['code' => ..., 'label' => ...]
+    protected $sheetTitle;
 
-    public function __construct(Collection $data, array $questions)
+    public function __construct(Collection $data, array $questions, string $sheetTitle = 'Data Khusus Prodi')
     {
         $this->data = $data;
         $this->questions = $questions;
+        $this->sheetTitle = $sheetTitle;
     }
 
     public function collection()
@@ -68,6 +70,7 @@ class ProdiSheetExport implements FromCollection, WithHeadings, WithTitle, WithS
 
     public function title(): string
     {
-        return 'Data Khusus Prodi';
+        // Excel sheet names max 31 chars
+        return mb_substr($this->sheetTitle, 0, 31);
     }
 }

@@ -20,9 +20,9 @@ class AlumniProfileSeeder extends Seeder
         $alumniData = [];
         $nimCounter = 1;
 
-        // 3 alumni per program studi
+        // 4 alumni per program studi (3 answered + 1 for testing)
         foreach ($programs as $program) {
-            for ($i = 0; $i < 3; $i++) {
+            for ($i = 0; $i < 4; $i++) {
                 $tahunLulus = $faker->numberBetween(2023, 2025);
                 $tahunMasuk = $tahunLulus - ($program->degree === 'D3' ? 3 : 4);
 

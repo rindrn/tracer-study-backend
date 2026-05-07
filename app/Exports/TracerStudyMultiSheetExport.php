@@ -14,20 +14,43 @@ class TracerStudyMultiSheetExport implements WithMultipleSheets
 
     protected $alumniData;
     protected $ministryQuestions;
-    protected $prodiQuestions;
+    protected $prodiQuestionsGrouped; // array keyed by prodi code
 
-    public function __construct(Collection $alumniData, array $ministryQuestions, array $prodiQuestions)
+    /**
+     * @param Collection $alumniData
+     * @param array      $ministryQuestions  [['code' => ..., 'label' => ...], ...]
+     * @param array      $prodiQuestionsGrouped  ['TI3' => ['name' => ..., 'questions' => [...], 'alumni' => Collection], ...]
+     */
+    public function __construct(Collection $alumniData, array $ministryQuestions, array $prodiQuestionsGrouped)
     {
         $this->alumniData = $alumniData;
         $this->ministryQuestions = $ministryQuestions;
-        $this->prodiQuestions = $prodiQuestions;
+        $this->prodiQuestionsGrouped = $prodiQuestionsGrouped;
     }
 
     public function sheets(): array
     {
-        return [
-            new MinistrySheetExport($this->alumniData, $this->ministryQuestions),
-            new ProdiSheetExport($this->alumniData, $this->prodiQuestions),
-        ];
+        $sheets = [];
+
+        // Sheet 1: Data Kementrian (semua alumni)
+        $sheets[] = new MinistrySheetExport($this->alumniData, $this->ministryQuestions);
+
+        // Sheet 2-N: Satu sheet per prodi yang punya data
+        foreach ($this->prodiQuestionsGrouped as $prodiCode => $prodiData) {
+            $prodiAlumni = $prodiData['alumni'] ?? collect();
+            $prodiQuestions = $prodiData['questions'] ?? [];
+
+            if ($prodiAlumni->isNotEmpty() && !empty($prodiQuestions)) {
+                $sheetTitle = "Data Khusus {$prodiCode}";
+                $sheets[] = new ProdiSheetExport($prodiAlumni, $prodiQuestions, $sheetTitle);
+            }
+        }
+
+        // Fallback: if no per-prodi sheets, add a single empty prodi sheet
+        if (count($sheets) === 1) {
+            $sheets[] = new ProdiSheetExport(collect(), [], 'Data Khusus Prodi');
+        }
+
+        return $sheets;
     }
 }

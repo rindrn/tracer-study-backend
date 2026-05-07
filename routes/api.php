@@ -42,7 +42,7 @@ Route::prefix('auth')->group(function () {
 Route::get('tracer-study/forms', [QuestionnaireFetchController::class, 'getActiveForms']); // Endpoint penarik soal untuk frontend UI
 Route::post('tracer-study/submit', [TracerStudySubmitController::class, 'store']); // Bisa dibuat public atau diproteksi sanctum sesuai policy. Disini diset public dahulu krn blm ada kepastian login as alumni.
 
-Route::apiResource('questionnaires', QuestionnaireController::class);
+Route::apiResource('questionnaires', QuestionnaireController::class)->only(['index', 'show']);
 
 Route::middleware("auth:sanctum")->group(function () {
  
@@ -63,7 +63,7 @@ Route::middleware("auth:sanctum")->group(function () {
     // ── Transactional CRUD (hanya admin) ────────────
     Route::middleware("role:admin")->group(function () {
         // Route::apiResource("tracer-officers", TracerOfficerController::class);
-        // Route::apiResource("questionnaires",  QuestionnaireController::class);
+        Route::apiResource("questionnaires",  QuestionnaireController::class)->only(['store', 'update', 'destroy']);
         Route::apiResource("thresholds",      ThresholdController::class);
         // Menghasilkan 5 endpoint per resource:
         // GET    /api/thresholds            -> index

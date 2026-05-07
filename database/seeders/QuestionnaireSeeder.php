@@ -29,8 +29,9 @@ class QuestionnaireSeeder extends Seeder
             'updated_at'   => $now,
         ]);
 
-        // ── Sections ─────────────────────────────────────────
+        // ── Sections (0 = Identitas, 1-9 = kuesioner) ────────
         $sections = [
+            ['title' => 'Identitas',                           'order_no' => 0],
             ['title' => 'Status & Pekerjaan',                  'order_no' => 1],
             ['title' => 'Studi Lanjut',                        'order_no' => 2],
             ['title' => 'Sumber Dana Kuliah',                  'order_no' => 3],
@@ -87,6 +88,24 @@ class QuestionnaireSeeder extends Seeder
 
             return $qId;
         };
+
+        // ═══════════════════════════════════════════════════════
+        // SECTION 0: IDENTITAS
+        // ═══════════════════════════════════════════════════════
+        $identityFields = [
+            ['nimhsmsmh',  'NIM',                true],
+            ['kdptimsmh',  'Kode PT',            true],
+            ['tahun_lulus','Tahun Lulus',         true],
+            ['kdpstmsmh',  'Kode Prodi',         true],
+            ['nmmhsmsmh',  'Nama',               true],
+            ['telpomsmh',  'Nomor Telepon/HP',   true],
+            ['emailmsmh',  'Alamat Email',       true],
+            ['nik',        'NIK',                true],
+            ['npwp',       'NPWP',               false],
+        ];
+        foreach ($identityFields as $idf) {
+            $insertQuestion(0, $idf[0], $idf[1], 'short_text', $idf[2]);
+        }
 
         // ═══════════════════════════════════════════════════════
         // SECTION 1: STATUS & PEKERJAAN
@@ -359,46 +378,93 @@ class QuestionnaireSeeder extends Seeder
         $insertQuestion(9, 'f1614', 'Sebutkan alasan lainnya mengambil pekerjaan yang tidak sesuai pendidikan', 'short_text', false, ['show_if' => ['f1613' => [1]]]);
 
         // ═══════════════════════════════════════════════════════
-        // 2. KUESIONER LOKAL — Contoh untuk Prodi Teknik Informatika D4
+        // 2. KUESIONER LOKAL — Per Program Studi (semua prodi)
         // ═══════════════════════════════════════════════════════
-        $tiProgram = $conn->table('programs')->where('code', 'TI')->first();
+        $this->seedProdiQuestionnaires($conn, $now);
+    }
 
-        if ($tiProgram) {
+    /**
+     * Seed satu kuesioner lokal per program studi.
+     */
+    private function seedProdiQuestionnaires($conn, Carbon $now): void
+    {
+        // Definisi pertanyaan khusus per jurusan
+        $jurusanQuestions = [
+            'Teknik Sipil' => [
+                ['q_software_desain', 'Software desain apa yang paling sering Anda gunakan di pekerjaan? (misal: AutoCAD, SAP2000, Revit)', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi SKA/SKT?', 'boolean'],
+            ],
+            'Teknik Mesin' => [
+                ['q_software_cad', 'Software CAD/CAM apa yang paling sering Anda gunakan di pekerjaan? (misal: SolidWorks, AutoCAD, CATIA)', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi K3 atau sertifikasi profesional lainnya?', 'boolean'],
+            ],
+            'Teknik Refrigerasi & Tata Udara' => [
+                ['q_sistem_pendingin', 'Sistem pendingin atau tata udara apa yang paling sering Anda tangani di pekerjaan?', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi kompetensi refrigerasi?', 'boolean'],
+            ],
+            'Teknik Konversi Energi' => [
+                ['q_bidang_energi', 'Bidang energi apa yang Anda tekuni saat ini? (misal: PLTU, PLTA, Energi Terbarukan)', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi K3 Listrik atau sertifikasi profesional lainnya?', 'boolean'],
+            ],
+            'Teknik Elektro' => [
+                ['q_platform', 'Platform embedded/PLC/telekomunikasi apa yang paling sering Anda gunakan di pekerjaan?', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi profesional di bidang kelistrikan/elektronika?', 'boolean'],
+            ],
+            'Teknik Kimia' => [
+                ['q_instrumen_lab', 'Instrumen lab atau peralatan proses apa yang paling sering Anda gunakan di pekerjaan?', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi K3 Kimia atau sertifikasi analis?', 'boolean'],
+            ],
+            'Teknik Komputer & Informatika' => [
+                ['q_framework', 'Framework atau teknologi apa yang paling sering Anda gunakan di tempat kerja?', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi IT profesional (misal: AWS, CCNA, Oracle)?', 'boolean'],
+            ],
+            'Akuntansi' => [
+                ['q_software_akuntansi', 'Software akuntansi apa yang Anda gunakan di pekerjaan? (misal: SAP, Accurate, Zahir)', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi profesi akuntansi (misal: Brevet A/B, CPA)?', 'boolean'],
+            ],
+            'Administrasi Niaga' => [
+                ['q_platform_digital', 'Platform digital marketing atau tools bisnis apa yang Anda gunakan di pekerjaan?', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi BNSP atau sertifikasi profesional lainnya?', 'boolean'],
+            ],
+            'Bahasa Inggris' => [
+                ['q_bidang_bahasa', 'Bidang pekerjaan bahasa apa yang Anda tekuni? (misal: penerjemah, pengajar, content writer)', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi TOEFL/IELTS? Jika ya, sebutkan skor terakhir.', 'short_text'],
+            ],
+        ];
+
+        $programs = $conn->table('programs')->get();
+
+        foreach ($programs as $program) {
+            $questions = $jurusanQuestions[$program->jurusan] ?? [
+                ['q_kompetensi_khusus', 'Kompetensi khusus apa yang paling berguna dari prodi Anda di dunia kerja?', 'short_text'],
+                ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi profesional yang relevan dengan bidang studi?', 'boolean'],
+            ];
+
             $qLokalId = $conn->table('questionnaires')->insertGetId([
-                'code'         => 'TI_2026',
-                'title'        => 'Kuesioner Tambahan Lulusan Teknik Informatika',
-                'description'  => 'Pertanyaan khusus dari Program Studi D4 Teknik Informatika POLBAN.',
+                'code'         => strtoupper($program->code) . '_2026',
+                'title'        => "Kuesioner Tambahan Lulusan {$program->name}",
+                'description'  => "Pertanyaan khusus dari Program Studi {$program->name} POLBAN.",
                 'period_year'  => 2026,
                 'version'      => 1,
                 'status'       => 'published',
-                'program_id'   => $tiProgram->id,
+                'program_id'   => $program->id,
                 'published_at' => $now,
                 'created_at'   => $now,
                 'updated_at'   => $now,
             ]);
 
-            $conn->table('questionnaire_questions')->insert([
-                [
+            foreach ($questions as $i => $q) {
+                $conn->table('questionnaire_questions')->insert([
                     'questionnaire_id' => $qLokalId,
-                    'code'             => 'q_framework',
-                    'question_text'    => 'Framework Web apa yang paling sering Anda gunakan di tempat kerja?',
-                    'question_type'    => 'short_text',
+                    'code'             => $q[0],
+                    'question_text'    => $q[1],
+                    'question_type'    => $q[2],
                     'is_required'      => false,
-                    'order_no'         => 1,
+                    'order_no'         => $i + 1,
                     'created_at'       => $now,
                     'updated_at'       => $now,
-                ],
-                [
-                    'questionnaire_id' => $qLokalId,
-                    'code'             => 'q_sertifikasi',
-                    'question_text'    => 'Apakah Anda memiliki sertifikasi IT profesional (Misal: AWS, CCNA)?',
-                    'question_type'    => 'boolean',
-                    'is_required'      => false,
-                    'order_no'         => 2,
-                    'created_at'       => $now,
-                    'updated_at'       => $now,
-                ],
-            ]);
+                ]);
+            }
         }
     }
 }

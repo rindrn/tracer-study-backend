@@ -22,7 +22,19 @@ class QuestionnaireController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $data = $rows->map(fn ($row) => $this->loadQuestionnaire((int) $row->id))->values();
+        // Pre-fetch response counts in one query
+        $responseCounts = DB::connection('oltp')->table('responses')
+            ->selectRaw('questionnaire_id, COUNT(*) as count')
+            ->groupBy('questionnaire_id')
+            ->pluck('count', 'questionnaire_id');
+
+        $data = $rows->map(function ($row) use ($responseCounts) {
+            $questionnaire = $this->loadQuestionnaire((int) $row->id);
+            if ($questionnaire) {
+                $questionnaire['response_count'] = (int) ($responseCounts[$row->id] ?? 0);
+            }
+            return $questionnaire;
+        })->values();
 
         return response()->json([
             'success' => true,
@@ -41,6 +53,11 @@ class QuestionnaireController extends Controller
                 'message' => 'Kuisioner tidak ditemukan.',
             ], 404);
         }
+
+        $questionnaire['response_count'] = DB::connection('oltp')
+            ->table('responses')
+            ->where('questionnaire_id', $id)
+            ->count();
 
         return response()->json([
             'success' => true,
@@ -141,6 +158,19 @@ class QuestionnaireController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
+        // Check if questionnaire has responses — block deletion if so
+        $responseCount = DB::connection('oltp')
+            ->table('responses')
+            ->where('questionnaire_id', $id)
+            ->count();
+
+        if ($responseCount > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Kuisioner tidak dapat dihapus karena sudah memiliki {$responseCount} responden.",
+            ], 422);
+        }
+
         $deleted = DB::connection('oltp')->table('questionnaires')->where('id', $id)->delete();
 
         if (! $deleted) {

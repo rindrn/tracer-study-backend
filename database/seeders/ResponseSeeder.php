@@ -17,9 +17,30 @@ class ResponseSeeder extends Seeder
 
         $alumniList = $conn->table('alumni_profiles')->get();
         $qGlobal = $conn->table('questionnaires')->whereNull('program_id')->first();
-        $tiProgram = $conn->table('programs')->where('code', 'TI')->first();
 
         if (!$qGlobal || $alumniList->isEmpty()) return;
+
+        // Pre-load programs and prodi questionnaires
+        $programs = $conn->table('programs')->get()->keyBy('id');
+        $prodiQuestionnaires = $conn->table('questionnaires')
+            ->whereNotNull('program_id')
+            ->where('status', 'published')
+            ->get()
+            ->keyBy('program_id');
+
+        // Prodi-specific answer generators (keyed by jurusan)
+        $prodiAnswerMap = [
+            'Teknik Sipil' => ['q_software_desain' => ['AutoCAD', 'SAP2000', 'Revit', 'SketchUp', 'ETABS']],
+            'Teknik Mesin' => ['q_software_cad' => ['SolidWorks', 'AutoCAD', 'CATIA', 'Fusion 360', 'Inventor']],
+            'Teknik Refrigerasi & Tata Udara' => ['q_sistem_pendingin' => ['AC Split', 'VRV/VRF System', 'Chiller', 'Cold Storage', 'AHU']],
+            'Teknik Konversi Energi' => ['q_bidang_energi' => ['PLTU', 'PLTA', 'Solar Panel', 'Biomassa', 'PLTG']],
+            'Teknik Elektro' => ['q_platform' => ['Arduino', 'PLC Siemens', 'Raspberry Pi', 'STM32', 'Mikrotik']],
+            'Teknik Kimia' => ['q_instrumen_lab' => ['HPLC', 'GC-MS', 'Spektrofotometer UV-Vis', 'AAS', 'Titrasi Otomatis']],
+            'Teknik Komputer & Informatika' => ['q_framework' => ['Laravel', 'React', 'Vue', 'Spring Boot', 'Express', 'Django', 'Flutter']],
+            'Akuntansi' => ['q_software_akuntansi' => ['SAP', 'Accurate', 'Zahir', 'MYOB', 'Jurnal.id']],
+            'Administrasi Niaga' => ['q_platform_digital' => ['Google Ads', 'Meta Business Suite', 'HubSpot', 'Canva', 'Shopify']],
+            'Bahasa Inggris' => ['q_bidang_bahasa' => ['Penerjemah', 'Pengajar', 'Content Writer', 'Tour Guide', 'Customer Service']],
+        ];
 
         $provinces = ['Jawa Barat', 'DKI Jakarta', 'Jawa Tengah', 'Jawa Timur', 'Banten', 'Sumatera Utara', 'Bali'];
         $cities    = ['Bandung', 'Jakarta Selatan', 'Bekasi', 'Semarang', 'Surabaya', 'Tangerang', 'Denpasar'];
@@ -27,6 +48,8 @@ class ResponseSeeder extends Seeder
         $universities = ['Universitas Indonesia', 'Institut Teknologi Bandung', 'Universitas Gadjah Mada', 'Universitas Padjadjaran', 'Universitas Brawijaya'];
 
         foreach ($alumniList as $alumni) {
+            $program = $programs[$alumni->program_id] ?? null;
+
             // 1. Buat Header Response
             $responseId = $conn->table('responses')->insertGetId([
                 'questionnaire_id' => $qGlobal->id,
@@ -38,6 +61,17 @@ class ResponseSeeder extends Seeder
             ]);
 
             $answers = [];
+
+            // ── Section 0: Identitas ─────────────────────────
+            $answers[] = $this->answer($responseId, 'nimhsmsmh', $alumni->nim, $now);
+            $answers[] = $this->answer($responseId, 'kdptimsmh', $alumni->kode_pt ?? '001001', $now);
+            $answers[] = $this->answer($responseId, 'tahun_lulus', (string)$alumni->graduation_year, $now);
+            $answers[] = $this->answer($responseId, 'kdpstmsmh', $program->code ?? '', $now);
+            $answers[] = $this->answer($responseId, 'nmmhsmsmh', $alumni->name, $now);
+            $answers[] = $this->answer($responseId, 'telpomsmh', $alumni->phone ?? '', $now);
+            $answers[] = $this->answer($responseId, 'emailmsmh', $alumni->email, $now);
+            $answers[] = $this->answer($responseId, 'nik', $alumni->nik ?? '', $now);
+            $answers[] = $this->answer($responseId, 'npwp', $alumni->npwp ?? '', $now);
 
             // ── Q1: f8 — Status saat ini ─────────────────────
             $statusKerja = $faker->randomElement([1, 1, 1, 3, 3, 4, 5, 2]); // weighted: more bekerja
@@ -158,9 +192,18 @@ class ResponseSeeder extends Seeder
                 $answers[] = $this->answer($responseId, $fCode, $val, $now);
             }
 
-            // ── Pertanyaan Prodi TI (lokal) ──────────────────
-            if ($tiProgram && $alumni->program_id == $tiProgram->id) {
-                $answers[] = $this->answer($responseId, 'q_framework', $faker->randomElement(['Laravel', 'React', 'Vue', 'Spring Boot', 'Express', 'Django', 'Flutter']), $now);
+            // ── Pertanyaan Prodi (lokal — per program studi) ─
+            if ($program && isset($prodiQuestionnaires[$program->id])) {
+                $jurusan = $program->jurusan;
+                $answerDefs = $prodiAnswerMap[$jurusan] ?? [];
+
+                // First question: text answer based on jurusan
+                $firstKey = array_key_first($answerDefs);
+                if ($firstKey && isset($answerDefs[$firstKey])) {
+                    $answers[] = $this->answer($responseId, $firstKey, $faker->randomElement($answerDefs[$firstKey]), $now);
+                }
+
+                // Second question: q_sertifikasi (boolean)
                 $answers[] = $this->answer($responseId, 'q_sertifikasi', $faker->randomElement(['1', '0']), $now);
             }
 

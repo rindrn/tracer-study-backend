@@ -14,6 +14,7 @@ class ReportController extends Controller
     {
         $user = $request->user();
         $conn = DB::connection('oltp');
+        $questionnaireId = $request->query('questionnaire_id');
 
         // 1. Ambil Data Alumni (Filter jika role adalah prodi)
         $query = $conn->table('alumni_profiles')
@@ -23,8 +24,14 @@ class ReportController extends Controller
                 'alumni_profiles.*',
                 'responses.id as response_id',
                 'programs.name as program_name',
+                'programs.code as program_code',
                 'programs.jurusan as jurusan_name'
             );
+
+        // Filter by specific questionnaire if provided
+        if ($questionnaireId) {
+            $query->where('responses.questionnaire_id', $questionnaireId);
+        }
 
         if ($user->isProdi()) {
             $query->where('alumni_profiles.program_id', $user->program_id);
@@ -52,11 +59,17 @@ class ReportController extends Controller
         // 3. Pisahkan Header Kolom (Kementrian vs Prodi) berdasarkan Kode
         $allQuestionCodes = $answers->pluck('question_code')->unique()->toArray();
 
+        // Identity codes yang tidak perlu ditampilkan sebagai kolom pertanyaan
+        $identityCodes = ['nimhsmsmh', 'kdptimsmh', 'tahun_lulus', 'kdpstmsmh', 'nmmhsmsmh', 'telpomsmh', 'emailmsmh', 'nik', 'npwp'];
+
         $ministryCodes = [];
         $prodiCodes = [];
 
         foreach ($allQuestionCodes as $code) {
-            // Asumsi: Pertanyaan kementrian selalu diawali huruf F.
+            // Skip identity codes — already in fixed columns
+            if (in_array($code, $identityCodes)) continue;
+
+            // Pertanyaan kementrian selalu diawali huruf F.
             // Pertanyaan selain itu dianggap Custom Prodi.
             if (preg_match('/^f\w+$/i', $code)) {
                 $ministryCodes[] = $code;
@@ -84,6 +97,7 @@ class ReportController extends Controller
             return ['code' => $code, 'label' => "{$text} ({$code})"];
         }, $ministryCodes);
 
+        // 5. Group prodi questions per program code
         $prodiQuestions = array_map(function ($code) use ($questionLabels) {
             $text = $questionLabels[$code] ?? $code;
             if (mb_strlen($text) > 80) {
@@ -92,11 +106,25 @@ class ReportController extends Controller
             return ['code' => $code, 'label' => "{$text} ({$code})"];
         }, $prodiCodes);
 
-        // 5. Generate & Download Excel
+        // Group alumni by program_code for per-prodi sheets
+        $prodiQuestionsGrouped = [];
+        $alumniByProdi = $alumniData->groupBy('program_code');
+
+        foreach ($alumniByProdi as $prodiCode => $prodiAlumni) {
+            if (!$prodiCode) continue;
+
+            $prodiQuestionsGrouped[$prodiCode] = [
+                'name'      => $prodiAlumni->first()->program_name ?? $prodiCode,
+                'questions' => $prodiQuestions, // All prodi questions (each alumni only has their own answers)
+                'alumni'    => $prodiAlumni,
+            ];
+        }
+
+        // 6. Generate & Download Excel
         $export = new TracerStudyMultiSheetExport(
             $alumniData,
             $ministryQuestions,
-            $prodiQuestions
+            $prodiQuestionsGrouped
         );
 
         return Excel::download($export, 'Laporan_Tracer_Study_'.date('YmdHis').'.xlsx');
