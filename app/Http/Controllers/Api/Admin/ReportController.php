@@ -97,14 +97,36 @@ class ReportController extends Controller
             return ['code' => $code, 'label' => "{$text} ({$code})"];
         }, $ministryCodes);
 
-        // 5. Group prodi questions per program code
-        $prodiQuestions = array_map(function ($code) use ($questionLabels) {
-            $text = $questionLabels[$code] ?? $code;
-            if (mb_strlen($text) > 80) {
-                $text = mb_substr($text, 0, 77) . '...';
-            }
-            return ['code' => $code, 'label' => "{$text} ({$code})"];
-        }, $prodiCodes);
+        // 5. Build per-prodi question lists from their own questionnaires
+        // Query each prodi's questionnaire questions directly
+        $prodiQuestionnaires = $conn->table('questionnaires')
+            ->whereNotNull('program_id')
+            ->where('status', 'published')
+            ->get()
+            ->keyBy('program_id');
+
+        // Get programs to map program_id -> code
+        $programMap = $conn->table('programs')->get()->keyBy('id');
+
+        // Build a map: program_code => [question objects]
+        $prodiQuestionsByProgram = [];
+        foreach ($prodiQuestionnaires as $programId => $qnr) {
+            $program = $programMap[$programId] ?? null;
+            if (!$program) continue;
+
+            $qCodes = $conn->table('questionnaire_questions')
+                ->where('questionnaire_id', $qnr->id)
+                ->orderBy('order_no')
+                ->pluck('question_text', 'code')
+                ->toArray();
+
+            $prodiQuestionsByProgram[$program->code] = array_map(function ($code, $text) {
+                if (mb_strlen($text) > 80) {
+                    $text = mb_substr($text, 0, 77) . '...';
+                }
+                return ['code' => $code, 'label' => "{$text} ({$code})"];
+            }, array_keys($qCodes), array_values($qCodes));
+        }
 
         // Group alumni by program_code for per-prodi sheets
         $prodiQuestionsGrouped = [];
@@ -115,7 +137,7 @@ class ReportController extends Controller
 
             $prodiQuestionsGrouped[$prodiCode] = [
                 'name'      => $prodiAlumni->first()->program_name ?? $prodiCode,
-                'questions' => $prodiQuestions, // All prodi questions (each alumni only has their own answers)
+                'questions' => $prodiQuestionsByProgram[$prodiCode] ?? [],
                 'alumni'    => $prodiAlumni,
             ];
         }

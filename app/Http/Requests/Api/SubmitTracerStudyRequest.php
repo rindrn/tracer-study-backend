@@ -18,11 +18,11 @@ class SubmitTracerStudyRequest extends FormRequest
             'nim' => ['required', 'string', 'max:30'],
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:150'],
-            'phone' => ['required', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:30'],
             'tahun_lulus' => ['required', 'integer'],
             'kdpstmsmh' => ['required', 'string'],
             'kode_pt' => ['nullable', 'string', 'max:10'],
-            'nik' => ['required', 'string', 'max:16'],
+            'nik' => ['nullable', 'string', 'max:16'],
             'npwp' => ['nullable', 'string', 'max:20'],
 
             // Kuesioner Wajib (F-Series)

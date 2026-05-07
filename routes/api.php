@@ -42,13 +42,16 @@ Route::prefix('auth')->group(function () {
 Route::get('tracer-study/forms', [QuestionnaireFetchController::class, 'getActiveForms']); // Endpoint penarik soal untuk frontend UI
 Route::post('tracer-study/submit', [TracerStudySubmitController::class, 'store']); // Bisa dibuat public atau diproteksi sanctum sesuai policy. Disini diset public dahulu krn blm ada kepastian login as alumni.
 
-Route::apiResource('questionnaires', QuestionnaireController::class)->only(['index', 'show']);
+Route::apiResource('questionnaires', QuestionnaireController::class)->only(['show']); // Public show for student form fetch
 
 Route::middleware("auth:sanctum")->group(function () {
  
     // Auth
     Route::post('auth/logout', [AuthController::class, 'logout']);
     Route::get('auth/me',     [AuthController::class, 'me']);
+
+    // Questionnaires — index inside auth so we can filter by role
+    Route::get('questionnaires', [QuestionnaireController::class, 'index']);
  
     // Programs — hanya admin yang bisa CRUD (p2mpp & prodi hanya GET)
     Route::get('programs',       [ProgramController::class, 'index']);

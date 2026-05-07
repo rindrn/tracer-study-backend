@@ -18,15 +18,35 @@ class QuestionnaireController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $rows = DB::connection('oltp')->table('questionnaires')
-            ->orderByDesc('id')
-            ->get();
+        $user = $request->user(); // null for public access
+        $query = DB::connection('oltp')->table('questionnaires');
 
-        // Pre-fetch response counts in one query
-        $responseCounts = DB::connection('oltp')->table('responses')
-            ->selectRaw('questionnaire_id, COUNT(*) as count')
-            ->groupBy('questionnaire_id')
-            ->pluck('count', 'questionnaire_id');
+        // Role-based filtering: prodi sees only global + own prodi
+        if ($user && method_exists($user, 'isProdi') && $user->isProdi()) {
+            $query->where(function ($q) use ($user) {
+                $q->whereNull('program_id')
+                  ->orWhere('program_id', $user->program_id);
+            });
+        }
+
+        $rows = $query->orderByDesc('id')->get();
+
+        // Build response counts — scoped by prodi if needed
+        if ($user && method_exists($user, 'isProdi') && $user->isProdi()) {
+            // For prodi: count only responses from their program's alumni
+            $responseCounts = DB::connection('oltp')->table('responses')
+                ->join('alumni_profiles', 'responses.alumni_id', '=', 'alumni_profiles.id')
+                ->where('alumni_profiles.program_id', $user->program_id)
+                ->selectRaw('responses.questionnaire_id, COUNT(*) as count')
+                ->groupBy('responses.questionnaire_id')
+                ->pluck('count', 'responses.questionnaire_id');
+        } else {
+            // Admin / public: count all
+            $responseCounts = DB::connection('oltp')->table('responses')
+                ->selectRaw('questionnaire_id, COUNT(*) as count')
+                ->groupBy('questionnaire_id')
+                ->pluck('count', 'questionnaire_id');
+        }
 
         $data = $rows->map(function ($row) use ($responseCounts) {
             $questionnaire = $this->loadQuestionnaire((int) $row->id);

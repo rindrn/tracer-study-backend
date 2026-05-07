@@ -47,8 +47,18 @@ class ResponseSeeder extends Seeder
         $companies = ['PT Telkom Indonesia', 'PT Pertamina', 'PT Astra International', 'Tokopedia', 'GoTo', 'PT PLN', 'Bank BCA', 'Shopee Indonesia', 'Traveloka', 'PT Krakatau Steel'];
         $universities = ['Universitas Indonesia', 'Institut Teknologi Bandung', 'Universitas Gadjah Mada', 'Universitas Padjadjaran', 'Universitas Brawijaya'];
 
+        // Track alumni index per program to skip 4th (testing account)
+        $alumniCountByProgram = [];
+
         foreach ($alumniList as $alumni) {
             $program = $programs[$alumni->program_id] ?? null;
+
+            // Count alumni per program — skip the 4th (index 3) for testing
+            $pid = $alumni->program_id;
+            $alumniCountByProgram[$pid] = ($alumniCountByProgram[$pid] ?? 0) + 1;
+            if ($alumniCountByProgram[$pid] > 3) {
+                continue; // Leave this alumni unanswered for testing
+            }
 
             // 1. Buat Header Response
             $responseId = $conn->table('responses')->insertGetId([
@@ -194,20 +204,42 @@ class ResponseSeeder extends Seeder
 
             // ── Pertanyaan Prodi (lokal — per program studi) ─
             if ($program && isset($prodiQuestionnaires[$program->id])) {
+                $prodiQnr = $prodiQuestionnaires[$program->id];
                 $jurusan = $program->jurusan;
                 $answerDefs = $prodiAnswerMap[$jurusan] ?? [];
+
+                // Create a separate response for the prodi questionnaire
+                $prodiResponseId = $conn->table('responses')->insertGetId([
+                    'questionnaire_id' => $prodiQnr->id,
+                    'alumni_id'        => $alumni->id,
+                    'status'           => 'submitted',
+                    'submitted_at'     => $now,
+                    'created_at'       => $now,
+                    'updated_at'       => $now,
+                ]);
+
+                $prodiAnswers = [];
 
                 // First question: text answer based on jurusan
                 $firstKey = array_key_first($answerDefs);
                 if ($firstKey && isset($answerDefs[$firstKey])) {
+                    $prodiAnswers[] = $this->answer($prodiResponseId, $firstKey, $faker->randomElement($answerDefs[$firstKey]), $now);
+                    // Also keep in global response for backward compat
                     $answers[] = $this->answer($responseId, $firstKey, $faker->randomElement($answerDefs[$firstKey]), $now);
                 }
 
                 // Second question: q_sertifikasi (boolean)
-                $answers[] = $this->answer($responseId, 'q_sertifikasi', $faker->randomElement(['1', '0']), $now);
+                $sertVal = $faker->randomElement(['1', '0']);
+                $prodiAnswers[] = $this->answer($prodiResponseId, 'q_sertifikasi', $sertVal, $now);
+                $answers[] = $this->answer($responseId, 'q_sertifikasi', $sertVal, $now);
+
+                // Insert prodi answers
+                if (count($prodiAnswers) > 0) {
+                    $conn->table('response_answers')->insert($prodiAnswers);
+                }
             }
 
-            // Bulk insert answers
+            // Bulk insert global answers
             foreach (array_chunk($answers, 50) as $chunk) {
                 $conn->table('response_answers')->insert($chunk);
             }

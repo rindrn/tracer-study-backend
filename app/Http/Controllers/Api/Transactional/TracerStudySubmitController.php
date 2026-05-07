@@ -53,11 +53,12 @@ class TracerStudySubmitController extends Controller
                 $alumniId = DB::connection('oltp')->table('alumni_profiles')->insertGetId($alumniData);
             }
 
-            // 3. Merekam Response ke kuesioner aktif
-            // Dalam prakteknya, ini ditautkan ke kuesioner tahun tersebut. Kita fallback ke ID 1 atau teratas.
-            $questionnaire = DB::connection('oltp')->table('questionnaires')->orderBy('id', 'desc')->first();
-            // Jika tidak ada kuesioner di DB, ini akan fail karena strict FK cascadeOnDelete. 
-            // Anggap DB punya kuesioner karena ini requirement foreign key.
+            // 3. Merekam Response ke kuesioner nasional (global)
+            $questionnaire = DB::connection('oltp')->table('questionnaires')
+                ->whereNull('program_id')
+                ->where('status', 'published')
+                ->first();
+
             if (!$questionnaire) {
                 throw new \Exception("Sistem belum memiliki referensi Kuesioner aktif.");
             }
