@@ -63,8 +63,8 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::delete('programs/{id}',   [ProgramController::class, 'destroy']);
     });
  
-    // ── Transactional CRUD (hanya admin) ────────────
-    Route::middleware("role:admin")->group(function () {
+    // ── Transactional CRUD (admin + prodi) ────────────
+    Route::middleware("role:admin,prodi")->group(function () {
         // Route::apiResource("tracer-officers", TracerOfficerController::class);
         Route::apiResource("questionnaires",  QuestionnaireController::class)->only(['store', 'update', 'destroy']);
         Route::apiResource("thresholds",      ThresholdController::class);

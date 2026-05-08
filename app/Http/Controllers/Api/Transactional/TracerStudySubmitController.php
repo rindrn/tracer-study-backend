@@ -109,6 +109,51 @@ class TracerStudySubmitController extends Controller
                 DB::connection('oltp')->table('response_answers')->insert($answerRecords);
             }
 
+            // 4b. Also create response for prodi-specific questionnaire (if exists)
+            $prodiQuestionnaire = DB::connection('oltp')->table('questionnaires')
+                ->where('program_id', $program->id)
+                ->where('status', 'published')
+                ->first();
+
+            if ($prodiQuestionnaire) {
+                // Remove old prodi response if exists
+                DB::connection('oltp')->table('responses')
+                    ->where('questionnaire_id', $prodiQuestionnaire->id)
+                    ->where('alumni_id', $alumniId)
+                    ->delete();
+
+                $prodiResponseId = DB::connection('oltp')->table('responses')->insertGetId([
+                    'questionnaire_id' => $prodiQuestionnaire->id,
+                    'alumni_id' => $alumniId,
+                    'status' => 'submitted',
+                    'submitted_at' => Carbon::now(),
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now()
+                ]);
+
+                // Get prodi question codes to filter relevant answers
+                $prodiQuestionCodes = DB::connection('oltp')->table('questionnaire_questions')
+                    ->where('questionnaire_id', $prodiQuestionnaire->id)
+                    ->pluck('code')
+                    ->toArray();
+
+                $prodiAnswerRecords = [];
+                foreach ($answerData as $key => $value) {
+                    if (in_array($key, $prodiQuestionCodes) && $value !== null) {
+                        $prodiAnswerRecords[] = [
+                            'response_id' => $prodiResponseId,
+                            'question_code' => $key,
+                            'answer_text' => is_bool($value) ? ($value ? '1' : '0') : (string) $value,
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now()
+                        ];
+                    }
+                }
+                if (count($prodiAnswerRecords) > 0) {
+                    DB::connection('oltp')->table('response_answers')->insert($prodiAnswerRecords);
+                }
+            }
+
             // 5. Normalisasi Data untuk Employment / Education
             if (in_array((int)$validated['f8'], [1, 3])) { // Pekerja (1) / Wiraswasta (3)
                 DB::connection('oltp')->table('employment_records')
