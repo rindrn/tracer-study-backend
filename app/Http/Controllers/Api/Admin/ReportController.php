@@ -33,7 +33,7 @@ class ReportController extends Controller
             $query->where('responses.questionnaire_id', $questionnaireId);
         }
 
-        if ($user->isProdi()) {
+        if ($user->isKaprodi()) {
             $query->where('alumni_profiles.program_id', $user->program_id);
         }
 

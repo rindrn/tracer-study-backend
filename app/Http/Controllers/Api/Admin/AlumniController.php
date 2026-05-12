@@ -36,7 +36,7 @@ class AlumniController extends Controller
             );
 
         // ROLE CHECK: Jika prodi, paksa filter hanya untuk prodinya saja
-        if ($user->isProdi()) {
+        if ($user->isKaprodi()) {
             $query->where('alumni_profiles.program_id', $user->program_id);
         }
 
@@ -73,7 +73,7 @@ class AlumniController extends Controller
         $validated = $request->validated();
 
         // ROLE CHECK: Force program_id untuk prodi
-        if ($user->isProdi()) {
+        if ($user->isKaprodi()) {
             $validated['program_id'] = $user->program_id;
         }
 
@@ -111,7 +111,7 @@ class AlumniController extends Controller
         }
 
         // ROLE CHECK: Cegah akses jika beda prodi
-        if ($user->isProdi() && $alumni->program_id !== $user->program_id) {
+        if ($user->isKaprodi() && $alumni->program_id !== $user->program_id) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses untuk alumni prodi lain.'], 403);
         }
 
@@ -144,7 +144,7 @@ class AlumniController extends Controller
         }
 
         // ROLE CHECK: Cegah akses jika beda prodi
-        if ($user->isProdi() && $alumni->program_id !== $user->program_id) {
+        if ($user->isKaprodi() && $alumni->program_id !== $user->program_id) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses untuk mengubah alumni prodi lain.'], 403);
         }
 
@@ -152,7 +152,7 @@ class AlumniController extends Controller
         $validated['updated_at'] = now();
 
         // Admin Prodi tidak boleh mengubah program_id (membajak ke prodi lain)
-        if ($user->isProdi() && isset($validated['program_id'])) {
+        if ($user->isKaprodi() && isset($validated['program_id'])) {
             unset($validated['program_id']); 
         }
 
@@ -187,7 +187,7 @@ class AlumniController extends Controller
         }
 
         // ROLE CHECK: Cegah akses jika beda prodi
-        if ($user->isProdi() && $alumni->program_id !== $user->program_id) {
+        if ($user->isKaprodi() && $alumni->program_id !== $user->program_id) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses untuk menghapus alumni prodi lain.'], 403);
         }
 

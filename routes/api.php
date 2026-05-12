@@ -63,8 +63,10 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::delete('programs/{id}',   [ProgramController::class, 'destroy']);
     });
  
-    // ── Transactional CRUD (admin + prodi) ────────────
-    Route::middleware("role:admin,prodi")->group(function () {
+    // ── Transactional CRUD (admin + kaprodi) ──────────
+    // Kaprodi boleh kelola threshold & questionnaire di prodinya; filter by
+    // program_id di-handle di level Service/Controller.
+    Route::middleware("role:admin,kaprodi")->group(function () {
         // Route::apiResource("tracer-officers", TracerOfficerController::class);
         Route::apiResource("questionnaires",  QuestionnaireController::class)->only(['store', 'update', 'destroy']);
         Route::apiResource("thresholds",      ThresholdController::class);
@@ -74,6 +76,15 @@ Route::middleware("auth:sanctum")->group(function () {
         // GET    /api/thresholds/{id}       -> show
         // PUT    /api/thresholds/{id}       -> update
         // DELETE /api/thresholds/{id}       -> destroy
+    });
+
+    // ── Manajemen Staff & Tim Tracer (admin + head_tracer) ─────────────────
+    // Scaffolding untuk endpoint CRUD staff / team — controller belum dibuat,
+    // biarkan group kosong dulu agar struktur konsisten dengan permission FE:
+    //   admin.staff (CRUD akun staff) + admin.team (CRUD tim tracer).
+    Route::middleware("role:admin,head_tracer")->group(function () {
+        // Route::apiResource('admin/staff',        StaffController::class);
+        // Route::apiResource('admin/tracer-team',  TracerTeamController::class);
     });
 
     // ── Manajemen Alumni (Admin & Prodi & P2MPP) ─────

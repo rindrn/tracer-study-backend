@@ -15,9 +15,21 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->unique();
             $table->string('password');
-            $table->enum('role', ['admin', 'p2mpp', 'prodi']);
- 
-            // FK ke programs.id — nullable karena admin/p2mpp tidak punya prodi
+            // Catatan: Laravel $table->enum() di PostgreSQL diterjemahkan jadi
+            // VARCHAR(255) + CHECK constraint, BUKAN native ENUM type.
+            // Urutan role: admin (super), p2mpp (dashboard read-only), kaprodi (prodi),
+            // head_tracer (kepala tracer), tracer_team (anggota), wadir (wakil direktur).
+            $table->enum('role', [
+                'admin',
+                'p2mpp',
+                'kaprodi',
+                'head_tracer',
+                'tracer_team',
+                'wadir',
+            ]);
+
+            // FK ke programs.id — nullable karena hanya kaprodi yang terikat ke prodi.
+            // admin / p2mpp / head_tracer / tracer_team / wadir selalu NULL.
             $table->foreignId('program_id')
                   ->nullable()
                   ->constrained('programs')   // FK ke programs.id di OLTP
