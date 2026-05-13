@@ -3,6 +3,9 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Transactional\ThresholdController;
+use App\Http\Controllers\Api\Transactional\LamController; 
+use App\Http\Controllers\Api\Transactional\LamVersionController; 
+use App\Http\Controllers\Api\Transactional\LamProgramController; 
 use App\Http\Controllers\Api\Transactional\ProgramController; 
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
 // use App\Http\Controllers\Api\Transactional\QuestionnaireController;
@@ -47,18 +50,47 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::put('programs/{id}',      [ProgramController::class, 'update']);
         Route::delete('programs/{id}',   [ProgramController::class, 'destroy']);
     });
- 
-    // ── Transactional CRUD (hanya admin) ────────────
-    Route::middleware("role:admin")->group(function () {
-        // Route::apiResource("tracer-officers", TracerOfficerController::class);
-        // Route::apiResource("questionnaires",  QuestionnaireController::class);
-        Route::apiResource("thresholds",      ThresholdController::class);
-        // Menghasilkan 5 endpoint per resource:
-        // GET    /api/thresholds            -> index
-        // POST   /api/thresholds            -> store
-        // GET    /api/thresholds/{id}       -> show
-        // PUT    /api/thresholds/{id}       -> update
-        // DELETE /api/thresholds/{id}       -> destroy
+
+    // LAMs — semua role bisa GET
+    Route::get('lams',          [LamController::class, 'index']);
+    Route::get('lams/{id}',     [LamController::class, 'show']);
+
+    // LAM nested reads — semua role
+    Route::get('lams/{id}/versions',  [LamVersionController::class, 'byLam']);
+    Route::get('lams/{id}/programs',  [LamProgramController::class, 'byLam']);
+    Route::get('lams/{id}/full',      [LamController::class, 'full']);         // ?year=2025
+
+    // LAM Versions — semua role bisa GET
+    Route::get('lam-versions/{id}',            [LamVersionController::class, 'show']);
+    Route::get('lam-versions/{id}/thresholds', [ThresholdController::class, 'byVersion']);
+
+    // ── Admin only ───────────────────────────────────────────
+    Route::middleware('role:admin')->group(function () {
+
+        // Programs
+        Route::post('programs',        [ProgramController::class, 'store']);
+        Route::put('programs/{id}',    [ProgramController::class, 'update']);
+        Route::delete('programs/{id}', [ProgramController::class, 'destroy']);
+
+        // LAMs
+        Route::post('lams',        [LamController::class, 'store']);
+        Route::put('lams/{id}',    [LamController::class, 'update']);
+        Route::delete('lams/{id}', [LamController::class, 'destroy']);
+
+        // LAM Versions
+        Route::post('lam-versions',        [LamVersionController::class, 'store']);
+        Route::put('lam-versions/{id}',    [LamVersionController::class, 'update']);
+        Route::delete('lam-versions/{id}', [LamVersionController::class, 'destroy']);
+
+        // LAM <-> Program mapping
+        Route::post('lam-programs',   [LamProgramController::class, 'store']);
+        Route::delete('lam-programs', [LamProgramController::class, 'destroy']);
+
+        // Thresholds
+        Route::post('thresholds',        [ThresholdController::class, 'store']);
+        Route::put('thresholds/{id}',    [ThresholdController::class, 'update']);
+        Route::delete('thresholds/{id}', [ThresholdController::class, 'destroy']);
+
     });
  
     // ── ETL — hanya admin ───────────────────────────────────
