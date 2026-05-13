@@ -119,6 +119,101 @@ class AlumniProfileRepository
     }
 
     /**
+     * Sama seperti paginateForAdmin tapi ditambah kolom `has_responded` (0/1)
+     * — menandakan apakah alumni sudah mengisi kuesioner global (kementrian).
+     *
+     * Definisi "sudah mengisi": ada minimal 1 row di `responses` untuk alumni tsb
+     * dengan questionnaire_id milik kuesioner global published (program_id NULL).
+     *
+     * Dipakai di halaman Data Alumni Prodi (kaprodi).
+     *
+     * @param array{program_id?: int, search?: string} $filters
+     */
+    public function paginateForAdminWithResponseStatus(array $filters, int $perPage): LengthAwarePaginator
+    {
+        $conn = DB::connection(self::CONN);
+
+        // Subquery: ambil id kuesioner global published (harusnya 1 row saja,
+        // tapi kita pakai IN agar aman kalau ada lebih dari satu)
+        $globalQnrIds = $conn->table('questionnaires')
+            ->whereNull('program_id')
+            ->where('status', 'published')
+            ->pluck('id');
+
+        $query = $conn->table('alumni_profiles')
+            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+            ->leftJoin('responses', function ($join) use ($globalQnrIds) {
+                $join->on('responses.alumni_id', '=', 'alumni_profiles.id')
+                     ->whereIn('responses.questionnaire_id', $globalQnrIds->isEmpty() ? [0] : $globalQnrIds->toArray());
+            })
+            ->select(
+                'alumni_profiles.*',
+                'programs.name as program_name',
+                'programs.jurusan as jurusan_name',
+                DB::raw('CASE WHEN responses.id IS NOT NULL THEN 1 ELSE 0 END as has_responded'),
+            );
+
+        if (!empty($filters['program_id'])) {
+            $query->where('alumni_profiles.program_id', $filters['program_id']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('alumni_profiles.nim', 'like', "%{$search}%")
+                  ->orWhere('alumni_profiles.name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->orderBy('alumni_profiles.id')->paginate($perPage);
+    }
+
+    /**
+     * Hitung stats alumni per prodi (atau semua kalau $programId null).
+     *
+     * Return: ['total' => int, 'answered' => int, 'unanswered' => int]
+     * Dipakai di halaman Data Alumni Prodi (kaprodi) dan dashboard admin.
+     */
+    public function countStatsByProgram(?int $programId): array
+    {
+        $conn = DB::connection(self::CONN);
+
+        // Total alumni
+        $totalQuery = $conn->table('alumni_profiles');
+        if ($programId !== null) {
+            $totalQuery->where('program_id', $programId);
+        }
+        $total = $totalQuery->count();
+
+        // Answered (yang punya row di responses untuk kuesioner global published)
+        $globalQnrIds = $conn->table('questionnaires')
+            ->whereNull('program_id')
+            ->where('status', 'published')
+            ->pluck('id');
+
+        if ($globalQnrIds->isEmpty()) {
+            return ['total' => $total, 'answered' => 0, 'unanswered' => $total];
+        }
+
+        $answeredQuery = $conn->table('alumni_profiles')
+            ->join('responses', 'responses.alumni_id', '=', 'alumni_profiles.id')
+            ->whereIn('responses.questionnaire_id', $globalQnrIds->toArray());
+
+        if ($programId !== null) {
+            $answeredQuery->where('alumni_profiles.program_id', $programId);
+        }
+
+        // distinct agar alumni yang punya multiple response ke qnr global tidak double-count
+        $answered = $answeredQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
+
+        return [
+            'total'      => $total,
+            'answered'   => $answered,
+            'unanswered' => max($total - $answered, 0),
+        ];
+    }
+
+    /**
      * Ambil semua alumni untuk laporan export (join programs + responses).
      *
      * @param array{program_id?: int, questionnaire_id?: int} $filters

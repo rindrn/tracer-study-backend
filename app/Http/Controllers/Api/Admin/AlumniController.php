@@ -35,6 +35,20 @@ class AlumniController extends Controller
         return response()->json(['success' => true, 'data' => $result]);
     }
 
+    /**
+     * GET /api/admin/alumni/stats
+     *
+     * Ringkasan statistik alumni untuk dashboard kaprodi / admin.
+     * Kaprodi: scoped ke prodinya saja; admin: seluruh prodi.
+     */
+    public function stats(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->getStats($request->user()),
+        ]);
+    }
+
     /** GET /api/admin/alumni/{id} */
     public function show(Request $request, int $id): JsonResponse
     {

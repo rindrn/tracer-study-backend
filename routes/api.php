@@ -88,6 +88,8 @@ Route::middleware("auth:sanctum")->group(function () {
     });
 
     // ── Manajemen Alumni (Admin & Prodi & P2MPP) ─────
+    // Route stats HARUS sebelum apiResource agar tidak ketangkap oleh `/{id}`.
+    Route::get('admin/alumni/stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
     Route::apiResource('admin/alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
 
     // ── Reports (Laporan / Unduhan) ──────────────────

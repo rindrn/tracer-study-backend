@@ -22,12 +22,35 @@ class AdminAlumniService
     ) {}
 
     // ═══════════════════════════════════════════════════════════
-    // LIST (paginate)
+    // LIST (paginate) — with has_responded flag for Kaprodi dashboard
     // ═══════════════════════════════════════════════════════════
     public function list(User $user, array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $filters = $this->applyRoleScope($user, $filters);
-        return $this->alumniRepo->paginateForAdmin($filters, $perPage);
+        return $this->alumniRepo->paginateForAdminWithResponseStatus($filters, $perPage);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // STATS — total / sudah mengisi / belum mengisi / response rate
+    // ═══════════════════════════════════════════════════════════
+    /**
+     * Return statistik alumni untuk dashboard (kaprodi = prodinya saja, admin = semua).
+     *
+     * Kuesioner yang dipakai sebagai baseline "sudah mengisi" adalah
+     * kuesioner global (program_id NULL, status published) — lihat
+     * AlumniProfileRepository::countStatsByProgram.
+     */
+    public function getStats(User $user): array
+    {
+        $programId = $user->isKaprodi() ? $user->program_id : null;
+
+        $stats = $this->alumniRepo->countStatsByProgram($programId);
+
+        $stats['response_rate'] = $stats['total'] > 0
+            ? round($stats['answered'] / $stats['total'] * 100, 1)
+            : 0.0;
+
+        return $stats;
     }
 
     // ═══════════════════════════════════════════════════════════
