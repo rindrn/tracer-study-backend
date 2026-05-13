@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\Transactional\LamController;
 use App\Http\Controllers\Api\Transactional\LamVersionController; 
 use App\Http\Controllers\Api\Transactional\LamProgramController; 
 use App\Http\Controllers\Api\Transactional\ProgramController; 
+use App\Http\Controllers\Api\Analytical\Kpi7Controller;
+
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
 // use App\Http\Controllers\Api\Transactional\QuestionnaireController;
 
@@ -91,6 +93,12 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::put('thresholds/{id}',    [ThresholdController::class, 'update']);
         Route::delete('thresholds/{id}', [ThresholdController::class, 'destroy']);
 
+    });
+
+    Route::prefix('dashboard/kpi')->group(function () {
+        Route::get('7/chart',   [Kpi7Controller::class, 'chart']);
+        Route::get('7/details', [Kpi7Controller::class, 'details']);
+        Route::get('7/export',  [Kpi7Controller::class, 'export']);
     });
  
     // ── ETL — hanya admin ───────────────────────────────────
