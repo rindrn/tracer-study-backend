@@ -3,199 +3,76 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use App\Http\Requests\Api\Admin\StoreAlumniRequest;
 use App\Http\Requests\Api\Admin\UpdateAlumniRequest;
+use App\Services\Transactional\AdminAlumniService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
+/**
+ * Admin/AlumniController — CRUD alumni untuk panel admin.
+ *
+ * Role scope di-handle di service:
+ *   - admin  : full akses
+ *   - kaprodi: hanya prodinya
+ *   - p2mpp  : read-only (tidak bisa store/update/destroy)
+ */
 class AlumniController extends Controller
 {
-    /**
-     * Display a listing of the alumni.
-     */
-    public function index(Request $request)
+    public function __construct(
+        private readonly AdminAlumniService $service,
+    ) {}
+
+    /** GET /api/admin/alumni */
+    public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
-        
-        $query = DB::connection('oltp')->table('alumni_profiles')
-            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-            ->leftJoin('employment_records', 'alumni_profiles.id', '=', 'employment_records.alumni_id')
-            ->leftJoin('education_records', 'alumni_profiles.id', '=', 'education_records.alumni_id')
-            ->select(
-                'alumni_profiles.*',
-                'programs.name as program_name',
-                'programs.jurusan as jurusan_name',
-                'employment_records.employment_status',
-                'employment_records.waiting_months',
-                'employment_records.salary_current',
-                'employment_records.company_name',
-                'employment_records.job_title',
-                'employment_records.work_city',
-                'education_records.is_further_study',
-                'education_records.institution_name'
-            );
+        $result = $this->service->list(
+            user:    $request->user(),
+            filters: ['search' => $request->query('search')],
+            perPage: (int) $request->query('per_page', 15),
+        );
 
-        // ROLE CHECK: Jika prodi, paksa filter hanya untuk prodinya saja
-        if ($user->isKaprodi()) {
-            $query->where('alumni_profiles.program_id', $user->program_id);
-        }
-
-        // Pencarian (Search)
-        if ($request->has('search')) {
-            $search = $request->query('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('alumni_profiles.nim', 'like', "%{$search}%")
-                  ->orWhere('alumni_profiles.name', 'like', "%{$search}%");
-            });
-        }
-
-        $perPage = $request->query('per_page', 15);
-        $alumni = $query->paginate($perPage);
-
-        return response()->json([
-            'success' => true,
-            'data' => $alumni
-        ]);
+        return response()->json(['success' => true, 'data' => $result]);
     }
 
-    /**
-     * Store a newly created alumni.
-     */
-    public function store(StoreAlumniRequest $request)
+    /** GET /api/admin/alumni/{id} */
+    public function show(Request $request, int $id): JsonResponse
     {
-        $user = $request->user();
+        $alumni = $this->service->show($request->user(), $id);
+        return response()->json(['success' => true, 'data' => $alumni]);
+    }
 
-        // P2MPP tidak boleh Create
-        if ($user->isP2mpp()) {
-            return response()->json(['message' => 'P2MPP tidak diizinkan menambah data alumni.'], 403);
-        }
-
-        $validated = $request->validated();
-
-        // ROLE CHECK: Force program_id untuk prodi
-        if ($user->isKaprodi()) {
-            $validated['program_id'] = $user->program_id;
-        }
-
-        $validated['created_at'] = now();
-        $validated['updated_at'] = now();
-
-        $id = DB::connection('oltp')->table('alumni_profiles')->insertGetId($validated);
+    /** POST /api/admin/alumni */
+    public function store(StoreAlumniRequest $request): JsonResponse
+    {
+        $id = $this->service->create($request->user(), $request->validated());
 
         return response()->json([
             'success' => true,
             'message' => 'Data alumni berhasil ditambahkan.',
-            'data' => ['id' => $id]
+            'data'    => ['id' => $id],
         ], 201);
     }
 
-    /**
-     * Display the specified alumni.
-     */
-    public function show(Request $request, $id)
+    /** PUT /api/admin/alumni/{id} */
+    public function update(UpdateAlumniRequest $request, int $id): JsonResponse
     {
-        $user = $request->user();
-
-        $alumni = DB::connection('oltp')->table('alumni_profiles')
-            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-            ->select(
-                'alumni_profiles.*',
-                'programs.name as program_name',
-                'programs.jurusan as jurusan_name'
-            )
-            ->where('alumni_profiles.id', $id)
-            ->first();
-
-        if (!$alumni) {
-            return response()->json(['message' => 'Alumni tidak ditemukan.'], 404);
-        }
-
-        // ROLE CHECK: Cegah akses jika beda prodi
-        if ($user->isKaprodi() && $alumni->program_id !== $user->program_id) {
-            return response()->json(['message' => 'Anda tidak memiliki hak akses untuk alumni prodi lain.'], 403);
-        }
+        $this->service->update($request->user(), $id, $request->validated());
 
         return response()->json([
             'success' => true,
-            'data' => $alumni
+            'message' => 'Data alumni berhasil diperbarui.',
         ]);
     }
 
-    /**
-     * Update the specified alumni.
-     */
-    public function update(UpdateAlumniRequest $request, $id)
+    /** DELETE /api/admin/alumni/{id} */
+    public function destroy(Request $request, int $id): JsonResponse
     {
-        $user = $request->user();
-
-        // P2MPP tidak boleh Update
-        if ($user->isP2mpp()) {
-            return response()->json(['message' => 'P2MPP tidak diizinkan mengubah data alumni.'], 403);
-        }
-
-        $alumni = DB::connection('oltp')->table('alumni_profiles')
-            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-            ->select('alumni_profiles.*', 'programs.name as program_name', 'programs.jurusan as jurusan_name')
-            ->where('alumni_profiles.id', $id)
-            ->first();
-
-        if (!$alumni) {
-            return response()->json(['message' => 'Alumni tidak ditemukan.'], 404);
-        }
-
-        // ROLE CHECK: Cegah akses jika beda prodi
-        if ($user->isKaprodi() && $alumni->program_id !== $user->program_id) {
-            return response()->json(['message' => 'Anda tidak memiliki hak akses untuk mengubah alumni prodi lain.'], 403);
-        }
-
-        $validated = $request->validated();
-        $validated['updated_at'] = now();
-
-        // Admin Prodi tidak boleh mengubah program_id (membajak ke prodi lain)
-        if ($user->isKaprodi() && isset($validated['program_id'])) {
-            unset($validated['program_id']); 
-        }
-
-        DB::connection('oltp')->table('alumni_profiles')->where('id', $id)->update($validated);
+        $this->service->delete($request->user(), $id);
 
         return response()->json([
             'success' => true,
-            'message' => 'Data alumni berhasil diperbarui.'
-        ]);
-    }
-
-    /**
-     * Remove the specified alumni from storage.
-     */
-    public function destroy(Request $request, $id)
-    {
-        $user = $request->user();
-
-        // P2MPP tidak boleh Delete
-        if ($user->isP2mpp()) {
-            return response()->json(['message' => 'P2MPP tidak diizinkan menghapus data alumni.'], 403);
-        }
-
-        $alumni = DB::connection('oltp')->table('alumni_profiles')
-            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-            ->select('alumni_profiles.*', 'programs.name as program_name', 'programs.jurusan as jurusan_name')
-            ->where('alumni_profiles.id', $id)
-            ->first();
-
-        if (!$alumni) {
-            return response()->json(['message' => 'Alumni tidak ditemukan.'], 404);
-        }
-
-        // ROLE CHECK: Cegah akses jika beda prodi
-        if ($user->isKaprodi() && $alumni->program_id !== $user->program_id) {
-            return response()->json(['message' => 'Anda tidak memiliki hak akses untuk menghapus alumni prodi lain.'], 403);
-        }
-
-        DB::connection('oltp')->table('alumni_profiles')->where('id', $id)->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data alumni berhasil dihapus.'
+            'message' => 'Data alumni berhasil dihapus.',
         ]);
     }
 }
