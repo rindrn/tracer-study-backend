@@ -1,24 +1,26 @@
 <?php
-
+// app/Http/Controllers/Api/Transactional/LamController.php
 namespace App\Http\Controllers\Api\Transactional;
 
 use App\Http\Controllers\Controller;
-use App\Http\Validators\ThresholdValidator;
-use App\Services\Transactional\ThresholdService;
+use App\Http\Validators\LamValidator;
+use App\Services\Transactional\LamService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class ThresholdController extends Controller
+class LamController extends Controller
 {
     public function __construct(
-        private readonly ThresholdService   $service,
-        private readonly ThresholdValidator $validator,
+        private readonly LamService   $service,
+        private readonly LamValidator $validator,
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
-        $result = $this->service->list((int) $request->query('per_page', 15));
-        return response()->json(['success' => true, 'message' => 'OK', ...$result]);
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->list(),
+        ]);
     }
 
     public function show(int $id): JsonResponse
@@ -29,12 +31,13 @@ class ThresholdController extends Controller
         ]);
     }
 
-    // GET /api/lam-versions/{id}/thresholds
-    public function byVersion(int $id): JsonResponse
+    // GET /api/lams/{id}/full?year=2025
+    public function full(Request $request, int $id): JsonResponse
     {
+        $year = (int) $request->query('year', now()->year);
         return response()->json([
             'success' => true,
-            'data'    => $this->service->byVersion($id),
+            'data'    => $this->service->full($id, $year),
         ]);
     }
 
@@ -43,17 +46,17 @@ class ThresholdController extends Controller
         $validated = $this->validator->validateCreate($request->all());
         return response()->json([
             'success' => true,
-            'message' => 'Threshold berhasil dibuat.',
+            'message' => 'LAM berhasil dibuat.',
             'data'    => $this->service->create($validated)->toArray(),
         ], 201);
     }
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $validated = $this->validator->validateUpdate($request->all());
+        $validated = $this->validator->validateUpdate($request->all(), $id);
         return response()->json([
             'success' => true,
-            'message' => 'Threshold berhasil diperbarui.',
+            'message' => 'LAM berhasil diperbarui.',
             'data'    => $this->service->update($id, $validated)->toArray(),
         ]);
     }
@@ -63,7 +66,7 @@ class ThresholdController extends Controller
         $this->service->delete($id);
         return response()->json([
             'success' => true,
-            'message' => 'Threshold berhasil dihapus.',
+            'message' => 'LAM berhasil dihapus.',
         ]);
     }
 }

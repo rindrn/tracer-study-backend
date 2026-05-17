@@ -1,15 +1,16 @@
 <?php
-// app/Services/Transactional/ThresholdService.php
 namespace App\Services\Transactional;
 
 use App\DTOs\Transactional\ThresholdResponseDTO;
 use App\Exceptions\BusinessException;
 use App\Repositories\Transactional\ThresholdRepository;
+use App\Repositories\Transactional\LamVersionRepository;
 
 class ThresholdService
 {
     public function __construct(
-        private readonly ThresholdRepository $repo,
+        private readonly ThresholdRepository  $repo,
+        private readonly LamVersionRepository $versionRepo,
     ) {}
 
     public function list(int $perPage = 15): array
@@ -33,34 +34,42 @@ class ThresholdService
     public function show(int $id): ThresholdResponseDTO
     {
         $row = $this->repo->findById($id);
-        if (! $row) {
-            throw new BusinessException("Threshold ID {$id} tidak ditemukan.", 404);
-        }
+        if (! $row) throw new BusinessException("Threshold ID {$id} tidak ditemukan.", 404);
         return ThresholdResponseDTO::fromRow($row);
     }
 
-    // ← Terima array $validated langsung dari validator
+    public function byVersion(int $lamVersionId): array
+    {
+        $version = $this->versionRepo->findById($lamVersionId);
+        if (! $version) throw new BusinessException("LAM Version ID {$lamVersionId} tidak ditemukan.", 404);
+
+        return [
+            'lam' => [
+                'id'   => $version->lam_id,
+                'name' => $version->lam_name,
+            ],
+            'version' => [
+                'id'   => $version->id,
+                'year' => $version->year,
+            ],
+            'thresholds' => $this->repo->byVersion($lamVersionId)
+                ->map(fn($row) => ThresholdResponseDTO::fromRow($row)->toArray())
+                ->toArray(),
+        ];
+    }
+
     public function create(array $validated): ThresholdResponseDTO
     {
-        $row = $this->repo->create(
-            ['name' => $validated['name'], 'value' => $validated['value']],
-            $validated['program_ids'],
-        );
+        $row = $this->repo->create($validated);
         return ThresholdResponseDTO::fromRow($row);
     }
 
-    // ← Terima array $validated langsung dari validator
     public function update(int $id, array $validated): ThresholdResponseDTO
     {
         if (! $this->repo->findById($id)) {
             throw new BusinessException("Threshold ID {$id} tidak ditemukan.", 404);
         }
-        $row = $this->repo->update(
-            $id,
-            ['name' => $validated['name'], 'value' => $validated['value']],
-            $validated['program_ids'],
-        );
-        return ThresholdResponseDTO::fromRow($row);
+        return ThresholdResponseDTO::fromRow($this->repo->update($id, $validated));
     }
 
     public function delete(int $id): void
