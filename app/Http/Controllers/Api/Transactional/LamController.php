@@ -15,11 +15,20 @@ class LamController extends Controller
         private readonly LamValidator $validator,
     ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        // ?include=versions,programs,thresholds
+        $include = $request->has('include')
+            ? array_map('trim', explode(',', $request->query('include', '')))
+            : [];
+
+        // Whitelist agar tidak bisa inject sembarang relasi
+        $allowed = ['versions', 'programs', 'thresholds'];
+        $include = array_intersect($include, $allowed);
+
         return response()->json([
             'success' => true,
-            'data'    => $this->service->list(),
+            'data'    => $this->service->list($include),
         ]);
     }
 

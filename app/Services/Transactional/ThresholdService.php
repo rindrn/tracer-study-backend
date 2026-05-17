@@ -41,27 +41,19 @@ class ThresholdService
     public function byVersion(int $lamVersionId): array
     {
         $version = $this->versionRepo->findById($lamVersionId);
-        if (! $version) throw new BusinessException("LAM Version ID {$lamVersionId} tidak ditemukan.", 404);
-
-        return [
-            'lam' => [
-                'id'   => $version->lam_id,
-                'name' => $version->lam_name,
-            ],
-            'version' => [
-                'id'   => $version->id,
-                'year' => $version->year,
-            ],
-            'thresholds' => $this->repo->byVersion($lamVersionId)
-                ->map(fn($row) => ThresholdResponseDTO::fromRow($row)->toArray())
-                ->toArray(),
-        ];
+        if (! $version) {
+            throw new BusinessException("LAM Version ID {$lamVersionId} tidak ditemukan.", 404);
+        }
+        $rows = $this->repo->byVersion($lamVersionId);
+        return $this->formatGroupedResponse($version, $rows);
     }
 
     public function create(array $validated): ThresholdResponseDTO
     {
-        $row = $this->repo->create($validated);
-        return ThresholdResponseDTO::fromRow($row);
+        // Cek duplikat (lam_version + indicator + level)
+        $existing = DB::connection('oltp')  // via constraint di DB sudah handle ini
+            ?? null; // Laravel akan throw QueryException jika duplicate, tangkap di Handler
+        return ThresholdResponseDTO::fromRow($this->repo->create($validated));
     }
 
     public function update(int $id, array $validated): ThresholdResponseDTO
@@ -78,5 +70,62 @@ class ThresholdService
             throw new BusinessException("Threshold ID {$id} tidak ditemukan.", 404);
         }
         $this->repo->delete($id);
+    }
+
+    public function bulkCreate(int $lamVersionId, array $validated): array
+    {
+        $version = $this->versionRepo->findById($lamVersionId);
+        if (! $version) {
+            throw new BusinessException("LAM Version ID {$lamVersionId} tidak ditemukan.", 404);
+        }
+
+        $rows = $this->repo->bulkCreate($lamVersionId, $validated['thresholds']);
+
+        return $this->formatGroupedResponse($version, $rows);
+    }
+
+    public function bulkUpdate(int $lamVersionId, array $validated): array
+    {
+        $version = $this->versionRepo->findById($lamVersionId);
+        if (! $version) {
+            throw new BusinessException("LAM Version ID {$lamVersionId} tidak ditemukan.", 404);
+        }
+
+        $this->repo->bulkUpdate($validated['thresholds']);
+
+        // Re-fetch untuk response terbaru
+        $rows = $this->repo->byVersion($lamVersionId);
+        return $this->formatGroupedResponse($version, $rows);
+    }
+
+    // Private helper: hindari duplikasi logic grouped response
+    private function formatGroupedResponse(object $version, \Illuminate\Support\Collection $rows): array
+    {
+        $grouped = $rows->groupBy('indicator_id')
+            ->map(function ($items) {
+                $first  = $items->first();
+                $result = [
+                    'indicator_id'   => $first->indicator_id,
+                    'indicator_key'  => $first->indicator_key,
+                    'indicator_name' => $first->indicator_name,
+                    'unit'           => $first->indicator_unit,
+                    'operator'       => $first->indicator_operator,
+                ];
+                foreach ($items as $item) {
+                    $result[$item->threshold_level] = [
+                        'threshold_id' => $item->threshold_id,
+                        'value'        => (float) $item->threshold_value,
+                    ];
+                }
+                return $result;
+            })
+            ->values()
+            ->toArray();
+
+        return [
+            'lam'        => ['id' => $version->lam_id, 'name' => $version->lam_name],
+            'version'    => ['id' => $version->id,     'year' => $version->year],
+            'thresholds' => $grouped,
+        ];
     }
 }

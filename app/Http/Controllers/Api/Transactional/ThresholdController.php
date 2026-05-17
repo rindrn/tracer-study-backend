@@ -66,4 +66,29 @@ class ThresholdController extends Controller
             'message' => 'Threshold berhasil dihapus.',
         ]);
     }
+
+    // POST /api/lam-versions/{id}/thresholds/bulk
+    public function bulkStore(Request $request, int $id): JsonResponse
+    {
+        $validated = $this->validator->validateBulkStore($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Threshold berhasil dibuat.',
+            'data'    => $this->service->bulkCreate($id, $validated),
+        ], 201);
+    }
+
+    // PUT /api/lam-versions/{id}/thresholds/bulk
+    public function bulkUpdate(Request $request, int $id): JsonResponse
+    {
+        $validated = $this->validator->validateBulkUpdate($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Threshold berhasil diperbarui.',
+            'data'    => $this->service->bulkUpdate($id, $validated),
+        ]);
+    }
+
 }

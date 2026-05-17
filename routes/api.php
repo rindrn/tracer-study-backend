@@ -2,6 +2,7 @@
  
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\Transactional\ThresholdIndicatorController;
 use App\Http\Controllers\Api\Transactional\ThresholdController;
 use App\Http\Controllers\Api\Transactional\LamController; 
 use App\Http\Controllers\Api\Transactional\LamVersionController; 
@@ -88,10 +89,15 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::post('lam-programs',   [LamProgramController::class, 'store']);
         Route::delete('lam-programs', [LamProgramController::class, 'destroy']);
 
+        // Threshold Indicators
+        Route::get('threshold-indicators', [ThresholdIndicatorController::class, 'index']);
+
         // Thresholds
         Route::post('thresholds',        [ThresholdController::class, 'store']);
         Route::put('thresholds/{id}',    [ThresholdController::class, 'update']);
         Route::delete('thresholds/{id}', [ThresholdController::class, 'destroy']);
+        Route::post('lam-versions/{id}/thresholds/bulk', [ThresholdController::class, 'bulkStore']);
+        Route::put('lam-versions/{id}/thresholds/bulk',  [ThresholdController::class, 'bulkUpdate']);
 
     });
 
