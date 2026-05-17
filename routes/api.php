@@ -2,7 +2,9 @@
  
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\AuthController;
+
 use App\Http\Controllers\Api\Transactional\ThresholdIndicatorController;
+use App\Http\Controllers\Api\Auth\AlumniAuthController;
 use App\Http\Controllers\Api\Transactional\ThresholdController;
 use App\Http\Controllers\Api\Transactional\LamController; 
 use App\Http\Controllers\Api\Transactional\LamVersionController; 
@@ -11,7 +13,11 @@ use App\Http\Controllers\Api\Transactional\ProgramController;
 use App\Http\Controllers\Api\Analytical\Kpi7Controller;
 
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
-// use App\Http\Controllers\Api\Transactional\QuestionnaireController;
+use App\Http\Controllers\Api\Transactional\QuestionnaireController;
+
+// Form Submission & Fetch Tracer Study
+use App\Http\Controllers\Api\Transactional\TracerStudySubmitController;
+use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
 
 // Controllers — Dashboard (OLAP page config)
 // use App\Http\Controllers\Api\Dashboard\OverviewController;
@@ -32,17 +38,27 @@ use App\Http\Controllers\Api\Analytical\Kpi7Controller;
 // PUBLIC — tidak butuh autentikasi
 // ═══════════════════════════════════════════════════════════
 Route::prefix('auth')->group(function () {
+    Route::get('demo-accounts', [AuthController::class, 'demoAccounts']);
     Route::post('login', [AuthController::class, 'login']);
+    Route::post('alumni-login', [AlumniAuthController::class, 'login']);  // Login alumni untuk isi kuesioner
 });
  
 // ═══════════════════════════════════════════════════════════
 // PROTECTED — wajib login (Sanctum token)
 // ═══════════════════════════════════════════════════════════
+Route::get('tracer-study/forms', [QuestionnaireFetchController::class, 'getActiveForms']); // Endpoint penarik soal untuk frontend UI
+Route::post('tracer-study/submit', [TracerStudySubmitController::class, 'store']); // Bisa dibuat public atau diproteksi sanctum sesuai policy. Disini diset public dahulu krn blm ada kepastian login as alumni.
+
+Route::apiResource('questionnaires', QuestionnaireController::class)->only(['show']); // Public show for student form fetch
+
 Route::middleware("auth:sanctum")->group(function () {
  
     // Auth
     Route::post('auth/logout', [AuthController::class, 'logout']);
     Route::get('auth/me',     [AuthController::class, 'me']);
+
+    // Questionnaires — index inside auth so we can filter by role
+    Route::get('questionnaires', [QuestionnaireController::class, 'index']);
  
     // Programs — hanya admin yang bisa CRUD (p2mpp & prodi hanya GET)
     Route::get('programs',       [ProgramController::class, 'index']);
@@ -53,6 +69,7 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::put('programs/{id}',      [ProgramController::class, 'update']);
         Route::delete('programs/{id}',   [ProgramController::class, 'destroy']);
     });
+
 
     // LAMs — semua role bisa GET
     Route::get('lams',          [LamController::class, 'index']);
@@ -105,7 +122,25 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('7/chart',   [Kpi7Controller::class, 'chart']);
         Route::get('7/details', [Kpi7Controller::class, 'details']);
         Route::get('7/export',  [Kpi7Controller::class, 'export']);
+
     });
+
+    // ── Manajemen Staff & Tim Tracer (admin + head_tracer) ─────────────────
+    // Scaffolding untuk endpoint CRUD staff / team — controller belum dibuat,
+    // biarkan group kosong dulu agar struktur konsisten dengan permission FE:
+    //   admin.staff (CRUD akun staff) + admin.team (CRUD tim tracer).
+    Route::middleware("role:admin,head_tracer")->group(function () {
+        // Route::apiResource('admin/staff',        StaffController::class);
+        // Route::apiResource('admin/tracer-team',  TracerTeamController::class);
+    });
+
+    // ── Manajemen Alumni (Admin & Prodi & P2MPP) ─────
+    // Route stats HARUS sebelum apiResource agar tidak ketangkap oleh `/{id}`.
+    Route::get('admin/alumni/stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
+    Route::apiResource('admin/alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
+
+    // ── Reports (Laporan / Unduhan) ──────────────────
+    Route::get('admin/reports/export-alumni', [\App\Http\Controllers\Api\Admin\ReportController::class, 'exportAlumniResponses']);
  
     // ── ETL — hanya admin ───────────────────────────────────
     // Route::middleware("role:admin")->group(function () {

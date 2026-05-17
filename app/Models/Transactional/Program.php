@@ -9,7 +9,7 @@ class Program extends Model
 {
     protected $connection = 'oltp';
     protected $table      = 'programs';
-    protected $fillable   = ['name', 'code', 'degree', 'is_active'];
+    protected $fillable   = ['name', 'code', 'degree', 'jurusan', 'is_active'];
     protected $casts      = ['is_active' => 'boolean'];
  
     public function users(): HasMany

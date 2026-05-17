@@ -129,7 +129,7 @@ return [
             'sslmode'        => 'prefer',
         ],
  
-        // ── DB OLAP — untuk FactAlumni, DimProgram, Views analitik ──
+        // ── DB OLAP — untuk kebutuhan analitik di masa depan ──
         'olap' => [
             'driver'         => 'pgsql',
             'host'           => env('OLAP_DB_HOST', '127.0.0.1'),
@@ -143,7 +143,6 @@ return [
             'search_path'    => 'tracer_olap',
             'sslmode'        => 'prefer',
         ],
- 
 
     ],
 
