@@ -89,13 +89,13 @@ Route::middleware("auth:sanctum")->group(function () {
 
     // ── Manajemen Alumni (Admin & Prodi & P2MPP) ─────
     // Route stats & template HARUS sebelum apiResource agar tidak ketangkap oleh `/{id}`.
-    Route::get('admin/alumni/stats',    [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
-    Route::get('admin/alumni/template', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'downloadTemplate']);
-    Route::post('admin/alumni/import',  [\App\Http\Controllers\Api\Admin\AlumniController::class, 'importAlumni']);
-    Route::apiResource('admin/alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
+    Route::get('alumni/stats',    [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
+    Route::get('alumni/template', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'downloadTemplate']);
+    Route::post('alumni/import',  [\App\Http\Controllers\Api\Admin\AlumniController::class, 'importAlumni']);
+    Route::apiResource('alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
 
     // ── Reports (Laporan / Unduhan) ──────────────────
-    Route::get('admin/reports/export-alumni', [\App\Http\Controllers\Api\Admin\ReportController::class, 'exportAlumniResponses']);
+    Route::get('reports/export-alumni', [\App\Http\Controllers\Api\Admin\ReportController::class, 'exportAlumniResponses']);
  
     // ── ETL — hanya admin ───────────────────────────────────
     // Route::middleware("role:admin")->group(function () {

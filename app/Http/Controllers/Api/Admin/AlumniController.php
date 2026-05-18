@@ -25,12 +25,19 @@ class AlumniController extends Controller
         private readonly AdminAlumniService $service,
     ) {}
 
-    /** GET /api/admin/alumni */
+    /** GET /api/alumni */
     public function index(Request $request): JsonResponse
     {
+        $questionnaireId = $request->query('questionnaire_id');
         $result = $this->service->list(
             user:    $request->user(),
-            filters: ['search' => $request->query('search')],
+            filters: [
+                'search' => $request->query('search'),
+                'questionnaire_id' => $questionnaireId ? (int) $questionnaireId : null,
+                'jurusan' => $request->query('jurusan'),
+                'program_id' => $request->query('program_id') ? (int) $request->query('program_id') : null,
+                'graduation_year' => $request->query('graduation_year') ? (int) $request->query('graduation_year') : null,
+            ],
             perPage: (int) $request->query('per_page', 15),
         );
 

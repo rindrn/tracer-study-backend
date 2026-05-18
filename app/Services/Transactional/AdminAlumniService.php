@@ -27,6 +27,10 @@ class AdminAlumniService
     public function list(User $user, array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $filters = $this->applyRoleScope($user, $filters);
+        if (!empty($filters['questionnaire_id'])) {
+            return $this->alumniRepo->paginateRespondentsByQuestionnaire($filters, $perPage);
+        }
+
         return $this->alumniRepo->paginateForAdminWithResponseStatus($filters, $perPage);
     }
 

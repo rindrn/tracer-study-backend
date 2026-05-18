@@ -119,22 +119,20 @@ class AlumniProfileRepository
     }
 
     /**
-     * Sama seperti paginateForAdmin tapi ditambah kolom `has_responded` (0/1)
-     * — menandakan apakah alumni sudah mengisi kuesioner global (kementrian).
-     *
-     * Definisi "sudah mengisi": ada minimal 1 row di `responses` untuk alumni tsb
-     * dengan questionnaire_id milik kuesioner global published (program_id NULL).
+     * Sama seperti paginateForAdmin tapi ditambah kolom `response_status`:
+     *   - 'finish'        → responses.status IN ('submitted','verified')
+     *   - 'ongoing'       → responses.status = 'started'
+     *   - 'belum_mengisi' → no response row
      *
      * Dipakai di halaman Data Alumni Prodi (kaprodi).
      *
-     * @param array{program_id?: int, search?: string} $filters
+     * @param array{program_id?: int, search?: string, jurusan?: string, graduation_year?: int} $filters
      */
     public function paginateForAdminWithResponseStatus(array $filters, int $perPage): LengthAwarePaginator
     {
         $conn = DB::connection(self::CONN);
 
-        // Subquery: ambil id kuesioner global published (harusnya 1 row saja,
-        // tapi kita pakai IN agar aman kalau ada lebih dari satu)
+        // Subquery: ambil id kuesioner global published
         $globalQnrIds = $conn->table('questionnaires')
             ->whereNull('program_id')
             ->where('status', 'published')
@@ -150,11 +148,23 @@ class AlumniProfileRepository
                 'alumni_profiles.*',
                 'programs.name as program_name',
                 'programs.jurusan as jurusan_name',
-                DB::raw('CASE WHEN responses.id IS NOT NULL THEN 1 ELSE 0 END as has_responded'),
+                DB::raw("CASE
+                    WHEN responses.status IN ('submitted','verified') THEN 'finish'
+                    WHEN responses.status = 'started' THEN 'ongoing'
+                    ELSE 'belum_mengisi'
+                END as response_status"),
             );
 
         if (!empty($filters['program_id'])) {
             $query->where('alumni_profiles.program_id', $filters['program_id']);
+        }
+
+        if (!empty($filters['jurusan'])) {
+            $query->where('programs.jurusan', $filters['jurusan']);
+        }
+
+        if (!empty($filters['graduation_year'])) {
+            $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
         }
 
         if (!empty($filters['search'])) {
@@ -169,10 +179,51 @@ class AlumniProfileRepository
     }
 
     /**
+     * List responden yang sudah mengisi kuesioner tertentu.
+     *
+     * @param array{program_id?: int, search?: string, questionnaire_id: int} $filters
+     */
+    public function paginateRespondentsByQuestionnaire(array $filters, int $perPage): LengthAwarePaginator
+    {
+        $query = DB::connection(self::CONN)->table('responses')
+            ->join('alumni_profiles', 'responses.alumni_id', '=', 'alumni_profiles.id')
+            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+            ->select(
+                'alumni_profiles.id',
+                'alumni_profiles.nim',
+                'alumni_profiles.name',
+                'alumni_profiles.email',
+                'alumni_profiles.program_id',
+                'alumni_profiles.graduation_year',
+                'programs.name as program_name',
+                'programs.jurusan as jurusan_name',
+                'responses.id as response_id',
+                'responses.status as response_status',
+                'responses.submitted_at as response_submitted_at',
+                'responses.created_at as response_created_at',
+                'responses.updated_at as response_updated_at',
+            )
+            ->where('responses.questionnaire_id', $filters['questionnaire_id']);
+
+        if (!empty($filters['program_id'])) {
+            $query->where('alumni_profiles.program_id', $filters['program_id']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('alumni_profiles.nim', 'like', "%{$search}%")
+                  ->orWhere('alumni_profiles.name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->orderByDesc('responses.submitted_at')->paginate($perPage);
+    }
+
+    /**
      * Hitung stats alumni per prodi (atau semua kalau $programId null).
      *
-     * Return: ['total' => int, 'answered' => int, 'unanswered' => int]
-     * Dipakai di halaman Data Alumni Prodi (kaprodi) dan dashboard admin.
+     * Return: ['total' => int, 'finish' => int, 'ongoing' => int, 'belum_mengisi' => int, 'answered' => int, 'unanswered' => int]
      */
     public function countStatsByProgram(?int $programId): array
     {
@@ -185,31 +236,45 @@ class AlumniProfileRepository
         }
         $total = $totalQuery->count();
 
-        // Answered (yang punya row di responses untuk kuesioner global published)
+        // Kuesioner global published
         $globalQnrIds = $conn->table('questionnaires')
             ->whereNull('program_id')
             ->where('status', 'published')
             ->pluck('id');
 
         if ($globalQnrIds->isEmpty()) {
-            return ['total' => $total, 'answered' => 0, 'unanswered' => $total];
+            return ['total' => $total, 'finish' => 0, 'ongoing' => 0, 'belum_mengisi' => $total, 'answered' => 0, 'unanswered' => $total];
         }
 
-        $answeredQuery = $conn->table('alumni_profiles')
+        // Finish: submitted or verified
+        $finishQuery = $conn->table('alumni_profiles')
             ->join('responses', 'responses.alumni_id', '=', 'alumni_profiles.id')
-            ->whereIn('responses.questionnaire_id', $globalQnrIds->toArray());
-
+            ->whereIn('responses.questionnaire_id', $globalQnrIds->toArray())
+            ->whereIn('responses.status', ['submitted', 'verified']);
         if ($programId !== null) {
-            $answeredQuery->where('alumni_profiles.program_id', $programId);
+            $finishQuery->where('alumni_profiles.program_id', $programId);
         }
+        $finish = $finishQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
 
-        // distinct agar alumni yang punya multiple response ke qnr global tidak double-count
-        $answered = $answeredQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
+        // Ongoing: started
+        $ongoingQuery = $conn->table('alumni_profiles')
+            ->join('responses', 'responses.alumni_id', '=', 'alumni_profiles.id')
+            ->whereIn('responses.questionnaire_id', $globalQnrIds->toArray())
+            ->where('responses.status', 'started');
+        if ($programId !== null) {
+            $ongoingQuery->where('alumni_profiles.program_id', $programId);
+        }
+        $ongoing = $ongoingQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
+
+        $belumMengisi = max($total - $finish - $ongoing, 0);
 
         return [
-            'total'      => $total,
-            'answered'   => $answered,
-            'unanswered' => max($total - $answered, 0),
+            'total'         => $total,
+            'finish'        => $finish,
+            'ongoing'       => $ongoing,
+            'belum_mengisi' => $belumMengisi,
+            'answered'      => $finish,
+            'unanswered'    => $total - $finish,
         ];
     }
 
