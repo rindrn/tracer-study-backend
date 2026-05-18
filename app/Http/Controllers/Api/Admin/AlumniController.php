@@ -8,6 +8,8 @@ use App\Http\Requests\Api\Admin\UpdateAlumniRequest;
 use App\Services\Transactional\AdminAlumniService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Admin/AlumniController — CRUD alumni untuk panel admin.
@@ -47,6 +49,20 @@ class AlumniController extends Controller
             'success' => true,
             'data'    => $this->service->getStats($request->user()),
         ]);
+    }
+
+    /**
+     * GET /api/admin/alumni/template
+     *
+     * Download template Excel kosongan (hanya header) untuk acuan import alumni.
+     * Dipakai admin / kepala tracer sebelum mengisi data untuk bulk import.
+     */
+    public function downloadTemplate(Request $request): BinaryFileResponse
+    {
+        return Excel::download(
+            $this->service->buildImportTemplate(),
+            'Template_Import_Alumni.xlsx',
+        );
     }
 
     /** GET /api/admin/alumni/{id} */

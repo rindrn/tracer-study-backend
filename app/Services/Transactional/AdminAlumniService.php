@@ -54,6 +54,21 @@ class AdminAlumniService
     }
 
     // ═══════════════════════════════════════════════════════════
+    // IMPORT TEMPLATE — download Excel kosongan berisi header
+    // ═══════════════════════════════════════════════════════════
+    /**
+     * Bangun export object untuk template Excel kosong (header saja).
+     *
+     * Dipakai oleh admin / kepala tracer untuk dapat "blueprint" kolom yang
+     * harus diisi sebelum meng-import data alumni. Fitur upload/parse akan
+     * diimplementasikan di round berikutnya.
+     */
+    public function buildImportTemplate(): \App\Exports\AlumniImportTemplateExport
+    {
+        return new \App\Exports\AlumniImportTemplateExport();
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // SHOW
     // ═══════════════════════════════════════════════════════════
     public function show(User $user, int $id): object
