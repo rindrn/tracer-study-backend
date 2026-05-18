@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Auth\AlumniAuthController;
 use App\Http\Controllers\Api\Transactional\ThresholdController;
 use App\Http\Controllers\Api\Transactional\ProgramController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireController;
+use App\Http\Controllers\Api\Transactional\ApprovalController;
 use App\Http\Controllers\Api\Transactional\TracerStudySubmitController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
 
@@ -45,19 +46,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('programs/{id}', [ProgramController::class, 'update']);
         Route::delete('programs/{id}', [ProgramController::class, 'destroy']);
 
-        // Questionnaire full manage (add/delete langsung tanpa approval)
-        Route::apiResource('questionnaires', QuestionnaireController::class)->only(['store', 'destroy']);
+        // Questionnaire delete (langsung tanpa approval)
+        Route::delete('questionnaires/{questionnaire}', [QuestionnaireController::class, 'destroy']);
 
-        // Approval management
-        // Route::get('approvals', [ApprovalController::class, 'index']);
-        // Route::post('approvals/{id}/approve', [ApprovalController::class, 'approve']);
-        // Route::post('approvals/{id}/reject', [ApprovalController::class, 'reject']);
+        // Approval management (approve/reject)
+        Route::post('approvals/{id}/approve', [ApprovalController::class, 'approve']);
+        Route::post('approvals/{id}/reject', [ApprovalController::class, 'reject']);
     });
 
     // ── Super Admin + Admin (head_tracer, tracer_team) ───────────────────
     Route::middleware('role:head_tracer,tracer_team')->group(function () {
-        // Edit kuesioner
+        // Create & edit kuesioner (tracer_team creates as draft, head_tracer can publish)
+        Route::post('questionnaires', [QuestionnaireController::class, 'store']);
         Route::put('questionnaires/{questionnaire}', [QuestionnaireController::class, 'update']);
+
+        // Approval list (head_tracer sees all, tracer_team sees own)
+        Route::get('approvals', [ApprovalController::class, 'index']);
+
+        // Request delete (tracer_team submits)
+        Route::post('approvals/request-delete', [ApprovalController::class, 'requestDelete']);
 
         // Thresholds
         Route::apiResource('thresholds', ThresholdController::class);
