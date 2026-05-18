@@ -30,10 +30,10 @@ class StoreAlumniRequest extends FormRequest
             'kode_pt' => ['nullable', 'string', 'max:10'],
         ];
 
-        // Admin & head_tracer wajib assign program_id manual (mereka tidak terikat ke prodi).
+        // Head_tracer wajib assign program_id manual (tidak terikat ke prodi).
         // Kaprodi tidak perlu — program_id auto-fill di AdminAlumniService::create.
-        // Role lain (p2mpp, tracer_team, wadir) ditolak di service via assertCanWrite.
-        if ($user && ($user->isAdmin() || $user->isHeadTracer())) {
+        // Role viewer (wadir, kajur) ditolak di service via assertCanWrite.
+        if ($user && $user->isHeadTracer()) {
             $rules['program_id'] = ['required', 'exists:oltp.programs,id'];
         }
 
