@@ -33,6 +33,8 @@ class QuestionnaireValidator
             'version' => ['nullable', 'integer', 'min:1'],
             'program_code' => ['nullable', 'string', 'exists:oltp.programs,code'],
             'program_id' => ['nullable', 'integer', 'exists:oltp.programs,id'],
+            'target_graduation_years' => ['nullable', 'array'],
+            'target_graduation_years.*' => ['integer'],
             'sections' => ['required', 'array', 'min:1'],
             'sections.*.title' => ['required', 'string', 'max:200'],
             'sections.*.description' => ['nullable', 'string'],

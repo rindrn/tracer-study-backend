@@ -105,4 +105,20 @@ class AlumniController extends Controller
             'message' => 'Data alumni berhasil dihapus.',
         ]);
     }
+
+    /** POST /api/admin/alumni/import */
+    public function importAlumni(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
+        ]);
+
+        $result = $this->service->importFromExcel($request->file('file'));
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$result['imported']} data alumni berhasil diimpor.",
+            'data'    => $result,
+        ]);
+    }
 }

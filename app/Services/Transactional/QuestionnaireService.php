@@ -75,19 +75,20 @@ class QuestionnaireService
             $version   = $validated['version'] ?? $this->questionnaireRepo->nextVersionForCode($baseCode);
 
             $id = $this->questionnaireRepo->insertHeader([
-                'code'               => $baseCode,
-                'title'              => $validated['title'],
-                'description'        => $validated['description'] ?? null,
-                'target'             => $validated['target'] ?? null,
-                'sample_respondents' => isset($validated['respondents'])
+                'code'                    => $baseCode,
+                'title'                   => $validated['title'],
+                'description'             => $validated['description'] ?? null,
+                'target'                  => $validated['target'] ?? null,
+                'sample_respondents'      => isset($validated['respondents'])
                     ? json_encode(array_values($validated['respondents']))
                     : null,
-                'period_year'        => (int) ($validated['period_year'] ?? (int) $now->format('Y')),
-                'version'            => $version,
-                'status'             => $validated['status'],
-                'program_id'         => $programId,
-                'published_at'       => $validated['status'] === 'published' ? $now : null,
-                'created_by'         => auth()->id(),
+                'period_year'             => (int) ($validated['period_year'] ?? (int) $now->format('Y')),
+                'target_graduation_years' => $this->encodeGraduationYears($validated),
+                'version'                 => $version,
+                'status'                  => $validated['status'],
+                'program_id'              => $programId,
+                'published_at'            => $validated['status'] === 'published' ? $now : null,
+                'created_by'              => auth()->id(),
             ]);
 
             $this->syncSections($id, $validated['sections'], $now);
@@ -116,18 +117,19 @@ class QuestionnaireService
             $version   = $validated['version'] ?? $existing->version;
 
             $this->questionnaireRepo->updateHeader($id, [
-                'code'               => $code,
-                'title'              => $validated['title'],
-                'description'        => $validated['description'] ?? null,
-                'target'             => $validated['target'] ?? null,
-                'sample_respondents' => isset($validated['respondents'])
+                'code'                    => $code,
+                'title'                   => $validated['title'],
+                'description'             => $validated['description'] ?? null,
+                'target'                  => $validated['target'] ?? null,
+                'sample_respondents'      => isset($validated['respondents'])
                     ? json_encode(array_values($validated['respondents']))
                     : null,
-                'period_year'        => (int) ($validated['period_year'] ?? $existing->period_year),
-                'version'            => $version,
-                'status'             => $validated['status'],
-                'program_id'         => $programId,
-                'published_at'       => $validated['status'] === 'published'
+                'period_year'             => (int) ($validated['period_year'] ?? $existing->period_year),
+                'target_graduation_years' => $this->encodeGraduationYears($validated, $existing->target_graduation_years ?? null),
+                'version'                 => $version,
+                'status'                  => $validated['status'],
+                'program_id'              => $programId,
+                'published_at'            => $validated['status'] === 'published'
                     ? ($existing->published_at ?? $now)
                     : $existing->published_at,
             ]);
@@ -172,6 +174,33 @@ class QuestionnaireService
             return $this->programRepo->findByCode($validated['program_code'])?->id;
         }
         return $fallback;
+    }
+
+    /**
+     * Encode list tahun lulusan target ke JSON untuk disimpan di kolom jsonb.
+     * Empty array → null (artinya "tidak ada filter / berlaku semua alumni").
+     * Backward compat: kalau payload tidak ada key, pakai $fallback existing.
+     */
+    private function encodeGraduationYears(array $validated, ?string $fallback = null): ?string
+    {
+        if (!array_key_exists('target_graduation_years', $validated)) {
+            return $fallback;
+        }
+
+        $years = $validated['target_graduation_years'];
+        if (!is_array($years) || empty($years)) {
+            return null;
+        }
+
+        $clean = collect($years)
+            ->map(fn ($y) => (int) $y)
+            ->filter(fn ($y) => $y > 1900 && $y < 2200)
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
+        return empty($clean) ? null : json_encode($clean);
     }
 
     /** Insert semua section + question + option untuk 1 kuesioner. */
@@ -322,7 +351,10 @@ class QuestionnaireService
             'respondents'  => $questionnaire->sample_respondents
                 ? json_decode($questionnaire->sample_respondents, true)
                 : [],
-            'period_year'  => (int) $questionnaire->period_year,
+            'period_year'             => (int) $questionnaire->period_year,
+            'target_graduation_years' => isset($questionnaire->target_graduation_years) && $questionnaire->target_graduation_years
+                ? json_decode($questionnaire->target_graduation_years, true)
+                : null,
             'version'      => (int) $questionnaire->version,
             'status'       => $questionnaire->status,
             'program_id'   => $questionnaire->program_id,

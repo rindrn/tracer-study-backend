@@ -19,11 +19,12 @@ class AlumniProfileSeeder extends Seeder
 
         $alumniData = [];
         $nimCounter = 1;
+        $fixedYears = [2022, 2023, 2024];
 
-        // 4 alumni per program studi (3 answered + 1 for testing)
         foreach ($programs as $program) {
-            for ($i = 0; $i < 4; $i++) {
-                $tahunLulus = $faker->numberBetween(2023, 2025);
+            for ($i = 0; $i < 5; $i++) {
+                // First 3: fixed grad years; last 2: random
+                $tahunLulus = $i < 3 ? $fixedYears[$i] : $faker->randomElement($fixedYears);
                 $tahunMasuk = $tahunLulus - ($program->degree === 'D3' ? 3 : 4);
 
                 $alumniData[] = [
@@ -46,7 +47,6 @@ class AlumniProfileSeeder extends Seeder
             }
         }
 
-        // Insert in chunks to avoid memory issues
         foreach (array_chunk($alumniData, 50) as $chunk) {
             DB::connection('oltp')->table('alumni_profiles')->insert($chunk);
         }

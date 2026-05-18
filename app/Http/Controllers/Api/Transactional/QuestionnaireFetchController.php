@@ -20,7 +20,8 @@ class QuestionnaireFetchController extends Controller
      */
     public function getActiveForms(Request $request): JsonResponse
     {
-        $data = $this->service->getActiveForms($request->query('kode_prodi'));
+        $graduationYear = $request->query('graduation_year') ? (int) $request->query('graduation_year') : null;
+        $data = $this->service->getActiveForms($request->query('kode_prodi'), $graduationYear);
 
         if (empty($data)) {
             return response()->json([

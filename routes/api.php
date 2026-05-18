@@ -91,6 +91,7 @@ Route::middleware("auth:sanctum")->group(function () {
     // Route stats & template HARUS sebelum apiResource agar tidak ketangkap oleh `/{id}`.
     Route::get('admin/alumni/stats',    [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
     Route::get('admin/alumni/template', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'downloadTemplate']);
+    Route::post('admin/alumni/import',  [\App\Http\Controllers\Api\Admin\AlumniController::class, 'importAlumni']);
     Route::apiResource('admin/alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
 
     // ── Reports (Laporan / Unduhan) ──────────────────

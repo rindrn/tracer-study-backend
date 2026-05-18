@@ -139,6 +139,24 @@ class AdminAlumniService
     }
 
     // ═══════════════════════════════════════════════════════════
+    // IMPORT FROM EXCEL
+    // ═══════════════════════════════════════════════════════════
+    /**
+     * Import alumni dari file Excel yang di-upload.
+     * Return: ['imported' => int, 'errors' => string[]]
+     */
+    public function importFromExcel(\Illuminate\Http\UploadedFile $file): array
+    {
+        $import = new \App\Imports\AlumniImport($this->alumniRepo);
+        \Maatwebsite\Excel\Facades\Excel::import($import, $file);
+
+        return [
+            'imported' => $import->getImportedCount(),
+            'errors'   => $import->getErrors(),
+        ];
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // Helpers (private)
     // ═══════════════════════════════════════════════════════════
 

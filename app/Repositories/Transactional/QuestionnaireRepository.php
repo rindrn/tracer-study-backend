@@ -67,6 +67,38 @@ class QuestionnaireRepository
             ->first();
     }
 
+    // ── Year-aware variant (round 5) ─────────────────────────
+    /**
+     * Kuesioner aktif global yang target_graduation_years-nya match dengan tahun lulus alumni.
+     * Backward compat: target_graduation_years NULL atau empty array dianggap "berlaku semua".
+     */
+    public function findActiveGlobalForYear(int $graduationYear): ?object
+    {
+        return DB::connection(self::CONN)->table('questionnaires')
+            ->whereNull('program_id')
+            ->where('status', 'published')
+            ->where(function ($q) use ($graduationYear) {
+                $q->whereNull('target_graduation_years')
+                  ->orWhereRaw("target_graduation_years::text = '[]'")
+                  ->orWhereJsonContains('target_graduation_years', $graduationYear);
+            })
+            ->first();
+    }
+
+    /** Kuesioner aktif prodi yang target year-nya match dengan tahun lulus alumni. */
+    public function findActiveByProgramForYear(int $programId, int $graduationYear): ?object
+    {
+        return DB::connection(self::CONN)->table('questionnaires')
+            ->where('program_id', $programId)
+            ->where('status', 'published')
+            ->where(function ($q) use ($graduationYear) {
+                $q->whereNull('target_graduation_years')
+                  ->orWhereRaw("target_graduation_years::text = '[]'")
+                  ->orWhereJsonContains('target_graduation_years', $graduationYear);
+            })
+            ->first();
+    }
+
     /** Published kuesioner untuk global OR prodi tertentu (list). */
     public function findActiveForProdi(int $programId): Collection
     {
@@ -76,6 +108,28 @@ class QuestionnaireRepository
                 ->where(function ($q) use ($programId) {
                     $q->whereNull('program_id')
                       ->orWhere('program_id', $programId);
+                })
+                ->get()
+        );
+    }
+
+    /**
+     * Sama dengan findActiveForProdi tapi tambah filter target_graduation_years.
+     * Dipakai di alumni form fill agar hanya muncul kuesioner sesuai tahun lulus.
+     */
+    public function findActiveForProdiAndYear(int $programId, int $graduationYear): Collection
+    {
+        return collect(
+            DB::connection(self::CONN)->table('questionnaires')
+                ->where('status', 'published')
+                ->where(function ($q) use ($programId) {
+                    $q->whereNull('program_id')
+                      ->orWhere('program_id', $programId);
+                })
+                ->where(function ($q) use ($graduationYear) {
+                    $q->whereNull('target_graduation_years')
+                      ->orWhereRaw("target_graduation_years::text = '[]'")
+                      ->orWhereJsonContains('target_graduation_years', $graduationYear);
                 })
                 ->get()
         );

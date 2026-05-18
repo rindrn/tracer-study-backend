@@ -287,4 +287,15 @@ class AlumniProfileRepository
             array_merge($data, ['nim' => $nim, 'created_at' => $now, 'updated_at' => $now])
         );
     }
+
+    /** Bulk insert alumni rows (used by Excel import). */
+    public function bulkInsert(array $rows): void
+    {
+        $now = now();
+        $records = array_map(fn ($row) => array_merge($row, ['created_at' => $now, 'updated_at' => $now]), $rows);
+
+        foreach (array_chunk($records, 100) as $chunk) {
+            DB::connection(self::CONN)->table('alumni_profiles')->insert($chunk);
+        }
+    }
 }

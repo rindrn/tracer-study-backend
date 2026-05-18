@@ -13,23 +13,36 @@ class QuestionnaireSeeder extends Seeder
         $now = Carbon::now();
         $conn = DB::connection('oltp');
 
-        // ═══════════════════════════════════════════════════════
-        // 1. KUESIONER NASIONAL (KEMENTRIAN) — program_id = null
-        // ═══════════════════════════════════════════════════════
-        $qGlobalId = $conn->table('questionnaires')->insertGetId([
-            'code'         => 'DIKTI_2026',
-            'title'        => 'Kuesioner Tracer Study Nasional 2026',
-            'description'  => 'Kuesioner wajib dari Kementerian Pendidikan untuk seluruh lulusan perguruan tinggi.',
-            'period_year'  => 2026,
-            'version'      => 1,
-            'status'       => 'published',
-            'program_id'   => null,
-            'published_at' => $now,
-            'created_at'   => $now,
-            'updated_at'   => $now,
-        ]);
+        $targetYears = [2022, 2023, 2024];
+        $globalIds = [];
 
-        // ── Sections (0 = Identitas, 1-9 = kuesioner) ────────
+        foreach ($targetYears as $tIdx => $targetYear) {
+            $gId = $conn->table('questionnaires')->insertGetId([
+                'code'                    => 'DIKTI_2026_v' . ($tIdx + 1),
+                'title'                   => "Kuesioner Tracer Study Nasional 2026 — Lulusan {$targetYear}",
+                'description'             => 'Kuesioner wajib dari Kementerian Pendidikan untuk seluruh lulusan perguruan tinggi.',
+                'period_year'             => 2026,
+                'version'                 => $tIdx + 1,
+                'status'                  => 'published',
+                'program_id'              => null,
+                'target_graduation_years' => json_encode([$targetYear]),
+                'published_at'            => $now,
+                'created_at'              => $now,
+                'updated_at'              => $now,
+            ]);
+            $globalIds[] = $gId;
+        }
+
+        foreach ($globalIds as $qGlobalId) {
+            $this->seedGlobalQuestions($conn, $qGlobalId, $now);
+        }
+
+        $this->seedProdiQuestionnaires($conn, $now);
+    }
+
+
+    private function seedGlobalQuestions($conn, int $qGlobalId, Carbon $now): void
+    {
         $sections = [
             ['title' => 'Identitas',                           'order_no' => 0],
             ['title' => 'Status & Pekerjaan',                  'order_no' => 1],
@@ -55,7 +68,6 @@ class QuestionnaireSeeder extends Seeder
             ]);
         }
 
-        // ── Helper: insert question + options ────────────────
         $orderCounter = 0;
         $insertQuestion = function (int $sectionNo, string $code, string $text, string $type, bool $required, ?array $meta = null, ?array $options = null) use ($conn, $qGlobalId, $sectionIds, $now, &$orderCounter) {
             $orderCounter++;
@@ -89,9 +101,8 @@ class QuestionnaireSeeder extends Seeder
             return $qId;
         };
 
-        // ═══════════════════════════════════════════════════════
+
         // SECTION 0: IDENTITAS
-        // ═══════════════════════════════════════════════════════
         $identityFields = [
             ['nimhsmsmh',  'NIM',                true],
             ['kdptimsmh',  'Kode PT',            true],
@@ -107,11 +118,7 @@ class QuestionnaireSeeder extends Seeder
             $insertQuestion(0, $idf[0], $idf[1], 'short_text', $idf[2]);
         }
 
-        // ═══════════════════════════════════════════════════════
         // SECTION 1: STATUS & PEKERJAAN
-        // ═══════════════════════════════════════════════════════
-
-        // Q1 — f8
         $insertQuestion(1, 'f8', 'Jelaskan status Anda saat ini?', 'single_choice', true, null, [
             ['1', 'Bekerja (full time / part time)'],
             ['2', 'Belum memungkinkan bekerja'],
@@ -120,19 +127,14 @@ class QuestionnaireSeeder extends Seeder
             ['5', 'Tidak kerja tetapi sedang mencari kerja'],
         ]);
 
-        // Q2 — f502
         $insertQuestion(1, 'f502', 'Dalam berapa bulan Anda mendapatkan pekerjaan pertama? / Dalam berapa bulan setelah lulus Anda memulai wiraswasta?', 'number', false, ['show_if' => ['f8' => [1, 3]]]);
 
-        // Q3 — f505
         $insertQuestion(1, 'f505', 'Berapa rata-rata pendapatan Anda per bulan? (take home pay)', 'number', false, ['show_if' => ['f8' => [1, 3]]]);
 
-        // Q4 — f5a1
         $insertQuestion(1, 'f5a1', 'Dimana lokasi tempat Anda bekerja? (Provinsi)', 'short_text', false, ['show_if' => ['f8' => [1, 3]]]);
 
-        // Q4 — f5a2
         $insertQuestion(1, 'f5a2', 'Dimana lokasi tempat Anda bekerja? (Kota/Kabupaten)', 'short_text', false, ['show_if' => ['f8' => [1, 3]]]);
 
-        // Q5 — f1101
         $insertQuestion(1, 'f1101', 'Apa jenis perusahaan/instansi/institusi tempat Anda bekerja sekarang?', 'single_choice', false, ['show_if' => ['f8' => [1]]], [
             ['1', 'Instansi pemerintah'],
             ['2', 'Organisasi non-profit/Lembaga Swadaya Masyarakat'],
@@ -143,27 +145,20 @@ class QuestionnaireSeeder extends Seeder
             ['5', 'Lainnya, tuliskan'],
         ]);
 
-        // Q5b — f1102
         $insertQuestion(1, 'f1102', 'Sebutkan jenis perusahaan/instansi lainnya', 'short_text', false, ['show_if' => ['f1101' => [5]]]);
 
-        // Q6 — f5b
         $insertQuestion(1, 'f5b', 'Apa nama perusahaan/kantor tempat Anda bekerja?', 'short_text', false, ['show_if' => ['f8' => [1]]]);
 
-        // Q7 — f5c
         $insertQuestion(1, 'f5c', 'Bila berwiraswasta, apa posisi/jabatan Anda saat ini?', 'number', false, ['show_if' => ['f8' => [3]]]);
 
-        // Q8 — f5d
         $insertQuestion(1, 'f5d', 'Apa tingkat tempat kerja Anda?', 'single_choice', false, ['show_if' => ['f8' => [1, 3]]], [
             ['1', 'Lokal/Wilayah/Wiraswasta tidak berbadan hukum'],
             ['2', 'Nasional/Wiraswasta berbadan hukum'],
             ['3', 'Multinasional/Internasional'],
         ]);
 
-        // ═══════════════════════════════════════════════════════
-        // SECTION 2: STUDI LANJUT
-        // ═══════════════════════════════════════════════════════
 
-        // Q9a — f18a
+        // SECTION 2: STUDI LANJUT
         $insertQuestion(2, 'f18a', 'Sumber biaya untuk studi lanjut?', 'single_choice', false, ['show_if' => ['f8' => [4]]], [
             ['1', 'Biaya Sendiri/Keluarga'],
             ['2', 'Beasiswa'],
@@ -171,20 +166,13 @@ class QuestionnaireSeeder extends Seeder
             ['4', 'Lainnya'],
         ]);
 
-        // Q9b — f18b
         $insertQuestion(2, 'f18b', 'Perguruan Tinggi tempat studi lanjut?', 'short_text', false, ['show_if' => ['f8' => [4]]]);
 
-        // Q9c — f18c
         $insertQuestion(2, 'f18c', 'Program Studi studi lanjut?', 'short_text', false, ['show_if' => ['f8' => [4]]]);
 
-        // Q9d — f18d
         $insertQuestion(2, 'f18d', 'Tanggal Masuk studi lanjut? (dd/mm/yyyy)', 'date', false, ['show_if' => ['f8' => [4]]]);
 
-        // ═══════════════════════════════════════════════════════
         // SECTION 3: SUMBER DANA KULIAH
-        // ═══════════════════════════════════════════════════════
-
-        // Q10 — f1201
         $insertQuestion(3, 'f1201', 'Sebutkan sumber dana dalam pembiayaan kuliah Anda? (bukan ketika Studi Lanjut)', 'single_choice', true, null, [
             ['1', 'Biaya Sendiri/Keluarga'],
             ['2', 'Beasiswa ADIK'],
@@ -195,14 +183,9 @@ class QuestionnaireSeeder extends Seeder
             ['7', 'Lainnya, tuliskan'],
         ]);
 
-        // Q10b — f1202
         $insertQuestion(3, 'f1202', 'Sebutkan sumber dana pembiayaan kuliah lainnya', 'short_text', false, ['show_if' => ['f1201' => [7]]]);
 
-        // ═══════════════════════════════════════════════════════
         // SECTION 4: KESESUAIAN PEKERJAAN & PENDIDIKAN
-        // ═══════════════════════════════════════════════════════
-
-        // Q11 — f14
         $insertQuestion(4, 'f14', 'Seberapa erat hubungan bidang studi dengan pekerjaan Anda?', 'single_choice', false, ['show_if' => ['f8' => [1]]], [
             ['1', 'Sangat Erat'],
             ['2', 'Erat'],
@@ -211,7 +194,6 @@ class QuestionnaireSeeder extends Seeder
             ['5', 'Tidak Sama Sekali'],
         ]);
 
-        // Q12 — f15
         $insertQuestion(4, 'f15', 'Tingkat pendidikan apa yang paling tepat/sesuai untuk pekerjaan Anda saat ini?', 'single_choice', false, ['show_if' => ['f8' => [1]]], [
             ['1', 'Setingkat Lebih Tinggi'],
             ['2', 'Tingkat yang Sama'],
@@ -219,10 +201,8 @@ class QuestionnaireSeeder extends Seeder
             ['4', 'Tidak Perlu Pendidikan Tinggi'],
         ]);
 
-        // ═══════════════════════════════════════════════════════
-        // SECTION 5: KOMPETENSI (f1761–f1774)
-        // ═══════════════════════════════════════════════════════
 
+        // SECTION 5: KOMPETENSI (f1761-f1774)
         $competencies = [
             ['f1761', 'f1762', 'Etika'],
             ['f1763', 'f1764', 'Keahlian berdasarkan bidang ilmu'],
@@ -243,10 +223,7 @@ class QuestionnaireSeeder extends Seeder
                 'number', true, ['scale_min' => 1, 'scale_max' => 5, 'competency' => $comp[2], 'dimension' => 'saat_ini']);
         }
 
-        // ═══════════════════════════════════════════════════════
-        // SECTION 6: METODE PEMBELAJARAN (f21–f27)
-        // ═══════════════════════════════════════════════════════
-
+        // SECTION 6: METODE PEMBELAJARAN (f21-f27)
         $methods = [
             ['f21', 'Perkuliahan'],
             ['f22', 'Demonstrasi'],
@@ -263,24 +240,18 @@ class QuestionnaireSeeder extends Seeder
                 'number', true, ['scale_min' => 1, 'scale_max' => 5, 'method' => $m[1]]);
         }
 
-        // ═══════════════════════════════════════════════════════
-        // SECTION 7: PENCARIAN KERJA
-        // ═══════════════════════════════════════════════════════
 
-        // Q15 — f301
+        // SECTION 7: PENCARIAN KERJA
         $insertQuestion(7, 'f301', 'Kapan Anda mulai mencari pekerjaan? Mohon pekerjaan sambilan tidak dimasukkan.', 'single_choice', true, null, [
             ['1', 'Kira-kira __ bulan sebelum lulus'],
             ['2', 'Kira-kira __ bulan sesudah lulus'],
             ['3', 'Saya tidak mencari kerja'],
         ]);
 
-        // f302
         $insertQuestion(7, 'f302', 'Kira-kira berapa bulan sebelum lulus Anda mulai mencari pekerjaan?', 'number', false, ['show_if' => ['f301' => [1]]]);
 
-        // f303
         $insertQuestion(7, 'f303', 'Kira-kira berapa bulan sesudah lulus Anda mulai mencari pekerjaan?', 'number', false, ['show_if' => ['f301' => [2]]]);
 
-        // Q16 — f401-f415 (Cara mencari pekerjaan — grouped checkbox)
         $jobSearchMethods = [
             ['f401', 'Melalui iklan di koran/majalah, brosur'],
             ['f402', 'Melamar ke perusahaan tanpa mengetahui lowongan yang ada'],
@@ -311,27 +282,17 @@ class QuestionnaireSeeder extends Seeder
                 'boolean', false, $meta);
         }
 
-        // f416
         $insertQuestion(7, 'f416', 'Sebutkan cara lainnya dalam mencari pekerjaan', 'short_text', false, ['show_if' => ['f415' => [1]]]);
 
-        // ═══════════════════════════════════════════════════════
-        // SECTION 8: STATISTIK LAMARAN
-        // ═══════════════════════════════════════════════════════
 
-        // Q17 — f6
+        // SECTION 8: STATISTIK LAMARAN
         $insertQuestion(8, 'f6', 'Berapa perusahaan/instansi yang sudah Anda lamar (lewat surat atau e-mail) sebelum Anda memperoleh pekerjaan pertama?', 'number', false);
 
-        // Q18 — f7
         $insertQuestion(8, 'f7', 'Berapa banyak perusahaan/instansi yang merespons lamaran Anda?', 'number', false);
 
-        // Q19 — f7a
         $insertQuestion(8, 'f7a', 'Berapa banyak perusahaan/instansi yang mengundang Anda untuk wawancara?', 'number', false);
 
-        // ═══════════════════════════════════════════════════════
         // SECTION 9: AKTIVITAS & ALASAN
-        // ═══════════════════════════════════════════════════════
-
-        // Q20 — f1001
         $insertQuestion(9, 'f1001', 'Apakah Anda aktif mencari pekerjaan dalam 4 minggu terakhir? Pilih satu jawaban.', 'single_choice', true, null, [
             ['1', 'Tidak'],
             ['2', 'Tidak, tapi saya sedang menunggu hasil lamaran kerja'],
@@ -340,10 +301,8 @@ class QuestionnaireSeeder extends Seeder
             ['5', 'Lainnya'],
         ]);
 
-        // f1002
         $insertQuestion(9, 'f1002', 'Sebutkan aktivitas lainnya dalam mencari pekerjaan', 'short_text', false, ['show_if' => ['f1001' => [5]]]);
 
-        // Q21 — f1601-f1614 (Alasan pekerjaan tidak sesuai — multi-select)
         $mismatchReasons = [
             ['f1601', 'Pertanyaan tidak sesuai; pekerjaan saya sekarang sudah sesuai dengan pendidikan saya'],
             ['f1602', 'Saya belum mendapatkan pekerjaan yang lebih sesuai'],
@@ -360,7 +319,6 @@ class QuestionnaireSeeder extends Seeder
             ['f1613', 'Lainnya'],
         ];
 
-        // Q21 — f1601-f1614 (Alasan pekerjaan tidak sesuai — grouped checkbox)
         foreach ($mismatchReasons as $i => $mr) {
             $meta = [
                 'group_code'  => 'q21_alasan_tidak_sesuai',
@@ -374,21 +332,12 @@ class QuestionnaireSeeder extends Seeder
                 'boolean', false, $meta);
         }
 
-        // f1614
         $insertQuestion(9, 'f1614', 'Sebutkan alasan lainnya mengambil pekerjaan yang tidak sesuai pendidikan', 'short_text', false, ['show_if' => ['f1613' => [1]]]);
-
-        // ═══════════════════════════════════════════════════════
-        // 2. KUESIONER LOKAL — Per Program Studi (semua prodi)
-        // ═══════════════════════════════════════════════════════
-        $this->seedProdiQuestionnaires($conn, $now);
     }
 
-    /**
-     * Seed satu kuesioner lokal per program studi.
-     */
+
     private function seedProdiQuestionnaires($conn, Carbon $now): void
     {
-        // Definisi pertanyaan khusus per jurusan
         $jurusanQuestions = [
             'Teknik Sipil' => [
                 ['q_software_desain', 'Software desain apa yang paling sering Anda gunakan di pekerjaan? (misal: AutoCAD, SAP2000, Revit)', 'short_text'],
@@ -440,30 +389,34 @@ class QuestionnaireSeeder extends Seeder
                 ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi profesional yang relevan dengan bidang studi?', 'boolean'],
             ];
 
-            $qLokalId = $conn->table('questionnaires')->insertGetId([
-                'code'         => strtoupper($program->code) . '_2026',
-                'title'        => "Kuesioner Tambahan Lulusan {$program->name}",
-                'description'  => "Pertanyaan khusus dari Program Studi {$program->name} POLBAN.",
-                'period_year'  => 2026,
-                'version'      => 1,
-                'status'       => 'published',
-                'program_id'   => $program->id,
-                'published_at' => $now,
-                'created_at'   => $now,
-                'updated_at'   => $now,
-            ]);
-
-            foreach ($questions as $i => $q) {
-                $conn->table('questionnaire_questions')->insert([
-                    'questionnaire_id' => $qLokalId,
-                    'code'             => $q[0],
-                    'question_text'    => $q[1],
-                    'question_type'    => $q[2],
-                    'is_required'      => false,
-                    'order_no'         => $i + 1,
-                    'created_at'       => $now,
-                    'updated_at'       => $now,
+            $prodiTargetYears = [2022, 2023, 2024];
+            foreach ($prodiTargetYears as $ptIdx => $ptYear) {
+                $qLokalId = $conn->table('questionnaires')->insertGetId([
+                    'code'                    => strtoupper($program->code) . '_2026_v' . ($ptIdx + 1),
+                    'title'                   => "Kuesioner Tambahan Lulusan {$program->name} — Lulusan {$ptYear}",
+                    'description'             => "Pertanyaan khusus dari Program Studi {$program->name} POLBAN.",
+                    'period_year'             => 2026,
+                    'version'                 => $ptIdx + 1,
+                    'status'                  => 'published',
+                    'program_id'              => $program->id,
+                    'target_graduation_years' => json_encode([$ptYear]),
+                    'published_at'            => $now,
+                    'created_at'              => $now,
+                    'updated_at'              => $now,
                 ]);
+
+                foreach ($questions as $i => $q) {
+                    $conn->table('questionnaire_questions')->insert([
+                        'questionnaire_id' => $qLokalId,
+                        'code'             => $q[0],
+                        'question_text'    => $q[1],
+                        'question_type'    => $q[2],
+                        'is_required'      => false,
+                        'order_no'         => $i + 1,
+                        'created_at'       => $now,
+                        'updated_at'       => $now,
+                    ]);
+                }
             }
         }
     }

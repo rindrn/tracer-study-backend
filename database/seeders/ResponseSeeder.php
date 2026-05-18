@@ -28,6 +28,32 @@ class ResponseSeeder extends Seeder
             ->get()
             ->keyBy('program_id');
 
+        // Year-aware: group global questionnaires by target year
+        $globalQnrs = $conn->table('questionnaires')
+            ->whereNull('program_id')
+            ->where('status', 'published')
+            ->get();
+        $globalByYear = [];
+        foreach ($globalQnrs as $gq) {
+            $years = $gq->target_graduation_years ? json_decode($gq->target_graduation_years, true) : [];
+            foreach ($years as $y) {
+                $globalByYear[$y] = $gq;
+            }
+        }
+
+        // Year-aware: group prodi questionnaires by program_id + target year
+        $allProdiQnrs = $conn->table('questionnaires')
+            ->whereNotNull('program_id')
+            ->where('status', 'published')
+            ->get();
+        $prodiByProgramYear = [];
+        foreach ($allProdiQnrs as $pq) {
+            $years = $pq->target_graduation_years ? json_decode($pq->target_graduation_years, true) : [];
+            foreach ($years as $y) {
+                $prodiByProgramYear[$pq->program_id][$y] = $pq;
+            }
+        }
+
         // Prodi-specific answer generators (keyed by jurusan)
         $prodiAnswerMap = [
             'Teknik Sipil' => ['q_software_desain' => ['AutoCAD', 'SAP2000', 'Revit', 'SketchUp', 'ETABS']],
@@ -53,16 +79,20 @@ class ResponseSeeder extends Seeder
         foreach ($alumniList as $alumni) {
             $program = $programs[$alumni->program_id] ?? null;
 
-            // Count alumni per program — skip the 4th (index 3) for testing
+            // Count alumni per program — skip the 5th (index 4) for testing
             $pid = $alumni->program_id;
             $alumniCountByProgram[$pid] = ($alumniCountByProgram[$pid] ?? 0) + 1;
-            if ($alumniCountByProgram[$pid] > 3) {
+            if ($alumniCountByProgram[$pid] > 4) {
                 continue; // Leave this alumni unanswered for testing
             }
 
+            // Year-pairing: find matching global questionnaire for this alumni's grad year
+            $alumniYear = (int) $alumni->graduation_year;
+            $matchedGlobal = $globalByYear[$alumniYear] ?? $qGlobal;
+
             // 1. Buat Header Response
             $responseId = $conn->table('responses')->insertGetId([
-                'questionnaire_id' => $qGlobal->id,
+                'questionnaire_id' => $matchedGlobal->id,
                 'alumni_id'        => $alumni->id,
                 'status'           => 'submitted',
                 'submitted_at'     => $now,
@@ -116,7 +146,7 @@ class ResponseSeeder extends Seeder
                 // Employment record
                 $conn->table('employment_records')->insert([
                     'alumni_id'         => $alumni->id,
-                    'questionnaire_id'  => $qGlobal->id,
+                    'questionnaire_id'  => $matchedGlobal->id,
                     'employment_status' => $statusKerja == 1 ? 'employed' : 'entrepreneur',
                     'company_name'      => $statusKerja == 1 ? $faker->randomElement($companies) : 'Usaha Sendiri',
                     'job_title'         => $faker->jobTitle,
@@ -138,7 +168,7 @@ class ResponseSeeder extends Seeder
 
                 $conn->table('education_records')->insert([
                     'alumni_id'        => $alumni->id,
-                    'questionnaire_id' => $qGlobal->id,
+                    'questionnaire_id' => $matchedGlobal->id,
                     'is_further_study' => true,
                     'institution_name' => $faker->randomElement($universities),
                     'degree'           => 'S2',
@@ -203,8 +233,8 @@ class ResponseSeeder extends Seeder
             }
 
             // ── Pertanyaan Prodi (lokal — per program studi) ─
-            if ($program && isset($prodiQuestionnaires[$program->id])) {
-                $prodiQnr = $prodiQuestionnaires[$program->id];
+            if ($program && isset($prodiByProgramYear[$program->id][$alumniYear])) {
+                $prodiQnr = $prodiByProgramYear[$program->id][$alumniYear];
                 $jurusan = $program->jurusan;
                 $answerDefs = $prodiAnswerMap[$jurusan] ?? [];
 
