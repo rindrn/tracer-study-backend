@@ -216,12 +216,18 @@ class QuestionnaireService
             ]);
 
             foreach (array_values($sectionData['questions']) as $questionIndex => $questionData) {
+                // Determine DB type — override to 'boolean' if group_code present (grouped boolean from template)
+                $dbType = $this->mapQuestionTypeToDatabase($questionData['type']);
+                if (!empty($questionData['group_code'])) {
+                    $dbType = 'boolean';
+                }
+
                 $questionId = $this->questionnaireRepo->insertQuestion([
                     'questionnaire_id' => $questionnaireId,
                     'section_id'       => $sectionId,
                     'code'             => $questionData['code'] ?: Str::slug($questionData['question']) . '-' . ($questionIndex + 1),
                     'question_text'    => $questionData['question'],
-                    'question_type'    => $this->mapQuestionTypeToDatabase($questionData['type']),
+                    'question_type'    => $dbType,
                     'is_required'      => (bool) ($questionData['required'] ?? false),
                     'order_no'         => (int) ($questionData['order_no'] ?? ($questionIndex + 1)),
                     'metadata'         => json_encode($this->buildQuestionMetadata($questionData)),
@@ -257,15 +263,20 @@ class QuestionnaireService
             'dropdown'        => 'single_choice',
             'linear_scale'    => 'number',
             'rating'          => 'number',
-            'boolean'         => 'single_choice',
+            'boolean'         => 'boolean',
             'date'            => 'date',
             'time'            => 'short_text',
             default           => 'short_text',
         };
     }
 
-    private function mapQuestionTypeToFrontend(string $dbType): string
+    private function mapQuestionTypeToFrontend(string $dbType, array $metadata = []): string
     {
+        // number with scale metadata → linear_scale (not short)
+        if ($dbType === 'number' && (isset($metadata['scale_min']) || isset($metadata['scaleMin']))) {
+            return 'linear_scale';
+        }
+
         return match ($dbType) {
             'short_text'      => 'short',
             'long_text'       => 'paragraph',
@@ -285,21 +296,28 @@ class QuestionnaireService
             'allowOther'    => $questionData['allowOther'] ?? false,
         ];
 
-        foreach (['scaleMin', 'scaleMax'] as $key) {
-            if (isset($questionData[$key])) {
-                $metadata[$key] = $questionData[$key];
-            }
+        // Scale metadata — store as snake_case for consistency with seeder
+        if (isset($questionData['scaleMin'])) {
+            $metadata['scale_min'] = $questionData['scaleMin'];
         }
+        if (isset($questionData['scaleMax'])) {
+            $metadata['scale_max'] = $questionData['scaleMax'];
+        }
+
         foreach (['gridRows', 'gridColumns'] as $key) {
             if (!empty($questionData[$key])) {
                 $metadata[$key] = array_values($questionData[$key]);
             }
         }
 
+        // Preserve group metadata (for grouped boolean questions from template)
+        foreach (['group_code', 'group_label', 'group_title'] as $key) {
+            if (!empty($questionData[$key])) {
+                $metadata[$key] = $questionData[$key];
+            }
+        }
+
         // Simpan pertanyaan bersyarat (logic) sebagai show_if di metadata.
-        // Format: show_if = { "f8": ["1", "3"] } atau { "f1201": ["Lainnya, tuliskan"] }
-        // FE mengirim values sebagai label opsi; disimpan apa adanya.
-        // Saat load kembali, FE resolve label↔code via optionLabelMap.
         if (!empty($questionData['logic']) && ($questionData['logic']['type'] ?? '') === 'in_array') {
             $depCode = $questionData['logic']['dependsOn'] ?? '';
             $values  = $questionData['logic']['values'] ?? [];
@@ -385,7 +403,7 @@ class QuestionnaireService
             'code'          => $question->code,
             'question'      => $question->question_text,
             'question_text' => $question->question_text,
-            'type'          => $metadata['original_type'] ?? $this->mapQuestionTypeToFrontend($question->question_type),
+            'type'          => $metadata['original_type'] ?? $this->mapQuestionTypeToFrontend($question->question_type, $metadata),
             'description'   => null,
             'options'       => ($optionsGrouped->get($question->id, collect()))->map(fn ($o) => [
                 'id'       => $o->id,
@@ -396,8 +414,8 @@ class QuestionnaireService
             ])->values()->toArray(),
             'required'    => (bool) $question->is_required,
             'allowOther'  => $metadata['allowOther'] ?? false,
-            'scaleMin'    => $metadata['scaleMin']   ?? 1,
-            'scaleMax'    => $metadata['scaleMax']   ?? 5,
+            'scaleMin'    => $metadata['scaleMin']   ?? $metadata['scale_min'] ?? 1,
+            'scaleMax'    => $metadata['scaleMax']   ?? $metadata['scale_max'] ?? 5,
             'gridRows'    => $metadata['gridRows']   ?? [],
             'gridColumns' => $metadata['gridColumns'] ?? [],
             'metadata'    => $metadata, // includes show_if for conditional logic
