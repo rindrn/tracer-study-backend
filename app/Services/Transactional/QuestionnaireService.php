@@ -296,6 +296,18 @@ class QuestionnaireService
             }
         }
 
+        // Simpan pertanyaan bersyarat (logic) sebagai show_if di metadata.
+        // Format: show_if = { "f8": ["1", "3"] } atau { "f1201": ["Lainnya, tuliskan"] }
+        // FE mengirim values sebagai label opsi; disimpan apa adanya.
+        // Saat load kembali, FE resolve label↔code via optionLabelMap.
+        if (!empty($questionData['logic']) && ($questionData['logic']['type'] ?? '') === 'in_array') {
+            $depCode = $questionData['logic']['dependsOn'] ?? '';
+            $values  = $questionData['logic']['values'] ?? [];
+            if ($depCode && !empty($values)) {
+                $metadata['show_if'] = [$depCode => array_values($values)];
+            }
+        }
+
         return $metadata;
     }
 
@@ -388,6 +400,7 @@ class QuestionnaireService
             'scaleMax'    => $metadata['scaleMax']   ?? 5,
             'gridRows'    => $metadata['gridRows']   ?? [],
             'gridColumns' => $metadata['gridColumns'] ?? [],
+            'metadata'    => $metadata, // includes show_if for conditional logic
         ];
     }
 }

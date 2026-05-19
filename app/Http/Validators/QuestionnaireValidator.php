@@ -56,6 +56,11 @@ class QuestionnaireValidator
             'sections.*.questions.*.options.*.label' => ['nullable', 'string', 'max:255'],
             'sections.*.questions.*.options.*.value' => ['nullable', 'string', 'max:255'],
             'sections.*.questions.*.options.*.code' => ['nullable', 'string', 'max:80'],
+            'sections.*.questions.*.logic' => ['nullable', 'array'],
+            'sections.*.questions.*.logic.type' => ['nullable', 'string', 'in:always,in_array'],
+            'sections.*.questions.*.logic.dependsOn' => ['nullable', 'string', 'max:100'],
+            'sections.*.questions.*.logic.values' => ['nullable', 'array'],
+            'sections.*.questions.*.logic.values.*' => ['nullable', 'string', 'max:255'],
         ], [
             'title.required' => 'Judul kuisioner wajib diisi.',
             'status.required' => 'Status kuisioner wajib diisi.',

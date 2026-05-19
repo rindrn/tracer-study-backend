@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::connection('oltp')->create('questionnaires', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 50);
+            $table->string('code', 100);
             $table->string('title', 200);
             $table->unsignedSmallInteger('period_year');
             $table->unsignedInteger('version')->default(1);
