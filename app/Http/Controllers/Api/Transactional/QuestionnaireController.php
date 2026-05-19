@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Transactional;
 
 use App\Http\Controllers\Controller;
 use App\Http\Validators\QuestionnaireValidator;
+use App\Models\Transactional\ApprovalRequest;
 use App\Services\Transactional\QuestionnaireService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,11 +40,29 @@ class QuestionnaireController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $this->validator->validateCreate($request->all());
+
+        // Tracer team hanya bisa buat draft (perlu approval head_tracer untuk publish)
+        if ($request->user()->isTracerTeam()) {
+            $validated['status'] = 'draft';
+        }
+
         $data = $this->service->create($validated);
+
+        // Buat approval request jika tracer_team
+        if ($request->user()->isTracerTeam()) {
+            ApprovalRequest::create([
+                'requester_id' => $request->user()->id,
+                'type'         => ApprovalRequest::TYPE_ADD_QUESTIONNAIRE,
+                'payload'      => ['questionnaire_id' => $data['id'], 'title' => $data['title']],
+                'status'       => ApprovalRequest::STATUS_PENDING,
+            ]);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Kuisioner berhasil disimpan.',
+            'message' => $request->user()->isTracerTeam()
+                ? 'Kuisioner berhasil diajukan sebagai draft. Menunggu approval Super Admin.'
+                : 'Kuisioner berhasil disimpan.',
             'data'    => $data,
         ], 201);
     }

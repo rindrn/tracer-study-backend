@@ -30,7 +30,7 @@ class UpdateAlumniRequest extends FormRequest
             'is_active' => ['nullable', 'boolean'],
         ];
 
-        if ($user && $user->isAdmin()) {
+        if ($user && $user->isHeadTracer()) {
             $rules['program_id'] = ['sometimes', 'required', 'exists:oltp.programs,id'];
         }
 

@@ -1,5 +1,4 @@
 <?php
-// database/seeders/UserSeeder.php
 namespace Database\Seeders;
 
 use App\Models\Transactional\Program;
@@ -12,39 +11,49 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // ── Akun Sistem (role global, program_id NULL) ───────
-        // Demo akun untuk coba login 5 role di luar kaprodi.
-        // Semua pakai password seragam: "password123".
-        $systemUsers = [
-            ['name' => 'Admin Sistem',         'email' => 'admin@test.com',        'role' => User::ROLE_ADMIN],
-            ['name' => 'Petugas P2MPP',        'email' => 'p2mpp@test.com',        'role' => User::ROLE_P2MPP],
-            ['name' => 'Kepala Tracer Study',  'email' => 'head.tracer@test.com',  'role' => User::ROLE_HEAD_TRACER],
-            ['name' => 'Tim Tracer 1',         'email' => 'tracer1@test.com',      'role' => User::ROLE_TRACER_TEAM],
-            ['name' => 'Tim Tracer 2',         'email' => 'tracer2@test.com',      'role' => User::ROLE_TRACER_TEAM],
-            ['name' => 'Wakil Direktur',       'email' => 'wadir@test.com',        'role' => User::ROLE_WADIR],
-        ];
+        $pw = Hash::make('password123');
 
-        foreach ($systemUsers as $data) {
-            User::updateOrCreate(['email' => $data['email']], array_merge($data, [
-                'program_id' => null,
-                'password'   => Hash::make('password123'),
-            ]));
+        // ── 1. Super Admin / Ketua Tracer — 1 akun ──────────
+        User::updateOrCreate(['email' => 'head.tracer@test.com'], [
+            'name' => 'Kepala Tracer Study', 'role' => User::ROLE_HEAD_TRACER,
+            'program_id' => null, 'jurusan' => null, 'password' => $pw,
+        ]);
+
+        // ── 2. Admin / Tim Tracer — 5 akun ──────────────────
+        for ($i = 1; $i <= 5; $i++) {
+            User::updateOrCreate(['email' => "tracer{$i}@test.com"], [
+                'name' => "Tim Tracer {$i}", 'role' => User::ROLE_TRACER_TEAM,
+                'program_id' => null, 'jurusan' => null, 'password' => $pw,
+            ]);
         }
 
-        // ── Akun Kaprodi (1 per program studi) ───────────────
-        // role = 'kaprodi' (sebelumnya 'prodi'), sinkron dengan FE RBAC.
+        // ── 3. Pimpinan (Wadir) — 5 akun ────────────────────
+        $pimpinan = ['Direktur', 'Wakil Direktur 1', 'Wakil Direktur 2', 'P2MPP 1', 'P2MPP 2'];
+        foreach ($pimpinan as $i => $name) {
+            $slug = Str::slug($name, '.');
+            User::updateOrCreate(['email' => "{$slug}@test.com"], [
+                'name' => $name, 'role' => User::ROLE_WADIR,
+                'program_id' => null, 'jurusan' => null, 'password' => $pw,
+            ]);
+        }
+
+        // ── 4. Kajur — 1 per jurusan (10 jurusan dari ProgramSeeder) ─────
+        $jurusanList = Program::distinct()->whereNotNull('jurusan')->pluck('jurusan');
+        foreach ($jurusanList as $jurusan) {
+            $slug = Str::slug($jurusan, '.');
+            User::updateOrCreate(['email' => "kajur.{$slug}@test.com"], [
+                'name' => "Kajur {$jurusan}", 'role' => User::ROLE_KAJUR,
+                'program_id' => null, 'jurusan' => $jurusan, 'password' => $pw,
+            ]);
+        }
+
+        // ── 5. Kaprodi — 1 per program studi ────────────────
         $programs = Program::all();
-
         foreach ($programs as $program) {
-            $emailSlug = Str::lower(str_replace([' ', '&', '/'], ['', '', ''], $program->code));
-            $email = "prodi.{$emailSlug}@test.com";
-
-            User::updateOrCreate(['email' => $email], [
-                'name'       => "Kaprodi {$program->name}",
-                'email'      => $email,
-                'role'       => User::ROLE_KAPRODI,
-                'program_id' => $program->id,
-                'password'   => Hash::make('password123'),
+            $slug = Str::lower(str_replace([' ', '&', '/'], '', $program->code));
+            User::updateOrCreate(['email' => "prodi.{$slug}@test.com"], [
+                'name' => "Kaprodi {$program->name}", 'role' => User::ROLE_KAPRODI,
+                'program_id' => $program->id, 'jurusan' => null, 'password' => $pw,
             ]);
         }
     }

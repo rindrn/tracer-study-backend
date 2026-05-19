@@ -42,6 +42,7 @@ class ReportService
         // 1. Ambil alumni (filtered by role + optional questionnaire_id)
         $filters = array_filter([
             'program_id'       => $user->isKaprodi() ? $user->program_id : null,
+            'jurusan'          => $user->isKajur() ? $user->jurusan : null,
             'questionnaire_id' => $questionnaireId,
         ], fn ($v) => $v !== null);
 
