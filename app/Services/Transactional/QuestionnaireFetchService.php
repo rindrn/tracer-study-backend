@@ -6,6 +6,7 @@ use App\Exceptions\BusinessException;
 use App\Repositories\Transactional\ProgramRepository;
 use App\Repositories\Transactional\QuestionnaireRepository;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * QuestionnaireFetchService — fetch kuesioner aktif (global + prodi) untuk alumni UI.
@@ -136,5 +137,25 @@ class QuestionnaireFetchService
                 'value' => $o->option_code, // FE pakai option_code sebagai value
             ])->values(),
         ];
+    }
+
+    /**
+     * Cek apakah alumni (by NIM) sudah pernah submit response ke salah satu kuesioner aktif.
+     */
+    public function hasAlumniResponded(string $nim, array $questionnaires): bool
+    {
+        $alumniId = DB::connection('oltp')->table('alumni_profiles')
+            ->where('nim', $nim)->value('id');
+
+        if (!$alumniId) {
+            return false;
+        }
+
+        $questionnaireIds = collect($questionnaires)->pluck('id')->toArray();
+
+        return DB::connection('oltp')->table('responses')
+            ->where('alumni_id', $alumniId)
+            ->whereIn('questionnaire_id', $questionnaireIds)
+            ->exists();
     }
 }
