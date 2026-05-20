@@ -61,6 +61,9 @@ class QuestionnaireValidator
             'sections.*.questions.*.logic.dependsOn' => ['nullable', 'string', 'max:100'],
             'sections.*.questions.*.logic.values' => ['nullable', 'array'],
             'sections.*.questions.*.logic.values.*' => ['nullable', 'string', 'max:255'],
+            'sections.*.questions.*.group_code' => ['nullable', 'string', 'max:100'],
+            'sections.*.questions.*.group_label' => ['nullable', 'string', 'max:500'],
+            'sections.*.questions.*.group_title' => ['nullable', 'string', 'max:500'],
         ], [
             'title.required' => 'Judul kuisioner wajib diisi.',
             'status.required' => 'Status kuisioner wajib diisi.',

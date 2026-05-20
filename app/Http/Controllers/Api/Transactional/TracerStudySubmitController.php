@@ -16,6 +16,8 @@ class TracerStudySubmitController extends Controller
     /** POST /api/tracer-study/submit */
     public function store(SubmitTracerStudyRequest $request): JsonResponse
     {
+        \Log::info('[TracerStudy] Submit payload keys', ['keys' => array_keys($request->all())]);
+
         $this->service->submit(
             validated:  $request->validated(),
             rawAnswers: $request->all(),
