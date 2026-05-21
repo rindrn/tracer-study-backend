@@ -1,0 +1,142 @@
+[
+    {
+        "code": "100000",
+        "name": "Prov. Jambi"
+    },
+    {
+        "code": "200000",
+        "name": "Prov. Sulawesi Tenggara"
+    },
+    {
+        "code": "210000",
+        "name": "Prov. Maluku"
+    },
+    {
+        "code": "320000",
+        "name": "Prov. Papua Barat"
+    },
+    {
+        "code": "330000",
+        "name": "Prov. Sulawesi Barat"
+    },
+    {
+        "code": "350000",
+        "name": "Luar Negeri"
+    },
+    {
+        "code": "300000",
+        "name": "Prov. Gorontalo"
+    },
+    {
+        "code": "180000",
+        "name": "Prov. Sulawesi Tengah"
+    },
+    {
+        "code": "190000",
+        "name": "Prov. Sulawesi Selatan"
+    },
+    {
+        "code": "270000",
+        "name": "Prov. Maluku Utara"
+    },
+    {
+        "code": "280000",
+        "name": "Prov. Banten"
+    },
+    {
+        "code": "170000",
+        "name": "Prov. Sulawesi Utara"
+    },
+    {
+        "code": "250000",
+        "name": "Prov. Papua"
+    },
+    {
+        "code": "260000",
+        "name": "Prov. Bengkulu"
+    },
+    {
+        "code": "240000",
+        "name": "Prov. Nusa Tenggara Timur"
+    },
+    {
+        "code": "110000",
+        "name": "Prov. Sumatera Selatan"
+    },
+    {
+        "code": "290000",
+        "name": "Prov. Kepulauan Bangka Belitung"
+    },
+    {
+        "code": "120000",
+        "name": "Prov. Lampung"
+    },
+    {
+        "code": "130000",
+        "name": "Prov. Kalimantan Barat"
+    },
+    {
+        "code": "340000",
+        "name": "Prov. Kalimantan Utara"
+    },
+    {
+        "code": "310000",
+        "name": "Prov. Kepulauan Riau"
+    },
+    {
+        "code": "160000",
+        "name": "Prov. Kalimantan Timur"
+    },
+    {
+        "code": "230000",
+        "name": "Prov. Nusa Tenggara Barat"
+    },
+    {
+        "code": "140000",
+        "name": "Prov. Kalimantan Tengah"
+    },
+    {
+        "code": "150000",
+        "name": "Prov. Kalimantan Selatan"
+    },
+    {
+        "code": "220000",
+        "name": "Prov. Bali"
+    },
+    {
+        "code": "10000",
+        "name": "Prov. D.K.I. Jakarta"
+    },
+    {
+        "code": "40000",
+        "name": "Prov. D.I. Yogyakarta"
+    },
+    {
+        "code": "60000",
+        "name": "Prov. Aceh"
+    },
+    {
+        "code": "20000",
+        "name": "Prov. Jawa Barat"
+    },
+    {
+        "code": "90000",
+        "name": "Prov. Riau"
+    },
+    {
+        "code": "30000",
+        "name": "Prov. Jawa Tengah"
+    },
+    {
+        "code": "50000",
+        "name": "Prov. Jawa Timur"
+    },
+    {
+        "code": "80000",
+        "name": "Prov. Sumatera Barat"
+    },
+    {
+        "code": "70000",
+        "name": "Prov. Sumatera Utara"
+    }
+]

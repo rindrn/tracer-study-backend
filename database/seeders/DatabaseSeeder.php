@@ -13,6 +13,8 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ProgramSeeder::class,
+            ProvinceSeeder::class,
+            CitySeeder::class,
             UserSeeder::class,
             PermissionSeeder::class,
             QuestionnaireSeeder::class,

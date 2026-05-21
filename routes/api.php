@@ -36,8 +36,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('questionnaires', [QuestionnaireController::class, 'index']);
 
     // Programs — read (semua role)
+    Route::get('programs/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadPrograms']);
     Route::get('programs', [ProgramController::class, 'index']);
     Route::get('programs/{id}', [ProgramController::class, 'show']);
+
+    // Regions — read (semua role)
+    Route::get('provinces/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadProvinces']);
+    Route::get('provinces', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'provinces']);
+    Route::get('cities/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadCities']);
+    Route::get('cities', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'cities']);
 
     // ── Super Admin only (head_tracer) ───────────────────────────────────
     Route::middleware('role:head_tracer')->group(function () {
@@ -45,6 +52,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('programs', [ProgramController::class, 'store']);
         Route::put('programs/{id}', [ProgramController::class, 'update']);
         Route::delete('programs/{id}', [ProgramController::class, 'destroy']);
+
+        // Provinces CRUD
+        Route::post('provinces', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'storeProvince']);
+        Route::put('provinces/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'updateProvince']);
+        Route::delete('provinces/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'destroyProvince']);
+
+        // Cities CRUD
+        Route::post('cities', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'storeCity']);
+        Route::put('cities/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'updateCity']);
+        Route::delete('cities/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'destroyCity']);
 
         // Questionnaire delete (langsung tanpa approval)
         Route::delete('questionnaires/{questionnaire}', [QuestionnaireController::class, 'destroy']);
