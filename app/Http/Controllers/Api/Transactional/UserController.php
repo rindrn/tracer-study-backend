@@ -76,11 +76,21 @@ class UserController extends Controller
         return response()->json(['success' => true, 'message' => 'User berhasil dihapus.']);
     }
 
+    public function toggleStatus(int $id): JsonResponse
+    {
+        $user = User::findOrFail($id);
+        $user->update(['status' => !$user->status]);
+        $user->load('program');
+
+        return response()->json([
+            'success' => true,
+            'message' => $user->status ? 'User berhasil diaktifkan.' : 'User berhasil dinonaktifkan.',
+            'data'    => $this->formatUser($user),
+        ]);
+    }
+
     private function formatUser(User $user): array
     {
-        // Scope aktual: head_tracer/tracer_team/wadir = "Seluruh Jurusan"
-        //               kajur = nama jurusan user
-        //               kaprodi = nama program studi user
         $scope = match ($user->role) {
             User::ROLE_HEAD_TRACER, User::ROLE_TRACER_TEAM, User::ROLE_WADIR => 'Seluruh Jurusan',
             User::ROLE_KAJUR => $user->jurusan ?? '-',
@@ -94,6 +104,7 @@ class UserController extends Controller
             'email'        => $user->email,
             'role'         => $user->role,
             'scope'        => $scope,
+            'status'       => $user->status,
             'program_id'   => $user->program_id,
             'program_name' => $user->program?->name,
             'jurusan'      => $user->jurusan,

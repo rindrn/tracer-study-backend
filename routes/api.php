@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Users (staff) CRUD
         Route::apiResource('users', UserController::class);
+        Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
 
         // Programs CRUD
         Route::post('programs', [ProgramController::class, 'store']);

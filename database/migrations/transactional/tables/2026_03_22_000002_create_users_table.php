@@ -32,8 +32,10 @@ return new class extends Migration
             // admin / p2mpp / head_tracer / tracer_team / wadir selalu NULL.
             $table->foreignId('program_id')
                   ->nullable()
-                  ->constrained('programs')   // FK ke programs.id di OLTP
-                  ->nullOnDelete();            // jika prodi dihapus, user.program_id = NULL
+                  ->constrained('programs')
+                  ->nullOnDelete();
+
+            $table->boolean('status')->default(true);
  
             $table->rememberToken();
             $table->timestamps();
