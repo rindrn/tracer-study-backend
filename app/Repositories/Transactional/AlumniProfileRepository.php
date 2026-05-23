@@ -179,15 +179,32 @@ class AlumniProfileRepository
     }
 
     /**
-     * List responden yang sudah mengisi kuesioner tertentu.
+     * List semua alumni yang ditargetkan oleh kuesioner tertentu,
+     * termasuk yang belum mengisi (LEFT JOIN responses).
+     *
+     * Status hanya 2:
+     *   - 'ongoing'  → belum ada response ATAU status = 'started'
+     *   - 'finished' → status IN ('submitted','verified')
      *
      * @param array{program_id?: int, search?: string, questionnaire_id: int} $filters
      */
     public function paginateRespondentsByQuestionnaire(array $filters, int $perPage): LengthAwarePaginator
     {
-        $query = DB::connection(self::CONN)->table('responses')
-            ->join('alumni_profiles', 'responses.alumni_id', '=', 'alumni_profiles.id')
+        $conn = DB::connection(self::CONN);
+        $questionnaireId = $filters['questionnaire_id'];
+
+        // Ambil info kuesioner untuk filter target
+        $questionnaire = $conn->table('questionnaires')
+            ->where('id', $questionnaireId)
+            ->select('program_id', 'target_graduation_years')
+            ->first();
+
+        $query = $conn->table('alumni_profiles')
             ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+            ->leftJoin('responses', function ($join) use ($questionnaireId) {
+                $join->on('responses.alumni_id', '=', 'alumni_profiles.id')
+                     ->where('responses.questionnaire_id', '=', $questionnaireId);
+            })
             ->select(
                 'alumni_profiles.id',
                 'alumni_profiles.nim',
@@ -198,13 +215,25 @@ class AlumniProfileRepository
                 'programs.name as program_name',
                 'programs.jurusan as jurusan_name',
                 'responses.id as response_id',
-                'responses.status as response_status',
+                DB::raw("CASE WHEN responses.status IN ('submitted','verified') THEN 'finished' ELSE 'ongoing' END as response_status"),
                 'responses.submitted_at as response_submitted_at',
                 'responses.created_at as response_created_at',
                 'responses.updated_at as response_updated_at',
-            )
-            ->where('responses.questionnaire_id', $filters['questionnaire_id']);
+            );
 
+        // Scope berdasarkan target kuesioner
+        if ($questionnaire && $questionnaire->program_id) {
+            $query->where('alumni_profiles.program_id', $questionnaire->program_id);
+        }
+
+        if ($questionnaire && $questionnaire->target_graduation_years) {
+            $years = json_decode($questionnaire->target_graduation_years, true);
+            if (!empty($years)) {
+                $query->whereIn('alumni_profiles.graduation_year', $years);
+            }
+        }
+
+        // Filter tambahan dari request
         if (!empty($filters['program_id'])) {
             $query->where('alumni_profiles.program_id', $filters['program_id']);
         }
@@ -217,7 +246,9 @@ class AlumniProfileRepository
             });
         }
 
-        return $query->orderByDesc('responses.submitted_at')->paginate($perPage);
+        return $query->orderByRaw("CASE WHEN responses.status IN ('submitted','verified') THEN 2 ELSE 1 END")
+            ->orderBy('alumni_profiles.name')
+            ->paginate($perPage);
     }
 
     /**

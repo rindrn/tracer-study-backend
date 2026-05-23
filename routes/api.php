@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\Transactional\QuestionnaireController;
 use App\Http\Controllers\Api\Transactional\ApprovalController;
 use App\Http\Controllers\Api\Transactional\TracerStudySubmitController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
+use App\Http\Controllers\Api\Transactional\RoleController;
+use App\Http\Controllers\Api\Transactional\UserController;
 
 // ═══════════════════════════════════════════════════════════
 // PUBLIC
@@ -46,8 +48,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('cities/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadCities']);
     Route::get('cities', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'cities']);
 
+    // Roles — read (semua role)
+    Route::get('roles', [RoleController::class, 'index']);
+
     // ── Super Admin only (head_tracer) ───────────────────────────────────
     Route::middleware('role:head_tracer')->group(function () {
+        // Roles CUD
+        Route::post('roles', [RoleController::class, 'store']);
+        Route::put('roles/{role}', [RoleController::class, 'update']);
+        Route::delete('roles/{role}', [RoleController::class, 'destroy']);
+
+        // Users (staff) CRUD
+        Route::apiResource('users', UserController::class);
+        Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
+
         // Programs CRUD
         Route::post('programs', [ProgramController::class, 'store']);
         Route::put('programs/{id}', [ProgramController::class, 'update']);
@@ -85,6 +99,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Thresholds
         Route::apiResource('thresholds', ThresholdController::class);
+
+        // Reset respondent status from finished to ongoing
+        Route::post('alumni/{alumniId}/reset-response', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'resetResponse']);
     });
 
     // ── Admin request (tracer_team) — perlu approval ─────────────────────

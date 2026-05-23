@@ -128,4 +128,25 @@ class AlumniController extends Controller
             'data'    => $result,
         ]);
     }
+
+    /** POST /api/alumni/{alumniId}/reset-response */
+    public function resetResponse(Request $request, int $alumniId): JsonResponse
+    {
+        $request->validate(['questionnaire_id' => ['required', 'integer']]);
+
+        $repo = app(\App\Repositories\Transactional\ResponseRepository::class);
+        $reset = $repo->resetToOngoing((int) $request->input('questionnaire_id'), $alumniId);
+
+        if (!$reset) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Responden tidak dalam status finished atau tidak ditemukan.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Status responden berhasil direset ke ongoing.',
+        ]);
+    }
 }

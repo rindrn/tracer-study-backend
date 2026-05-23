@@ -15,10 +15,12 @@ class DatabaseSeeder extends Seeder
             ProgramSeeder::class,
             ProvinceSeeder::class,
             CitySeeder::class,
+            RoleSeeder::class,
             UserSeeder::class,
             PermissionSeeder::class,
             QuestionnaireSeeder::class,
             AlumniProfileSeeder::class,
+            QuestionnaireAssignmentSeeder::class,
             ResponseSeeder::class,
         ]);
     }

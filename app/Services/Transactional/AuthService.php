@@ -40,6 +40,12 @@ class AuthService
                 'email' => ['Email atau password salah.'],
             ]);
         }
+
+        if (! $user->isActive()) {
+            throw ValidationException::withMessages([
+                'email' => ['Akun Anda telah dinonaktifkan. Hubungi administrator.'],
+            ]);
+        }
  
         // Satu user = satu token aktif
         $user->tokens()->delete();

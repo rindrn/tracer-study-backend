@@ -19,17 +19,17 @@ class UserSeeder extends Seeder
             'program_id' => null, 'jurusan' => null, 'password' => $pw,
         ]);
 
-        // ── 2. Admin / Tim Tracer — 5 akun ──────────────────
-        for ($i = 1; $i <= 5; $i++) {
+        // ── 2. Admin / Tim Tracer — 2 akun ──────────────────
+        for ($i = 1; $i <= 2; $i++) {
             User::updateOrCreate(['email' => "tracer{$i}@test.com"], [
                 'name' => "Tim Tracer {$i}", 'role' => User::ROLE_TRACER_TEAM,
                 'program_id' => null, 'jurusan' => null, 'password' => $pw,
             ]);
         }
 
-        // ── 3. Pimpinan (Wadir) — 5 akun ────────────────────
-        $pimpinan = ['Direktur', 'Wakil Direktur 1', 'Wakil Direktur 2', 'P2MPP 1', 'P2MPP 2'];
-        foreach ($pimpinan as $i => $name) {
+        // ── 3. Pimpinan (Wadir) — 2 akun ────────────────────
+        $pimpinan = ['Wakil Direktur 1', 'Wakil Direktur 2'];
+        foreach ($pimpinan as $name) {
             $slug = Str::slug($name, '.');
             User::updateOrCreate(['email' => "{$slug}@test.com"], [
                 'name' => $name, 'role' => User::ROLE_WADIR,

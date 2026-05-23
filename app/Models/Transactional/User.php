@@ -13,9 +13,9 @@ class User extends Authenticatable
 
     protected $connection = 'oltp';
     protected $table      = 'users';
-    protected $fillable   = ['name', 'email', 'password', 'role', 'program_id', 'jurusan'];
+    protected $fillable   = ['name', 'email', 'password', 'role', 'program_id', 'jurusan', 'status'];
     protected $hidden     = ['password', 'remember_token'];
-    protected $casts      = ['password' => 'hashed'];
+    protected $casts      = ['password' => 'hashed', 'status' => 'boolean'];
 
     // ── Role constants ───────────────────────────────────────────────────────
     public const ROLE_HEAD_TRACER  = 'head_tracer';   // Super Admin
@@ -68,5 +68,10 @@ class User extends Authenticatable
     public function canAccessJurusan(): bool
     {
         return $this->role === self::ROLE_KAJUR && $this->jurusan !== null;
+    }
+
+    public function isActive(): bool
+    {
+        return (bool) $this->status;
     }
 }
