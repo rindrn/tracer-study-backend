@@ -44,6 +44,7 @@ class AlumniProfileRepository
                 'alumni_profiles.is_active',
                 'alumni_profiles.nik',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.code as program_code',
                 'programs.degree as program_degree',
             )
@@ -72,6 +73,7 @@ class AlumniProfileRepository
             ->select(
                 'alumni_profiles.*',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
             )
             ->where('alumni_profiles.id', $id)
@@ -92,6 +94,7 @@ class AlumniProfileRepository
             ->select(
                 'alumni_profiles.*',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
                 'employment_records.employment_status',
                 'employment_records.waiting_months',
@@ -147,6 +150,7 @@ class AlumniProfileRepository
             ->select(
                 'alumni_profiles.*',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
                 DB::raw("CASE
                     WHEN responses.status IN ('submitted','verified') THEN 'finish'
@@ -175,7 +179,7 @@ class AlumniProfileRepository
             });
         }
 
-        return $query->orderBy('alumni_profiles.id')->paginate($perPage);
+        return $query->orderByDesc('alumni_profiles.graduation_year')->orderByDesc('alumni_profiles.id')->paginate($perPage);
     }
 
     /**
@@ -213,6 +217,7 @@ class AlumniProfileRepository
                 'alumni_profiles.program_id',
                 'alumni_profiles.graduation_year',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
                 'responses.id as response_id',
                 DB::raw("CASE WHEN responses.status IN ('submitted','verified') THEN 'finished' ELSE 'ongoing' END as response_status"),
@@ -323,6 +328,7 @@ class AlumniProfileRepository
                 'alumni_profiles.*',
                 'responses.id as response_id',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.code as program_code',
                 'programs.jurusan as jurusan_name',
             );

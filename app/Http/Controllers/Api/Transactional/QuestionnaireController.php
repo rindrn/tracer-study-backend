@@ -19,6 +19,16 @@ class QuestionnaireController extends Controller
     /** GET /api/questionnaires — semua role, kaprodi di-scope ke prodinya di service. */
     public function index(Request $request): JsonResponse
     {
+        // If page param present, use paginated response
+        if ($request->query('page')) {
+            $result = $this->service->listPaginated(
+                $request->user(),
+                ['graduation_year' => $request->query('graduation_year'), 'search' => $request->query('search')],
+                (int) $request->query('per_page', 100),
+            );
+            return response()->json(['success' => true, 'data' => $result]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'OK',

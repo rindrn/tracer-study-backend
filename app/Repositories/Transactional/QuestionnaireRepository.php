@@ -41,6 +41,36 @@ class QuestionnaireRepository
         return collect($query->orderByDesc('id')->get());
     }
 
+    /**
+     * Paginated list with optional graduation_year filter.
+     */
+    public function paginateHeaders(?int $programId, array $filters, int $perPage): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = DB::connection(self::CONN)->table('questionnaires');
+
+        if ($programId !== null) {
+            $query->where(function ($q) use ($programId) {
+                $q->whereNull('program_id')
+                  ->orWhere('program_id', $programId);
+            });
+        }
+
+        if (!empty($filters['graduation_year'])) {
+            $year = (int) $filters['graduation_year'];
+            $query->whereRaw("target_graduation_years::jsonb @> ?", [json_encode([$year])]);
+        }
+
+        if (!empty($filters['search'])) {
+            $s = $filters['search'];
+            $query->where(function ($q) use ($s) {
+                $q->where('title', 'ilike', "%{$s}%")
+                  ->orWhere('code', 'ilike', "%{$s}%");
+            });
+        }
+
+        return $query->orderByDesc('id')->paginate($perPage);
+    }
+
     public function findHeaderById(int $id): ?object
     {
         return DB::connection(self::CONN)

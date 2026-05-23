@@ -48,6 +48,33 @@ class QuestionnaireService
         })->values()->toArray();
     }
 
+    /**
+     * Paginated list with filters.
+     */
+    public function listPaginated(?User $user, array $filters = [], int $perPage = 100): array
+    {
+        $programId = ($user && $user->isKaprodi()) ? $user->program_id : null;
+
+        $paginator = $this->questionnaireRepo->paginateHeaders($programId, $filters, $perPage);
+        $responseCounts = $this->questionnaireRepo->countResponsesGroupedAll($programId);
+
+        $items = collect($paginator->items())->map(function ($row) use ($responseCounts) {
+            $questionnaire = $this->loadQuestionnaire((int) $row->id);
+            if ($questionnaire) {
+                $questionnaire['response_count'] = (int) ($responseCounts[$row->id] ?? 0);
+            }
+            return $questionnaire;
+        })->filter()->values()->toArray();
+
+        return [
+            'data'         => $items,
+            'current_page' => $paginator->currentPage(),
+            'last_page'    => $paginator->lastPage(),
+            'per_page'     => $paginator->perPage(),
+            'total'        => $paginator->total(),
+        ];
+    }
+
     // ═══════════════════════════════════════════════════════════
     // SHOW — detail 1 kuesioner
     // ═══════════════════════════════════════════════════════════
