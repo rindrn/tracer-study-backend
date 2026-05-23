@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             QuestionnaireSeeder::class,
             AlumniProfileSeeder::class,
+            QuestionnaireAssignmentSeeder::class,
             ResponseSeeder::class,
         ]);
     }

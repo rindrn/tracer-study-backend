@@ -17,15 +17,18 @@ class AlumniProfileSeeder extends Seeder
         $programs = DB::connection('oltp')->table('programs')->get();
         if ($programs->isEmpty()) return;
 
+        $totalTarget = 500;
+        $perProgram = (int) ceil($totalTarget / $programs->count());
+
         $alumniData = [];
         $nimCounter = 1;
-        $fixedYears = [2022, 2023, 2024];
+        $graduationYears = [2020, 2021, 2022, 2023, 2024, 2025];
 
         foreach ($programs as $program) {
-            for ($i = 0; $i < 5; $i++) {
-                // First 3: fixed grad years; last 2: random
-                $tahunLulus = $i < 3 ? $fixedYears[$i] : $faker->randomElement($fixedYears);
-                $tahunMasuk = $tahunLulus - ($program->degree === 'D3' ? 3 : 4);
+            for ($i = 0; $i < $perProgram; $i++) {
+                $tahunLulus = $faker->randomElement($graduationYears);
+                $duration = $program->degree === 'D3' ? 3 : 4;
+                $tahunMasuk = $tahunLulus - $duration;
 
                 $alumniData[] = [
                     'program_id'      => $program->id,
@@ -47,7 +50,7 @@ class AlumniProfileSeeder extends Seeder
             }
         }
 
-        foreach (array_chunk($alumniData, 50) as $chunk) {
+        foreach (array_chunk($alumniData, 100) as $chunk) {
             DB::connection('oltp')->table('alumni_profiles')->insert($chunk);
         }
     }

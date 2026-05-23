@@ -82,6 +82,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Thresholds
         Route::apiResource('thresholds', ThresholdController::class);
+
+        // Reset respondent status from finished to ongoing
+        Route::post('alumni/{alumniId}/reset-response', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'resetResponse']);
     });
 
     // ── Admin request (tracer_team) — perlu approval ─────────────────────

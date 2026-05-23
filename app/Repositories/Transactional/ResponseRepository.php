@@ -56,6 +56,30 @@ class ResponseRepository
             ->delete();
     }
 
+    /**
+     * Reset status responden dari finished (submitted/verified) ke ongoing (started).
+     * Menghapus jawaban dan reset status agar alumni bisa mengisi ulang.
+     */
+    public function resetToOngoing(int $questionnaireId, int $alumniId): bool
+    {
+        $response = $this->findByQuestionnaireAndAlumni($questionnaireId, $alumniId);
+        if (!$response || !in_array($response->status, ['submitted', 'verified'])) {
+            return false;
+        }
+
+        // Hapus jawaban
+        DB::connection(self::CONN)->table('response_answers')
+            ->where('response_id', $response->id)
+            ->delete();
+
+        // Hapus response row agar alumni bisa submit ulang dari awal
+        DB::connection(self::CONN)->table('responses')
+            ->where('id', $response->id)
+            ->delete();
+
+        return true;
+    }
+
     public function createResponse(int $questionnaireId, int $alumniId, string $status = 'submitted'): int
     {
         $now = Carbon::now();
