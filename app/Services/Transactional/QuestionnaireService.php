@@ -35,9 +35,10 @@ class QuestionnaireService
     public function list(?User $user): array
     {
         $programId = ($user && $user->isKaprodi()) ? $user->program_id : null;
+        $jurusan = ($user && $user->isKajur()) ? $user->jurusan : null;
 
         $rows = $this->questionnaireRepo->listHeaders($programId);
-        $responseCounts = $this->questionnaireRepo->countResponsesGroupedAll($programId);
+        $responseCounts = $this->questionnaireRepo->countResponsesGroupedAll($programId, $jurusan);
 
         return $rows->map(function ($row) use ($responseCounts) {
             $questionnaire = $this->loadQuestionnaire((int) $row->id);
@@ -54,9 +55,10 @@ class QuestionnaireService
     public function listPaginated(?User $user, array $filters = [], int $perPage = 100): array
     {
         $programId = ($user && $user->isKaprodi()) ? $user->program_id : null;
+        $jurusan = ($user && $user->isKajur()) ? $user->jurusan : null;
 
         $paginator = $this->questionnaireRepo->paginateHeaders($programId, $filters, $perPage);
-        $responseCounts = $this->questionnaireRepo->countResponsesGroupedAll($programId);
+        $responseCounts = $this->questionnaireRepo->countResponsesGroupedAll($programId, $jurusan);
 
         $items = collect($paginator->items())->map(function ($row) use ($responseCounts) {
             $questionnaire = $this->loadQuestionnaire((int) $row->id);

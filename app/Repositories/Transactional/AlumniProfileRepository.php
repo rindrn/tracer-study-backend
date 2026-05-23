@@ -243,6 +243,10 @@ class AlumniProfileRepository
             $query->where('alumni_profiles.program_id', $filters['program_id']);
         }
 
+        if (!empty($filters['jurusan'])) {
+            $query->where('programs.jurusan', $filters['jurusan']);
+        }
+
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
@@ -261,7 +265,7 @@ class AlumniProfileRepository
      *
      * Return: ['total' => int, 'finish' => int, 'ongoing' => int, 'belum_mengisi' => int, 'answered' => int, 'unanswered' => int]
      */
-    public function countStatsByProgram(?int $programId): array
+    public function countStatsByProgram(?int $programId, ?string $jurusan = null): array
     {
         $conn = DB::connection(self::CONN);
 
@@ -269,6 +273,9 @@ class AlumniProfileRepository
         $totalQuery = $conn->table('alumni_profiles');
         if ($programId !== null) {
             $totalQuery->where('program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $totalQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                ->where('programs.jurusan', $jurusan);
         }
         $total = $totalQuery->count();
 
@@ -289,6 +296,9 @@ class AlumniProfileRepository
             ->whereIn('responses.status', ['submitted', 'verified']);
         if ($programId !== null) {
             $finishQuery->where('alumni_profiles.program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $finishQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                ->where('programs.jurusan', $jurusan);
         }
         $finish = $finishQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
 
@@ -299,6 +309,9 @@ class AlumniProfileRepository
             ->where('responses.status', 'started');
         if ($programId !== null) {
             $ongoingQuery->where('alumni_profiles.program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $ongoingQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                ->where('programs.jurusan', $jurusan);
         }
         $ongoing = $ongoingQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
 

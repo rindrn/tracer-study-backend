@@ -47,8 +47,9 @@ class AdminAlumniService
     public function getStats(User $user): array
     {
         $programId = $user->isKaprodi() ? $user->program_id : null;
+        $jurusan = $user->isKajur() ? $user->jurusan : null;
 
-        $stats = $this->alumniRepo->countStatsByProgram($programId);
+        $stats = $this->alumniRepo->countStatsByProgram($programId, $jurusan);
 
         $stats['response_rate'] = $stats['total'] > 0
             ? round($stats['answered'] / $stats['total'] * 100, 1)

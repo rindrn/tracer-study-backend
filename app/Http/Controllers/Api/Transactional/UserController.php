@@ -94,7 +94,7 @@ class UserController extends Controller
         $scope = match ($user->role) {
             User::ROLE_HEAD_TRACER, User::ROLE_TRACER_TEAM, User::ROLE_WADIR => 'Seluruh Jurusan',
             User::ROLE_KAJUR => $user->jurusan ?? '-',
-            User::ROLE_KAPRODI => $user->program?->name ?? '-',
+            User::ROLE_KAPRODI => $user->program ? ($user->program->name . ' (' . $user->program->degree . ')') : '-',
             default => '-',
         };
 
@@ -106,7 +106,7 @@ class UserController extends Controller
             'scope'        => $scope,
             'status'       => $user->status,
             'program_id'   => $user->program_id,
-            'program_name' => $user->program?->name,
+            'program_name' => $user->program ? ($user->program->name . ' (' . $user->program->degree . ')') : null,
             'jurusan'      => $user->jurusan,
             'created_at'   => $user->created_at,
         ];

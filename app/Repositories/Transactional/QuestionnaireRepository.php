@@ -282,13 +282,19 @@ class QuestionnaireRepository
      * Count responses per questionnaire. Kalau $programId ada, filter per prodi.
      * Return: collection of [questionnaire_id => count].
      */
-    public function countResponsesGroupedAll(?int $programId = null): Collection
+    public function countResponsesGroupedAll(?int $programId = null, ?string $jurusan = null): Collection
     {
-        $query = DB::connection(self::CONN)->table('responses');
+        $conn = DB::connection(self::CONN);
+        $query = $conn->table('responses')
+            ->join('alumni_profiles', 'responses.alumni_id', '=', 'alumni_profiles.id')
+            ->join('questionnaires', 'responses.questionnaire_id', '=', 'questionnaires.id')
+            ->whereRaw("alumni_profiles.graduation_year::text = ANY(SELECT jsonb_array_elements_text(questionnaires.target_graduation_years))");
 
         if ($programId !== null) {
-            $query->join('alumni_profiles', 'responses.alumni_id', '=', 'alumni_profiles.id')
-                  ->where('alumni_profiles.program_id', $programId);
+            $query->where('alumni_profiles.program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $query->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                  ->where('programs.jurusan', $jurusan);
         }
 
         return $query
