@@ -265,7 +265,7 @@ class AlumniProfileRepository
      *
      * Return: ['total' => int, 'finish' => int, 'ongoing' => int, 'belum_mengisi' => int, 'answered' => int, 'unanswered' => int]
      */
-    public function countStatsByProgram(?int $programId, ?string $jurusan = null): array
+    public function countStatsByProgram(?int $programId, ?string $jurusan = null, ?int $graduationYear = null): array
     {
         $conn = DB::connection(self::CONN);
 
@@ -276,6 +276,9 @@ class AlumniProfileRepository
         } elseif ($jurusan !== null) {
             $totalQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
                 ->where('programs.jurusan', $jurusan);
+        }
+        if ($graduationYear !== null) {
+            $totalQuery->where('alumni_profiles.graduation_year', $graduationYear);
         }
         $total = $totalQuery->count();
 
@@ -300,6 +303,9 @@ class AlumniProfileRepository
             $finishQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
                 ->where('programs.jurusan', $jurusan);
         }
+        if ($graduationYear !== null) {
+            $finishQuery->where('alumni_profiles.graduation_year', $graduationYear);
+        }
         $finish = $finishQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
 
         // Ongoing: started
@@ -313,6 +319,9 @@ class AlumniProfileRepository
             $ongoingQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
                 ->where('programs.jurusan', $jurusan);
         }
+        if ($graduationYear !== null) {
+            $ongoingQuery->where('alumni_profiles.graduation_year', $graduationYear);
+        }
         $ongoing = $ongoingQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
 
         $belumMengisi = max($total - $finish - $ongoing, 0);
@@ -325,6 +334,21 @@ class AlumniProfileRepository
             'answered'      => $finish,
             'unanswered'    => $total - $finish,
         ];
+    }
+
+    public function getAvailableGraduationYears(?int $programId, ?string $jurusan = null): array
+    {
+        $query = DB::connection(self::CONN)->table('alumni_profiles')
+            ->whereNotNull('graduation_year');
+
+        if ($programId !== null) {
+            $query->where('program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $query->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                ->where('programs.jurusan', $jurusan);
+        }
+
+        return $query->distinct()->orderByDesc('graduation_year')->pluck('graduation_year')->toArray();
     }
 
     /**

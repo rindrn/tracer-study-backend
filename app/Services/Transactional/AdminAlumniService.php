@@ -44,16 +44,18 @@ class AdminAlumniService
      * kuesioner global (program_id NULL, status published) — lihat
      * AlumniProfileRepository::countStatsByProgram.
      */
-    public function getStats(User $user): array
+    public function getStats(User $user, ?int $graduationYear = null): array
     {
         $programId = $user->isKaprodi() ? $user->program_id : null;
         $jurusan = $user->isKajur() ? $user->jurusan : null;
 
-        $stats = $this->alumniRepo->countStatsByProgram($programId, $jurusan);
+        $stats = $this->alumniRepo->countStatsByProgram($programId, $jurusan, $graduationYear);
 
         $stats['response_rate'] = $stats['total'] > 0
             ? round($stats['answered'] / $stats['total'] * 100, 1)
             : 0.0;
+
+        $stats['graduation_years'] = $this->alumniRepo->getAvailableGraduationYears($programId, $jurusan);
 
         return $stats;
     }

@@ -54,7 +54,7 @@ class AlumniController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data'    => $this->service->getStats($request->user()),
+            'data'    => $this->service->getStats($request->user(), $request->query('graduation_year') ? (int) $request->query('graduation_year') : null),
         ]);
     }
 
