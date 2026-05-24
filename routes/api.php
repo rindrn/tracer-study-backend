@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\Transactional\QuestionnaireController;
 use App\Http\Controllers\Api\Transactional\TracerStudySubmitController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
 
+use App\Http\Controllers\Api\Analytical\Kpi13Controller;
 // Controllers — Dashboard (OLAP page config)
 // use App\Http\Controllers\Api\Dashboard\OverviewController;
 // use App\Http\Controllers\Api\Dashboard\EmploymentController;
@@ -165,4 +166,9 @@ Route::middleware("auth:sanctum")->group(function () {
     //     Route::get("waiting-time",     [WaitingTimeChartController::class, "index"]);
     // });
  
+    Route::prefix('dashboard/kpi')->group(function () {
+        // KPI 13 — Perbandingan KPI Lintas Program Studi
+        Route::get('13/chart',  [Kpi13Controller::class, 'chart']);
+        Route::get('13/export', [Kpi13Controller::class, 'export']);
+    });
 });
