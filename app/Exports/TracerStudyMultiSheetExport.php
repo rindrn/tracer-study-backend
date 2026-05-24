@@ -14,18 +14,17 @@ class TracerStudyMultiSheetExport implements WithMultipleSheets
 
     protected $alumniData;
     protected $ministryQuestions;
-    protected $prodiQuestionsGrouped; // array keyed by prodi code
+    protected $prodiQuestionsGrouped;
+    protected $optionsMap;
+    protected $questionMeta;
 
-    /**
-     * @param Collection $alumniData
-     * @param array      $ministryQuestions  [['code' => ..., 'label' => ...], ...]
-     * @param array      $prodiQuestionsGrouped  ['TI3' => ['name' => ..., 'questions' => [...], 'alumni' => Collection], ...]
-     */
-    public function __construct(Collection $alumniData, array $ministryQuestions, array $prodiQuestionsGrouped)
+    public function __construct(Collection $alumniData, array $ministryQuestions, array $prodiQuestionsGrouped, array $optionsMap = [], array $questionMeta = [])
     {
         $this->alumniData = $alumniData;
         $this->ministryQuestions = $ministryQuestions;
         $this->prodiQuestionsGrouped = $prodiQuestionsGrouped;
+        $this->optionsMap = $optionsMap;
+        $this->questionMeta = $questionMeta;
     }
 
     public function sheets(): array
@@ -33,7 +32,7 @@ class TracerStudyMultiSheetExport implements WithMultipleSheets
         $sheets = [];
 
         // Sheet 1: Data Kementrian (semua alumni)
-        $sheets[] = new MinistrySheetExport($this->alumniData, $this->ministryQuestions);
+        $sheets[] = new MinistrySheetExport($this->alumniData, $this->ministryQuestions, $this->optionsMap, $this->questionMeta);
 
         // Sheet 2-N: Satu sheet per prodi yang punya data
         foreach ($this->prodiQuestionsGrouped as $prodiCode => $prodiData) {
@@ -42,7 +41,7 @@ class TracerStudyMultiSheetExport implements WithMultipleSheets
 
             if ($prodiAlumni->isNotEmpty() && !empty($prodiQuestions)) {
                 $sheetTitle = "Data Khusus {$prodiCode}";
-                $sheets[] = new ProdiSheetExport($prodiAlumni, $prodiQuestions, $sheetTitle);
+                $sheets[] = new ProdiSheetExport($prodiAlumni, $prodiQuestions, $sheetTitle, $this->optionsMap, $this->questionMeta);
             }
         }
 

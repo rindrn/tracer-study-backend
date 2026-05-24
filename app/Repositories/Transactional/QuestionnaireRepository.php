@@ -259,6 +259,53 @@ class QuestionnaireRepository
             ->toArray();
     }
 
+    /**
+     * Get options map keyed by question code.
+     * Returns: [question_code => [option_code => option_label, ...]]
+     */
+    public function getOptionsByQuestionCodes(array $codes): array
+    {
+        if (empty($codes)) return [];
+
+        $rows = DB::connection(self::CONN)->table('questionnaire_options as o')
+            ->join('questionnaire_questions as q', 'o.question_id', '=', 'q.id')
+            ->whereIn('q.code', $codes)
+            ->orderBy('o.order_no')
+            ->select('q.code as question_code', 'o.option_code', 'o.option_label')
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row->question_code][$row->option_code] = $row->option_label;
+        }
+        return $map;
+    }
+
+    /**
+     * Get question types + metadata keyed by code.
+     * Returns: [question_code => ['type' => ..., 'metadata' => ...]]
+     */
+    public function getQuestionMetaByCode(array $codes): array
+    {
+        if (empty($codes)) return [];
+
+        $rows = DB::connection(self::CONN)->table('questionnaire_questions')
+            ->whereIn('code', $codes)
+            ->select('code', 'question_type', 'metadata')
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            if (!isset($map[$row->code])) {
+                $map[$row->code] = [
+                    'type' => $row->question_type,
+                    'metadata' => $row->metadata ? json_decode($row->metadata, true) : null,
+                ];
+            }
+        }
+        return $map;
+    }
+
     // ═══════════════════════════════════════════════════════════
     // READ — versi / counter
     // ═══════════════════════════════════════════════════════════
@@ -285,6 +332,7 @@ class QuestionnaireRepository
     public function countResponsesGroupedAll(?int $programId = null, ?string $jurusan = null): Collection
     {
         $conn = DB::connection(self::CONN);
+
         $query = $conn->table('responses')
             ->join('alumni_profiles', 'responses.alumni_id', '=', 'alumni_profiles.id')
             ->join('questionnaires', 'responses.questionnaire_id', '=', 'questionnaires.id')

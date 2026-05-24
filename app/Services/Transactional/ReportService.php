@@ -74,7 +74,12 @@ class ReportService
 
         $ministryQuestions = $this->buildHeaderList($ministryCodes, $questionLabels);
 
-        // 5. Build per-prodi question + alumni grouping
+        // 5. Options map + question types for label resolution
+        $allCodes = array_merge($ministryCodes, $prodiCodes);
+        $optionsMap = $this->questionnaireRepo->getOptionsByQuestionCodes($allCodes);
+        $questionMeta = $this->questionnaireRepo->getQuestionMetaByCode($allCodes);
+
+        // 6. Build per-prodi question + alumni grouping
         $prodiQuestionsByProgram = $this->buildProdiQuestionsByProgram();
         $alumniByProdi = $alumniData->groupBy('program_code');
 
@@ -94,6 +99,8 @@ class ReportService
             $alumniData,
             $ministryQuestions,
             $prodiQuestionsGrouped,
+            $optionsMap,
+            $questionMeta,
         );
     }
 
