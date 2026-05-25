@@ -216,11 +216,11 @@ class QuestionnaireSeeder extends Seeder
         foreach ($competencies as $comp) {
             $insertQuestion(5, $comp[0],
                 "Pada saat lulus, pada tingkat mana kompetensi {$comp[2]} Anda kuasai? (A)",
-                'number', true, ['scale_min' => 1, 'scale_max' => 5, 'competency' => $comp[2], 'dimension' => 'saat_lulus']);
+                'number', true, ['scale_min' => 1, 'scale_max' => 5, 'competency' => $comp[2], 'dimension' => 'saat_lulus', 'scale_labels' => ['Sangat Rendah', 'Rendah', 'Cukup', 'Tinggi', 'Sangat Tinggi']]);
 
             $insertQuestion(5, $comp[1],
                 "Pada saat ini, pada tingkat mana kompetensi {$comp[2]} diperlukan dalam pekerjaan? (B)",
-                'number', true, ['scale_min' => 1, 'scale_max' => 5, 'competency' => $comp[2], 'dimension' => 'saat_ini']);
+                'number', true, ['scale_min' => 1, 'scale_max' => 5, 'competency' => $comp[2], 'dimension' => 'saat_ini', 'scale_labels' => ['Sangat Rendah', 'Rendah', 'Cukup', 'Tinggi', 'Sangat Tinggi']]);
         }
 
         // SECTION 6: METODE PEMBELAJARAN (f21-f27)
@@ -237,7 +237,7 @@ class QuestionnaireSeeder extends Seeder
         foreach ($methods as $m) {
             $insertQuestion(6, $m[0],
                 "Menurut Anda seberapa besar penekanan pada metode pembelajaran \"{$m[1]}\" di program studi Anda?",
-                'number', true, ['scale_min' => 1, 'scale_max' => 5, 'method' => $m[1]]);
+                'number', true, ['scale_min' => 1, 'scale_max' => 5, 'method' => $m[1], 'scale_labels' => ['Sangat Besar', 'Besar', 'Cukup Besar', 'Kurang Besar', 'Tidak Sama Sekali']]);
         }
 
 

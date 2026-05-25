@@ -333,6 +333,10 @@ class QuestionnaireService
             $metadata['scale_max'] = $questionData['scaleMax'];
         }
 
+        if (!empty($questionData['scaleLabels'])) {
+            $metadata['scale_labels'] = $questionData['scaleLabels'];
+        }
+
         foreach (['gridRows', 'gridColumns'] as $key) {
             if (!empty($questionData[$key])) {
                 $metadata[$key] = array_values($questionData[$key]);
@@ -445,6 +449,7 @@ class QuestionnaireService
             'allowOther'  => $metadata['allowOther'] ?? false,
             'scaleMin'    => $metadata['scaleMin']   ?? $metadata['scale_min'] ?? 1,
             'scaleMax'    => $metadata['scaleMax']   ?? $metadata['scale_max'] ?? 5,
+            'scaleLabels' => $metadata['scale_labels'] ?? [],
             'gridRows'    => $metadata['gridRows']   ?? [],
             'gridColumns' => $metadata['gridColumns'] ?? [],
             'metadata'    => $metadata, // includes show_if for conditional logic

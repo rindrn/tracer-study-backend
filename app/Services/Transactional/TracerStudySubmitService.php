@@ -158,12 +158,20 @@ class TracerStudySubmitService
             if (in_array($key, self::IDENTITY_KEYS, strict: true) || $value === null) {
                 continue;
             }
+            if ($key === 'questionnaire_ids') {
+                continue;
+            }
             if ($filterCodes !== null && !in_array($key, $filterCodes, strict: true)) {
                 continue;
             }
+            $text = match (true) {
+                is_bool($value) => $value ? '1' : '0',
+                is_array($value) => json_encode($value),
+                default => (string) $value,
+            };
             $records[] = [
                 'question_code' => $key,
-                'answer_text'   => is_bool($value) ? ($value ? '1' : '0') : (string) $value,
+                'answer_text'   => $text,
             ];
         }
 
