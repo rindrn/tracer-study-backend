@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
 use App\Http\Controllers\Api\Analytical\Kpi13Controller;
 // Controllers — Dashboard (OLAP page config)
 use App\Http\Controllers\Api\Analytical\KeterserapanController;
+use App\Http\Controllers\Api\Analytical\FilterMetaController;
  
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
@@ -139,6 +140,8 @@ Route::middleware("auth:sanctum")->group(function () {
     });
 
     Route::prefix('dashboard')->group(function () {
+
+        Route::get('meta/filter-options',        [FilterMetaController::class, 'filterOptions']);
  
         // ── Segmen: Tingkat Keterserapan Lulusan ─────────────────────────
         Route::prefix('keterserapan')->group(function () {
