@@ -23,6 +23,7 @@ use Illuminate\Http\Response;
  *
  *   GET /api/dashboard/keterserapan/drill-down
  *       → Drill-down list alumni per status (modal klik chart)
+ *       → Drill-down list alumni per tahun lulus (modal klik chart)
  *
  *   GET /api/dashboard/keterserapan/bandingkan
  *       → Perbandingan keterserapan per prodi (halaman Bandingkan)
@@ -156,18 +157,19 @@ class KeterserapanController extends Controller
     /**
      * GET /api/dashboard/keterserapan/drill-down
      *
-     * Dipanggil saat user klik segmen chart (pie/bar).
-     * Mengembalikan list alumni yang masuk ke status yang diklik.
+     * Dipanggil saat user klik segmen chart (pie atau bar per tahun).
+     * Minimal salah satu dari status atau tahun_lulus wajib diisi.
      *
      * Query params:
-     *   status          string   WAJIB — label status alumni yang diklik
-     *                            (contoh: "Bekerja", "Wirausaha", "Studi Lanjut", "Tidak Bekerja")
+     *   status          string   Label status alumni ("Bekerja", "terserap", "tidak", dll.)
+     *                            Wajib diisi jika tahun_lulus kosong.
+     *   tahun_lulus     string   Tahun lulus yang diklik di bar chart.
+     *                            Wajib diisi jika status kosong.
      *   jenjang         string
      *   jurusan         string
      *   nama_prodi      string
-     *   tahun_lulus     string
      *   minggu_snapshot string
-     *   search          string   Cari berdasarkan nama alumni (contains, case-insensitive)
+     *   search          string
      *   page            int      Default: 1
      *   per_page        int      Default: 15, max: 100
      *
@@ -175,12 +177,18 @@ class KeterserapanController extends Controller
      * {
      *   "success": true,
      *   "data": {
-     *     "status": "Bekerja",
-     *     "filters": { "tahun_lulus": "2022", "minggu_snapshot": "W-48" },
+     *     "status": "terserap",
+     *     "filters": { "tahun_lulus": "2023" },
      *     "pagination": { "page": 1, "per_page": 15, "total_on_page": 15 },
      *     "data": [
-     *       { "nama": "Irfan Hakim",  "nim": "3230000", "nama_prodi": "Teknik Elektronika", "jenjang": "D3", "tahun_lulus": "2023" },
-     *       { "nama": "Budi Santoso", "nim": "4220001", "nama_prodi": "Akuntansi Manajemen","jenjang": "D4", "tahun_lulus": "2022" }
+     *       {
+     *         "nama": "Irfan Hakim",
+     *         "nim": "3230000",
+     *         "nama_prodi": "Teknik Elektronika",
+     *         "jenjang": "D3",
+     *         "tahun_lulus": "2023",
+     *         "status": "Bekerja"
+     *       }
      *     ]
      *   }
      * }
@@ -188,7 +196,7 @@ class KeterserapanController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $params = $request->validate([
-            'status'          => 'required|string|max:50',
+            'status'          => 'nullable|string|max:50',
             'jenjang'         => 'nullable|string|in:D3,D4',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
@@ -199,6 +207,13 @@ class KeterserapanController extends Controller
             'per_page'        => 'nullable|integer|min:5|max:100',
         ]);
 
+        if (empty($params['status']) && empty($params['tahun_lulus'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter status atau tahun_lulus wajib diisi.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         try {
             $dto = $this->service->getDrillDown($params);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
@@ -206,7 +221,6 @@ class KeterserapanController extends Controller
             return $this->serviceError($e);
         }
     }
-
     // ──────────────────────────────────────────────────────────────
 
     /**

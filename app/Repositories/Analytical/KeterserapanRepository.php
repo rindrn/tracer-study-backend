@@ -10,7 +10,7 @@ use Illuminate\Support\Collection;
  * Query ke Cube.js untuk segmen "Tingkat Keterserapan Lulusan":
  *   1. Distribusi status per tahun lulus   → bar stacked 100%
  *   2. Distribusi status snapshot terkini  → pie chart
- *   3. Detail alumni per status            → drill-down list (raw, no pre-agg)
+ *   3. Detail alumni per status dan per tahun_lulus → drill-down list (raw, no pre-agg)
  *   4. Perbandingan keterserapan per prodi → halaman Bandingkan
  *
  * Pre-agg Cube.js yang dipakai: FactTracerStudy.utama
@@ -256,6 +256,104 @@ class KeterserapanRepository extends BaseAnalyticalRepository
         ]);
 
         return $this->reshapePerProdi($normalized, $prodiFilter);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  5. DRILL-DOWN — detail alumni per tahun lulus (klik bar)
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * List alumni per tahun lulus untuk modal drill-down bar chart.
+     *
+     * $statusLabel null   → semua status (atau exclude Belum Bekerja jika $excludeStatus diisi)
+     * $statusLabel string → filter status spesifik (label DW)
+     * $excludeStatus      → dipakai saat FE kirim "terserap" (exclude Belum Bekerja)
+     *
+     * TIDAK pakai pre-agg — data individual.
+     */
+    public function getDetailAlumniByTahun(
+        string  $tahunLulus,
+        ?string $statusLabel    = null,
+        ?string $excludeStatus  = 'Belum Bekerja',  // aktif hanya jika $statusLabel null & FE kirim 'terserap'
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $namaProdi      = null,
+        ?string $mingguSnapshot = null,
+        ?string $search         = null,
+        int     $page           = 1,
+        int     $perPage        = 15,
+    ): array {
+        $extra = [
+            [
+                'member'   => 'DimAlumni.tahun_lulus',
+                'operator' => 'equals',
+                'values'   => [$tahunLulus],
+            ],
+        ];
+
+        if ($statusLabel !== null && $statusLabel !== '') {
+            // Filter status spesifik
+            $extra[] = [
+                'member'   => 'DimStatusAlumni.label',
+                'operator' => 'equals',
+                'values'   => [$statusLabel],
+            ];
+        } elseif ($excludeStatus !== null && $excludeStatus !== '') {
+            // Shorthand 'terserap': exclude status tidak terserap
+            $extra[] = [
+                'member'   => 'DimStatusAlumni.label',
+                'operator' => 'notEquals',
+                'values'   => [$excludeStatus],
+            ];
+        }
+
+        $filters = $this->buildGlobalFilters(
+            jenjang:        $jenjang,
+            jurusan:        $jurusan,
+            namaProdi:      $namaProdi,
+            mingguSnapshot: $mingguSnapshot,
+            extra:          $extra,
+        );
+
+        if ($search !== null && $search !== '') {
+            $filters[] = [
+                'member'   => 'DimAlumni.nama',
+                'operator' => 'contains',
+                'values'   => [$search],
+            ];
+        }
+
+        $result = $this->cube->load([
+            'measures'   => ['FactTracerStudy.count_alumni'],
+            'dimensions' => [
+                'DimAlumni.nama',
+                'DimAlumni.nim',
+                'DimProdi.nama_prodi',
+                'DimProdi.jenjang',
+                'DimAlumni.tahun_lulus',
+                'DimStatusAlumni.label',  // tampil di kolom tabel modal
+            ],
+            'filters' => $filters,
+            'order'   => [['DimAlumni.nama', 'asc']],
+            'limit'   => $perPage,
+            'offset'  => ($page - 1) * $perPage,
+        ]);
+
+        $data = $result->map(fn($r) => [
+            'nama'        => $r['DimAlumni.nama']        ?? '',
+            'nim'         => $r['DimAlumni.nim']         ?? '',
+            'nama_prodi'  => $r['DimProdi.nama_prodi']   ?? '',
+            'jenjang'     => $r['DimProdi.jenjang']      ?? '',
+            'tahun_lulus' => $r['DimAlumni.tahun_lulus'] ?? '',
+            'status'      => $r['DimStatusAlumni.label'] ?? '',
+        ])->toArray();
+
+        return [
+            'data'          => $data,
+            'page'          => $page,
+            'per_page'      => $perPage,
+            'total_on_page' => count($data),
+        ];
     }
 
     // ──────────────────────────────────────────────────────────────

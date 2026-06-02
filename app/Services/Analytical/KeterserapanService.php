@@ -16,6 +16,7 @@ use Illuminate\Support\Collection;
  *   - getBar()          → bar stacked 100% per tahun lulus
  *   - getPie()          → pie distribusi status snapshot terkini
  *   - getDrillDown()    → drill-down list alumni per status
+ *   - getDrillDownTahun() → drill-down list alumni per tahun lulus
  *   - getBandingkan()   → perbandingan keterserapan per prodi
  *   - getProdiList()    → daftar prodi untuk chip filter
  *
@@ -113,13 +114,30 @@ class KeterserapanService
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  DRILL-DOWN — list alumni per status
+    //  DRILL-DOWN — router utama (dipanggil Controller)
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Data drill-down untuk modal "klik status → list alumni".
+     * Router: ada tahun_lulus → getDrillDownTahun, hanya status → getDrillDownStatus.
+     * Bisa juga kombinasi keduanya (klik segmen bar tertentu di tahun tertentu).
      */
     public function getDrillDown(array $params): KeterserapanDrillDownDTO
+    {
+        if (!empty($params['tahun_lulus'])) {
+            return $this->getDrillDownTahun($params);
+        }
+
+        return $this->getDrillDownStatus($params);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  DRILL-DOWN — by status (klik pie)
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * List alumni per status — untuk modal klik segmen pie.
+     */
+    private function getDrillDownStatus(array $params): KeterserapanDrillDownDTO
     {
         $page    = max(1, (int) ($params['page']     ?? 1));
         $perPage = min(100, max(5, (int) ($params['per_page'] ?? 15)));
@@ -144,6 +162,66 @@ class KeterserapanService
             totalOnPage: $result['total_on_page'],
             filters:     $this->activeFilters($params),
         );
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  DRILL-DOWN — by tahun lulus (klik bar)
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * List alumni per tahun lulus — untuk modal klik bar tren.
+     * Status opsional: kosong = semua, "terserap"/"tidak" = shorthand kategori.
+     */
+    private function getDrillDownTahun(array $params): KeterserapanDrillDownDTO
+    {
+        $page        = max(1, (int) ($params['page']     ?? 1));
+        $perPage     = min(100, max(5, (int) ($params['per_page'] ?? 15)));
+        $statusLabel = $this->resolveStatusLabel($params['status'] ?? null);
+
+        $result = $this->repo->getDetailAlumniByTahun(
+            tahunLulus:     $params['tahun_lulus']     ?? '',
+            statusLabel:    $statusLabel,
+            jenjang:        $params['jenjang']         ?? null,
+            jurusan:        $params['jurusan']         ?? null,
+            namaProdi:      $params['nama_prodi']      ?? null,
+            mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            search:         $params['search']          ?? null,
+            page:           $page,
+            perPage:        $perPage,
+        );
+
+        return new KeterserapanDrillDownDTO(
+            data:        $result['data'],
+            status:      $params['status'] ?? 'semua',
+            page:        $page,
+            perPage:     $perPage,
+            totalOnPage: $result['total_on_page'],
+            filters:     $this->activeFilters($params, [
+                'tahun_lulus', 'status', 'jenjang', 'jurusan', 'nama_prodi', 'minggu_snapshot',
+            ]),
+        );
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  PRIVATE HELPERS (tambah resolveStatusLabel)
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Resolve shorthand status dari FE ke label DW, atau null jika semua.
+     *
+     * 'terserap' → null karena filter multi-label tidak bisa pakai equals.
+     *              Repo akan pakai notEquals 'Belum Bekerja' sebagai gantinya.
+     * 'tidak'    → 'Belum Bekerja' (label DW)
+     * label lain → pakai apa adanya
+     */
+    private function resolveStatusLabel(?string $status): ?string
+    {
+        return match ($status) {
+            null, '', 'semua' => null,
+            'terserap'        => null,   // ditangani repo via excludeStatus
+            'tidak'           => 'Belum Bekerja',
+            default           => $status,
+        };
     }
 
     // ──────────────────────────────────────────────────────────────
