@@ -21,16 +21,7 @@ use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
 
 use App\Http\Controllers\Api\Analytical\Kpi13Controller;
 // Controllers — Dashboard (OLAP page config)
-// use App\Http\Controllers\Api\Dashboard\OverviewController;
-// use App\Http\Controllers\Api\Dashboard\EmploymentController;
-// use App\Http\Controllers\Api\Dashboard\EducationController;
-// use App\Http\Controllers\Api\Dashboard\AnalyticsController;
- 
-// Controllers — Charts (OLAP chart data)
-// use App\Http\Controllers\Api\Charts\StatusChartController;
-// use App\Http\Controllers\Api\Charts\GenderChartController;
-// use App\Http\Controllers\Api\Charts\SalaryChartController;
-// use App\Http\Controllers\Api\Charts\WaitingTimeChartController;
+use App\Http\Controllers\Api\Analytical\KeterserapanController;
  
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
@@ -149,26 +140,34 @@ Route::middleware("auth:sanctum")->group(function () {
     //     Route::get("data-pipeline/status",  [ExcelImportController::class, "status"]);
     // });
  
-    // ── Dashboard page config (semua role yang login) ────────
-    // Route::prefix("dashboard")->group(function () {
-    //     Route::get("overview",   [OverviewController::class,   "index"]);
-    //     Route::get("employment", [EmploymentController::class, "index"]);
-    //     Route::get("education",  [EducationController::class,  "index"]);
-    //     Route::get("analytics",  [AnalyticsController::class,  "index"]);
-    // });
- 
-    // ── Chart data endpoints (semua role yang login) ─────────
-    // Route::prefix("charts")->group(function () {
-    //     Route::get("status",           [StatusChartController::class,      "index"]);
-    //     Route::get("gender",           [GenderChartController::class,      "index"]);
-    //     Route::get("salary",           [SalaryChartController::class,      "index"]);
-    //     Route::get("salary/detail",    [SalaryChartController::class,      "detail"]);
-    //     Route::get("waiting-time",     [WaitingTimeChartController::class, "index"]);
-    // });
- 
     Route::prefix('dashboard/kpi')->group(function () {
         // KPI 13 — Perbandingan KPI Lintas Program Studi
         Route::get('13/chart',  [Kpi13Controller::class, 'chart']);
         Route::get('13/export', [Kpi13Controller::class, 'export']);
+    });
+
+    Route::prefix('dashboard')->group(function () {
+ 
+        // ── Segmen: Tingkat Keterserapan Lulusan ─────────────────────────
+        Route::prefix('keterserapan')->group(function () {
+    
+            // Bar stacked 100% — distribusi status per tahun lulus
+            // GET /api/dashboard/keterserapan/bar
+            Route::get('bar',        [KeterserapanController::class, 'bar']);
+    
+            // Pie — distribusi status snapshot terkini
+            // GET /api/dashboard/keterserapan/pie
+            Route::get('pie',        [KeterserapanController::class, 'pie']);
+    
+            // Drill-down list alumni (modal klik chart)
+            // GET /api/dashboard/keterserapan/drill-down
+            Route::get('drill-down', [KeterserapanController::class, 'drillDown']);
+    
+            // Halaman Bandingkan Prodi — bar stacked + tabel
+            // Chip filter prodi dibaca dari GET /api/dashboard/meta/filter-options → field prodi[]
+            // GET /api/dashboard/keterserapan/bandingkan
+            Route::get('bandingkan', [KeterserapanController::class, 'bandingkan']);
+    
+        });
     });
 });
