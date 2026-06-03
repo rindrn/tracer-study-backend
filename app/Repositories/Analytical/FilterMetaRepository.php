@@ -106,7 +106,7 @@ class FilterMetaRepository extends BaseAnalyticalRepository
      * Semua jurusan unik yang ada di DW.
      * Dipakai untuk: filter global "Jurusan" (level 2 hierarki prodi).
      *
-     * @return array<array{jurusan:string}>
+     * @return array<array{jurusan:string, jenjang:string}>
      *
      * Menyertakan jenjang agar FE bisa filter chip jurusan
      * ketika user sudah pilih jenjang tertentu.
@@ -116,14 +116,18 @@ class FilterMetaRepository extends BaseAnalyticalRepository
         return $this->cube->load([
             'dimensions' => [
                 'DimProdi.jurusan',
+                'DimProdi.jenjang',
             ],
             'order' => [
-                ['DimProdi.jurusan', 'asc'],
+                ['DimProdi.jenjang',  'asc'],
+                ['DimProdi.jurusan',  'asc'],
             ],
         ])
-        ->map(fn ($r) => $r['DimProdi.jurusan'] ?? null)
-        ->filter()
-        ->unique()
+        ->map(fn($r) => [
+            'jurusan' => $r['DimProdi.jurusan'] ?? '',
+            'jenjang' => $r['DimProdi.jenjang'] ?? '',
+        ])
+        ->unique('jurusan')
         ->values()
         ->toArray();
     }
@@ -133,24 +137,33 @@ class FilterMetaRepository extends BaseAnalyticalRepository
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Semua program studi
+     * Semua program studi dengan hierarki jenjang → jurusan → nama_prodi.
      * Dipakai untuk: filter global "Program Studi" (level 3 hierarki).
      *
-     * @return array<array{nama_prodi:string}>
+     * @return array<array{nama_prodi:string, jurusan:string, jenjang:string, kode_prodi:string}>
      */
     public function getProdi(): array
     {
         return $this->cube->load([
             'dimensions' => [
                 'DimProdi.nama_prodi',
+                'DimProdi.jurusan',
+                'DimProdi.jenjang',
+                'DimProdi.kode_prodi',
             ],
             'order' => [
+                ['DimProdi.jenjang',    'asc'],
+                ['DimProdi.jurusan',    'asc'],
                 ['DimProdi.nama_prodi', 'asc'],
             ],
         ])
-        ->map(fn ($r) => $r['DimProdi.nama_prodi'] ?? null)
-        ->filter()
-        ->unique()
+        ->map(fn($r) => [
+            'nama_prodi' => $r['DimProdi.nama_prodi'] ?? '',
+            'jurusan'    => $r['DimProdi.jurusan']    ?? '',
+            'jenjang'    => $r['DimProdi.jenjang']    ?? '',
+            'kode_prodi' => $r['DimProdi.kode_prodi'] ?? '',
+        ])
+        ->unique('nama_prodi')
         ->values()
         ->toArray();
     }
