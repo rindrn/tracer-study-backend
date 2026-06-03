@@ -1,65 +1,129 @@
-# tracer-study-backend
-Backend service for a Tracer Study information system, developed as part of a final project (Tugas Akhir).
+# Tracer Study Backend Service
 
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+Backend service untuk **Sistem Informasi Tracer Study**, dikembangkan sebagai bagian dari **Tugas Akhir (Final Project)**.
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Backend ini dibangun dengan **Laravel (PHP)** dan menerapkan pendekatan **Layered Architecture** (Controller → Service → Repository → DTO) agar kode lebih rapi, mudah dirawat, dan aman untuk kebutuhan role-based access.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Ringkasan Arsitektur
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Alur request (high level)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Frontend (React) → **Laravel Controller** → **Service** → **Repository** → *(PostgreSQL / Cube.js API)* → **DTO** → Response JSON
 
-## Learning Laravel
+### Kenapa tidak langsung React → Cube.js?
+Cube.js tetap berada di belakang backend (Laravel) agar:
+- Token tidak bocor di client
+- Query tidak bisa dimanipulasi sembarangan
+- Kontrol akses berbasis role (mis. Kaprodi hanya prodi sendiri) tetap terpusat
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+> Penjelasan arsitektur lengkap (Before vs After: MVC vs Layered + Cube.js) ada di dokumen: **`docs/architecture.md`**.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-## Laravel Sponsors
+## Tech Stack
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- **Laravel / PHP**
+- **PostgreSQL** (lihat dokumen pada folder `docs/`)
+- (Opsional) **Cube.js** sebagai analytic layer untuk kebutuhan dashboard/OLAP
 
-### Premium Partners
+---
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Struktur Project (Ringkasan)
 
-## Contributing
+```text
+app/
+  DTOs/
+  Exceptions/
+  Http/
+    Controllers/
+    Middleware/
+    Validators/
+  Models/
+  Providers/
+  Repositories/
+  Services/
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+routes/
+  api.php
+  web.php
+  console.php
 
-## Code of Conduct
+database/
+config/
+resources/
+public/
+storage/
+tests/
+docs/
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+---
 
-## Security Vulnerabilities
+## Dokumentasi (Folder `docs/`)
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Dokumen yang tersedia:
+- `docs/postgresql-connection-guide.md` — panduan koneksi PostgreSQL
+- `docs/postgresql-two-schema-bootstrap.sql` — bootstrap SQL untuk skema PostgreSQL (two-schema)
+- `docs/database-blueprint-two-schema.md` — rancangan/blueprint database
+- `docs/migration-checklist.md` — checklist migrasi
+- `docs/architecture.md` — konsep arsitektur (Before vs After) + Cube.js
 
-## License
+---
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Cara Menjalankan (Local Development)
 
+### Prasyarat
+- PHP + Composer
+- PostgreSQL
 
+### Langkah
 
+1) Clone
+```bash
+git clone <YOUR_GIT_URL>
+cd tracer-study-backend
+```
+
+2) Install dependencies
+```bash
+composer install
+```
+
+3) Setup environment
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+
+4) Set konfigurasi database di `.env`  
+Minimal:
+- `DB_CONNECTION=pgsql`
+- `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
+
+> Untuk panduan detail PostgreSQL, baca `docs/postgresql-connection-guide.md`.
+
+5) Jalankan migrasi (jika memakai migration)
+```bash
+php artisan migrate
+```
+
+> Jika kamu memakai bootstrap SQL two-schema, gunakan `docs/postgresql-two-schema-bootstrap.sql` sesuai kebutuhan.
+
+6) Jalankan server
+```bash
+php artisan serve
+```
+
+---
+
+## API Routes
+
+- Endpoint API didefinisikan di: `routes/api.php`
+
+---
+
+## Lisensi
+
+Internal / untuk kebutuhan Tugas Akhir (sesuaikan jika ingin open-source).
