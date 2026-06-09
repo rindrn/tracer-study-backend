@@ -142,6 +142,7 @@ Route::middleware("auth:sanctum")->group(function () {
     Route::prefix('dashboard')->group(function () {
 
         Route::get('meta/filter-options',        [FilterMetaController::class, 'filterOptions']);
+        Route::get('thresholds', [ThresholdController::class, 'forChart']);
  
         // ── Segmen: Tingkat Keterserapan Lulusan ─────────────────────────
         Route::prefix('keterserapan')->group(function () {

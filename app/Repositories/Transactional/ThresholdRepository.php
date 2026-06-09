@@ -120,4 +120,46 @@ class ThresholdRepository
             }
         });
     }
+
+    public function byProdiAndIndicator(int $prodiId, string $indicatorKey): ?object
+    {
+        // Return object berisi lam info + collection of versions+thresholds
+        // Pakai 1 query dengan join berantai
+        $lamRow = DB::connection('oltp')
+            ->table('lam_programs as lp')
+            ->join('lams as l',          'l.id',  '=', 'lp.lam_id')
+            ->where('lp.program_id', $prodiId)
+            ->select('l.id as lam_id', 'l.name as lam_name', 'l.code as lam_code')
+            ->first();
+
+        if (! $lamRow) return null;
+
+        $rows = DB::connection('oltp')
+            ->table('lam_versions as lv')
+            ->join('thresholds as t',           't.lam_version_id',  '=', 'lv.id')
+            ->join('threshold_indicators as ti', 'ti.id',             '=', 't.indicator_id')
+            ->where('lv.lam_id',  $lamRow->lam_id)
+            ->where('ti.key',     $indicatorKey)
+            ->select(
+                'lv.id as version_id',
+                'lv.year',
+                'lv.version_name',
+                'lv.is_active',
+                'ti.key as indicator_key',
+                'ti.name as indicator_name',
+                'ti.unit as indicator_unit',
+                'ti.operator as indicator_operator',
+                't.id as threshold_id',
+                't.level as threshold_level',
+                't.value as threshold_value',
+            )
+            ->orderBy('lv.year')
+            ->orderBy('t.level')
+            ->get();
+
+        return (object) [
+            'lam'  => $lamRow,
+            'rows' => $rows,
+        ];
+    }
 }

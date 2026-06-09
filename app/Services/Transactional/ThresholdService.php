@@ -128,4 +128,90 @@ class ThresholdService
             'thresholds' => $grouped,
         ];
     }
+
+    public function forChart(?int $prodiId, string $indicatorKey): array
+    {
+        // Mode agregasi semua prodi
+        if (! $prodiId) {
+            return [
+                'context'   => 'all_prodi',
+                'lam'       => null,
+                'indicator' => $this->resolveIndicatorMeta($indicatorKey),
+                'versions'  => [],
+            ];
+        }
+
+        $result = $this->repo->byProdiAndIndicator($prodiId, $indicatorKey);
+
+        // Prodi tidak punya LAM
+        if (! $result) {
+            return [
+                'context'   => 'prodi',
+                'lam'       => null,
+                'indicator' => $this->resolveIndicatorMeta($indicatorKey),
+                'versions'  => [],
+            ];
+        }
+
+        // Group rows per version
+        $versions = collect($result->rows)
+            ->groupBy('version_id')
+            ->map(function ($items) use ($result) {
+                $first = $items->first();
+                $thresholds = [];
+                foreach ($items as $item) {
+                    $thresholds[$item->threshold_level] = [
+                        'threshold_id' => $item->threshold_id,
+                        'value'        => (float) $item->threshold_value,
+                    ];
+                }
+                return [
+                    'id'         => $first->version_id,
+                    'year'       => $first->year,
+                    'version_name' => $first->version_name,
+                    'label'      => $result->lam->lam_name . ' ' . $first->year,
+                    'is_active'  => (bool) $first->is_active,
+                    'thresholds' => $thresholds,
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        $firstRow = $result->rows->first();
+
+        return [
+            'context'   => 'prodi',
+            'lam'       => [
+                'id'   => $result->lam->lam_id,
+                'name' => $result->lam->lam_name,
+                'code' => $result->lam->lam_code,
+            ],
+            'indicator' => [
+                'key'      => $firstRow->indicator_key,
+                'name'     => $firstRow->indicator_name,
+                'unit'     => $firstRow->indicator_unit,
+                'operator' => $firstRow->indicator_operator,
+            ],
+            'versions' => $versions,
+        ];
+    }
+
+    private function resolveIndicatorMeta(string $key): array
+    {
+        // Untuk mode all_prodi, tetap kembalikan metadata indicator
+        // agar FE bisa tahu unit/operator-nya
+        $row = DB::connection('oltp')
+            ->table('threshold_indicators')
+            ->where('key', $key)
+            ->first();
+
+        if (! $row) return ['key' => $key, 'name' => null, 'unit' => null, 'operator' => null];
+
+        return [
+            'key'      => $row->key,
+            'name'     => $row->name,
+            'unit'     => $row->unit,
+            'operator' => $row->operator,
+        ];
+    }
 }

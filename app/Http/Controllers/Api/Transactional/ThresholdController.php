@@ -91,4 +91,21 @@ class ThresholdController extends Controller
         ]);
     }
 
+    // GET /api/dashboard/thresholds?prodi_id=3&indicator=employment_time
+    public function forChart(Request $request): JsonResponse
+    {
+        $request->validate([
+            'indicator' => 'required|string',
+            'prodi_id'  => 'nullable|integer',
+        ]);
+
+        $prodiId       = $request->query('prodi_id') ? (int) $request->query('prodi_id') : null;
+        $indicatorKey  = $request->query('indicator');
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->forChart($prodiId, $indicatorKey),
+        ]);
+    }
+
 }
