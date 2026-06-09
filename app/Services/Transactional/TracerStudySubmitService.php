@@ -113,10 +113,17 @@ class TracerStudySubmitService
 
     private function upsertAlumni(array $validated, int $programId): int
     {
+        $phone = $validated['phone'] ?? null;
+        if ($phone) {
+            $phone = preg_replace('/[\s\-\(\)]/', '', $phone);
+            if (str_starts_with($phone, '08')) $phone = '+62' . substr($phone, 1);
+            elseif (str_starts_with($phone, '62')) $phone = '+' . $phone;
+        }
+
         return $this->alumniRepo->upsertByNim($validated['nim'], [
             'name'            => $validated['name'],
             'email'           => $validated['email'],
-            'phone'           => $validated['phone'],
+            'phone'           => $phone,
             'program_id'      => $programId,
             'graduation_year' => $validated['tahun_lulus'],
             'kode_pt'         => $validated['kode_pt'] ?? null,

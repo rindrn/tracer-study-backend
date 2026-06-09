@@ -39,9 +39,10 @@ class AlumniImport implements ToCollection, WithHeadingRow
             ];
 
             $validator = Validator::make($data, [
-                'nim'        => 'required|string',
+                'nim'        => 'required|string|min:5',
                 'name'       => 'required|string',
                 'kode_prodi' => 'required|string',
+                'email'      => 'nullable|email',
             ]);
 
             if ($validator->fails()) {
@@ -64,7 +65,7 @@ class AlumniImport implements ToCollection, WithHeadingRow
                 'nim'             => $data['nim'],
                 'name'            => $data['name'],
                 'email'           => $data['email'] ?: null,
-                'phone'           => $data['phone'] ?: null,
+                'phone'           => $this->normalizePhone($data['phone']),
                 'graduation_year' => $data['graduation_year'] ? (int) $data['graduation_year'] : null,
                 'program_id'      => $programCodes[$data['kode_prodi']],
                 'is_active'       => true,
@@ -85,5 +86,21 @@ class AlumniImport implements ToCollection, WithHeadingRow
     public function getImportedCount(): int
     {
         return $this->importedCount;
+    }
+
+    private function normalizePhone(?string $phone): ?string
+    {
+        if (!$phone) return null;
+        $phone = preg_replace('/[\s\-\(\)]/', '', $phone);
+        if (str_starts_with($phone, '08')) {
+            return '+62' . substr($phone, 1);
+        }
+        if (str_starts_with($phone, '62')) {
+            return '+' . $phone;
+        }
+        if (str_starts_with($phone, '+62')) {
+            return $phone;
+        }
+        return $phone;
     }
 }

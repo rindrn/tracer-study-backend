@@ -35,7 +35,7 @@ class AlumniProfileSeeder extends Seeder
                     'nim'             => $tahunMasuk . str_pad($nimCounter, 10, '0', STR_PAD_LEFT),
                     'name'            => $faker->name,
                     'email'           => $faker->unique()->safeEmail,
-                    'phone'           => $faker->phoneNumber,
+                    'phone'           => '+62' . $faker->numerify('8########'),
                     'entry_year'      => $tahunMasuk,
                     'graduation_year' => $tahunLulus,
                     'gpa'             => $faker->randomFloat(2, 2.7, 4.0),
