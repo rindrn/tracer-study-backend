@@ -14,8 +14,26 @@ class User extends Authenticatable
     protected $connection = 'oltp';
     protected $table      = 'users';
     protected $fillable   = ['name', 'email', 'password', 'role', 'program_id', 'jurusan', 'status'];
-    protected $hidden     = ['password', 'remember_token'];
+    protected $hidden     = ['password'];
     protected $casts      = ['password' => 'hashed', 'status' => 'boolean'];
+
+    /**
+     * Auth pakai Sanctum token; kolom remember_token dihapus pada migration
+     * 2026_05_25_000001. Override agar trait Authenticatable tidak menulis
+     * ke kolom yang sudah tidak ada.
+     */
+    public function getRememberTokenName(): string
+    {
+        return '';
+    }
+    public function getRememberToken(): ?string
+    {
+        return null;
+    }
+    public function setRememberToken($value): void
+    {
+        // no-op
+    }
 
     // ── Role constants ───────────────────────────────────────────────────────
     public const ROLE_HEAD_TRACER  = 'head_tracer';   // Super Admin
