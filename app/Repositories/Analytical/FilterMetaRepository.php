@@ -146,6 +146,7 @@ class FilterMetaRepository extends BaseAnalyticalRepository
     {
         return $this->cube->load([
             'dimensions' => [
+                'DimProdi.id_prodi',
                 'DimProdi.nama_prodi',
                 'DimProdi.jurusan',
                 'DimProdi.jenjang',
@@ -158,6 +159,7 @@ class FilterMetaRepository extends BaseAnalyticalRepository
             ],
         ])
         ->map(fn($r) => [
+            'id'         => (int) ($r['DimProdi.id_prodi'] ?? 0),
             'nama_prodi' => $r['DimProdi.nama_prodi'] ?? '',
             'jurusan'    => $r['DimProdi.jurusan']    ?? '',
             'jenjang'    => $r['DimProdi.jenjang']    ?? '',
