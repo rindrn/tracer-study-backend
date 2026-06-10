@@ -205,10 +205,10 @@ class Kpi13Repository
     public function getAvailableYears(): Collection
     {
         return $this->cube->load([
-            'dimensions' => ['DimWaktu.tahun_snapshot'],
-            'order'      => [['DimWaktu.tahun_snapshot', 'desc']],
+            'dimensions' => ['DimAlumni.tahun_lulus'],
+            'order'      => [['DimAlumni.tahun_l', 'desc']],
         ])
-        ->pluck('DimWaktu.tahun_snapshot')
+        ->pluck('DimAlumni.tahun_lulus')
         ->filter()       // buang null
         ->unique()
         ->values();
@@ -229,7 +229,7 @@ class Kpi13Repository
         }
 
         return [[
-            'member'   => 'DimWaktu.tahun_snapshot',
+            'member'   => 'DimAlumni.tahun_lulus',
             'operator' => 'equals',
             'values'   => [$tahun],
         ]];

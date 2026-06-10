@@ -22,7 +22,7 @@ use App\Http\Controllers\Api\Analytical\Kpi13Controller;
 // Controllers — Dashboard (OLAP page config)
 use App\Http\Controllers\Api\Analytical\KeterserapanController;
 use App\Http\Controllers\Api\Analytical\FilterMetaController;
- 
+ use App\Http\Controllers\Api\Analytical\MasaTungguController;
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
  
@@ -164,5 +164,12 @@ Route::middleware("auth:sanctum")->group(function () {
             Route::get('bandingkan', [KeterserapanController::class, 'bandingkan']);
     
         });
+    });
+
+    Route::prefix('dashboard/masa-tunggu')->group(function () {
+        Route::get('bar',        [MasaTungguController::class, 'bar']);
+        Route::get('distribusi', [MasaTungguController::class, 'distribusi']);
+        Route::get('drill-down', [MasaTungguController::class, 'drillDown']);
+        Route::get('bandingkan', [MasaTungguController::class, 'bandingkan']);
     });
 });
