@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\Analytical\KeterserapanController;
 use App\Http\Controllers\Api\Analytical\FilterMetaController;
 use App\Http\Controllers\Api\Analytical\MasaTungguController;
 use App\Http\Controllers\Api\Analytical\KesesuaianController;
+use App\Http\Controllers\Api\Analytical\WirausahaController;
 
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
@@ -180,5 +181,12 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('pie',        [KesesuaianController::class, 'pie']);
         Route::get('alasan',     [KesesuaianController::class, 'alasan']);
         Route::get('drill-down', [KesesuaianController::class, 'drillDown']);
+    });
+
+    Route::prefix('dashboard/wirausaha')->group(function () {
+        Route::get('bar',        [WirausahaController::class, 'bar']);
+        Route::get('pie',        [WirausahaController::class, 'pie']);
+        Route::get('drill-down', [WirausahaController::class, 'drillDown']);
+        Route::get('bandingkan', [WirausahaController::class, 'bandingkan']);
     });
 });
