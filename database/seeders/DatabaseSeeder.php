@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             AlumniProfileSeeder::class,
             QuestionnaireAssignmentSeeder::class,
             ResponseSeeder::class,
+            StakeholderContactSeeder::class,
         ]);
     }
 }

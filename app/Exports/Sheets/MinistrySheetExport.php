@@ -87,7 +87,7 @@ class MinistrySheetExport implements FromCollection, WithHeadings, WithTitle, Wi
 
     public function title(): string
     {
-        return 'Data Kementrian';
+        return 'Data Pertanyaan Wajib';
     }
 
     private function resolveLabel(string $code, $raw): string

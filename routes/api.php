@@ -119,4 +119,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Reports
     Route::get('reports/export-alumni', [\App\Http\Controllers\Api\Admin\ReportController::class, 'exportAlumniResponses']);
+
+    // Stakeholder Contacts
+    Route::get('stakeholder-contacts/export', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'export']);
+    Route::get('stakeholder-contacts', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'index']);
+    Route::post('stakeholder-contacts', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'store']);
 });

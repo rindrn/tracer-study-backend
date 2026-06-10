@@ -40,14 +40,14 @@ class TracerStudyMultiSheetExport implements WithMultipleSheets
             $prodiQuestions = $prodiData['questions'] ?? [];
 
             if ($prodiAlumni->isNotEmpty() && !empty($prodiQuestions)) {
-                $sheetTitle = "Data Khusus {$prodiCode}";
+                $sheetTitle = "Pertanyaan Tambahan {$prodiCode}";
                 $sheets[] = new ProdiSheetExport($prodiAlumni, $prodiQuestions, $sheetTitle, $this->optionsMap, $this->questionMeta);
             }
         }
 
         // Fallback: if no per-prodi sheets, add a single empty prodi sheet
         if (count($sheets) === 1) {
-            $sheets[] = new ProdiSheetExport(collect(), [], 'Data Khusus Prodi');
+            $sheets[] = new ProdiSheetExport(collect(), [], 'Pertanyaan Tambahan');
         }
 
         return $sheets;

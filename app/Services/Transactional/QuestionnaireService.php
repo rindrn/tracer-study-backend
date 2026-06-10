@@ -276,6 +276,7 @@ class QuestionnaireService
                         'option_value' => $value,
                         'order_no'     => (int) ($optionData['order_no'] ?? ($optionIndex + 1)),
                         'is_active'    => true,
+                        'is_hidden'    => (bool) ($optionData['is_hidden'] ?? false),
                     ]);
                 }
             }
@@ -444,6 +445,7 @@ class QuestionnaireService
                 'label'    => $o->option_label,
                 'value'    => $o->option_value,
                 'order_no' => $o->order_no,
+                'is_hidden' => (bool) ($o->is_hidden ?? false),
             ])->values()->toArray(),
             'required'    => (bool) $question->is_required,
             'allowOther'  => $metadata['allowOther'] ?? false,
