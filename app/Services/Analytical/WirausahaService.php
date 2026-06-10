@@ -62,7 +62,7 @@ class WirausahaService
 
     public function getPie(array $params): WirausahaPieDTO
     {
-        $tingkatRaw = $this->repo->getPieTingkat(
+        $posisiRaw = $this->repo->getPiePosisi(
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
@@ -78,19 +78,31 @@ class WirausahaService
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
         );
 
-        $total = $tingkatRaw->sum('count');
+        $total = $posisiRaw->sum('count');
 
-        $tingkat = $tingkatRaw->map(fn($r) => [
+        // Pisahkan top-3 dan sisanya
+        $top3      = $posisiRaw->take(3);
+        $lainnya   = $posisiRaw->skip(3);
+        $countLain = $lainnya->sum('count');
+
+        $posisi = $top3->map(fn($r) => [
             'label' => $r['label'],
             'count' => $r['count'],
             'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
         ])->values()->toArray();
 
-        $sebaranKota = $kotaRaw->values()->toArray();
+        // Tambahkan "Lainnya" hanya kalau ada data di rank 4+
+        if ($countLain > 0) {
+            $posisi[] = [
+                'label' => 'Lainnya',
+                'count' => $countLain,
+                'pct'   => $total > 0 ? round($countLain / $total * 100, 1) : 0.0,
+            ];
+        }
 
         return new WirausahaPieDTO(
-            tingkat:     $tingkat,
-            sebaranKota: $sebaranKota,
+            posisi:      $posisi,
+            sebaranKota: $kotaRaw->values()->toArray(),
             total:       $total,
             filters:     $this->activeFilters($params),
         );

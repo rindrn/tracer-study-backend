@@ -94,37 +94,40 @@ class WirausahaRepository extends BaseAnalyticalRepository
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  2a. PIE — distribusi tingkat wirausaha (Lokal/Nasional/Internasional)
+    //  2a. PIE — distribusi POSISI/JABATAN wirausaha (Owner, Co-founder, dll)
     // ──────────────────────────────────────────────────────────────
 
     /**
-     *
      * @return Collection<array{label, count}>
      */
-    public function getPieTingkat(
+    public function getPiePosisi(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
-        $filters = $this->buildGlobalFilters(
-            jenjang:        $jenjang,
-            jurusan:        $jurusan,
-            namaProdi:      $namaProdi,
-            tahunLulus:     $tahunLulus,
-            mingguSnapshot: $mingguSnapshot,
+        $filters = array_merge(
+            $this->buildGlobalFilters(
+                jenjang:        $jenjang,
+                jurusan:        $jurusan,
+                namaProdi:      $namaProdi,
+                tahunLulus:     $tahunLulus,
+                mingguSnapshot: $mingguSnapshot,
+            ),
+            // hanya alumni wirausaha
+            [['member' => 'FactTracerStudy.status_alumni_sk', 'operator' => 'equals', 'values' => ['3']]],
         );
 
         return $this->cube->load([
             'measures'   => ['FactTracerStudy.count_alumni'],
-            'dimensions' => ['DimWirausaha.label_tingkat_instansi'],
+            'dimensions' => ['DimWirausaha.jabatan'],
             'filters'    => $filters,
             'order'      => [['FactTracerStudy.count_alumni', 'desc']],
         ])->map(fn($r) => [
-            'label' => $r['DimWirausaha.label_tingkat_instansi'] ?? '',
+            'label' => $r['DimWirausaha.jabatan'] ?? '',
             'count' => (int) ($r['FactTracerStudy.count_alumni'] ?? 0),
-        ]);
+        ])->filter(fn($r) => $r['label'] !== ''); // buang row kosong
     }
 
     // ──────────────────────────────────────────────────────────────
