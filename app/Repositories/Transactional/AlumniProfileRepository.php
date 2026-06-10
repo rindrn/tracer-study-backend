@@ -123,9 +123,9 @@ class AlumniProfileRepository
 
     /**
      * Sama seperti paginateForAdmin tapi ditambah kolom `response_status`:
-     *   - 'finish'        → responses.status IN ('submitted','verified')
-     *   - 'ongoing'       → responses.status = 'started'
-     *   - 'belum_mengisi' → no response row
+     *   - 'finished'    → responses.status IN ('submitted','verified')
+     *   - 'ongoing'     → responses.status = 'started'
+     *   - 'not_started' → no response row
      *
      * Dipakai di halaman Data Alumni Prodi (kaprodi).
      *
@@ -153,9 +153,9 @@ class AlumniProfileRepository
                 'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
                 DB::raw("CASE
-                    WHEN responses.status IN ('submitted','verified') THEN 'finish'
+                    WHEN responses.status IN ('submitted','verified') THEN 'finished'
                     WHEN responses.status = 'started' THEN 'ongoing'
-                    ELSE 'belum_mengisi'
+                    ELSE 'not_started'
                 END as response_status"),
             );
 
@@ -186,9 +186,10 @@ class AlumniProfileRepository
      * List semua alumni yang ditargetkan oleh kuesioner tertentu,
      * termasuk yang belum mengisi (LEFT JOIN responses).
      *
-     * Status hanya 2:
-     *   - 'ongoing'  → belum ada response ATAU status = 'started'
-     *   - 'finished' → status IN ('submitted','verified')
+     * Status ada 3 (mutlak):
+     *   - 'finished'    → status IN ('submitted','verified')
+     *   - 'ongoing'     → status = 'started' (response sudah dibuat tapi belum submit)
+     *   - 'not_started' → belum ada response row sama sekali
      *
      * @param array{program_id?: int, search?: string, questionnaire_id: int} $filters
      */
@@ -220,7 +221,11 @@ class AlumniProfileRepository
                 'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
                 'responses.id as response_id',
-                DB::raw("CASE WHEN responses.status IN ('submitted','verified') THEN 'finished' ELSE 'ongoing' END as response_status"),
+                DB::raw("CASE
+                    WHEN responses.status IN ('submitted','verified') THEN 'finished'
+                    WHEN responses.status = 'started' THEN 'ongoing'
+                    ELSE 'not_started'
+                END as response_status"),
                 'responses.submitted_at as response_submitted_at',
                 'responses.created_at as response_created_at',
                 'responses.updated_at as response_updated_at',
@@ -255,7 +260,11 @@ class AlumniProfileRepository
             });
         }
 
-        return $query->orderByRaw("CASE WHEN responses.status IN ('submitted','verified') THEN 2 ELSE 1 END")
+        return $query->orderByRaw("CASE
+                WHEN responses.status IN ('submitted','verified') THEN 3
+                WHEN responses.status = 'started' THEN 2
+                ELSE 1
+            END")
             ->orderBy('alumni_profiles.name')
             ->paginate($perPage);
     }
@@ -263,7 +272,7 @@ class AlumniProfileRepository
     /**
      * Hitung stats alumni per prodi (atau semua kalau $programId null).
      *
-     * Return: ['total' => int, 'finish' => int, 'ongoing' => int, 'belum_mengisi' => int, 'answered' => int, 'unanswered' => int]
+     * Return: ['total' => int, 'finished' => int, 'ongoing' => int, 'not_started' => int, 'answered' => int, 'unanswered' => int]
      */
     public function countStatsByProgram(?int $programId, ?string $jurusan = null, ?int $graduationYear = null): array
     {
@@ -289,7 +298,7 @@ class AlumniProfileRepository
             ->pluck('id');
 
         if ($globalQnrIds->isEmpty()) {
-            return ['total' => $total, 'finish' => 0, 'ongoing' => 0, 'belum_mengisi' => $total, 'answered' => 0, 'unanswered' => $total];
+            return ['total' => $total, 'finished' => 0, 'ongoing' => 0, 'not_started' => $total, 'answered' => 0, 'unanswered' => $total];
         }
 
         // Finish: submitted or verified
@@ -324,15 +333,15 @@ class AlumniProfileRepository
         }
         $ongoing = $ongoingQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
 
-        $belumMengisi = max($total - $finish - $ongoing, 0);
+        $notStarted = max($total - $finish - $ongoing, 0);
 
         return [
-            'total'         => $total,
-            'finish'        => $finish,
-            'ongoing'       => $ongoing,
-            'belum_mengisi' => $belumMengisi,
-            'answered'      => $finish,
-            'unanswered'    => $total - $finish,
+            'total'       => $total,
+            'finished'    => $finish,
+            'ongoing'     => $ongoing,
+            'not_started' => $notStarted,
+            'answered'    => $finish,
+            'unanswered'  => $total - $finish,
         ];
     }
 
