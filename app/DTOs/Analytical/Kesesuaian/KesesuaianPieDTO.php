@@ -1,21 +1,21 @@
 <?php
 
-namespace App\DTOs\Analytical\MasaTunggu;
+namespace App\DTOs\Analytical\Kesesuaian;
 
-
-class MasaTungguBandingkanDTO
+class KesesuaianPieDTO
 {
     public function __construct(
         private readonly array $data,
-        private readonly array $prodiList,
+        private readonly int   $total,
         private readonly array $filters,
     ) {}
 
     public function toArray(): array
     {
         return [
+            'chart_type' => 'pie',
             'filters'    => $this->filters,
-            'prodi_list' => $this->prodiList,
+            'total'      => $this->total,
             'data'       => $this->data,
         ];
     }

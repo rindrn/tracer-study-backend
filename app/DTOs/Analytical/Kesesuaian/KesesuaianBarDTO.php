@@ -1,9 +1,8 @@
 <?php
 
-namespace App\DTOs\Analytical\MasaTunggu;
+namespace App\DTOs\Analytical\Kesesuaian;
 
-
-class MasaTungguBarDTO
+class KesesuaianBarDTO
 {
     public function __construct(
         private readonly array $data,

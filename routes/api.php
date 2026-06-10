@@ -22,7 +22,9 @@ use App\Http\Controllers\Api\Analytical\Kpi13Controller;
 // Controllers — Dashboard (OLAP page config)
 use App\Http\Controllers\Api\Analytical\KeterserapanController;
 use App\Http\Controllers\Api\Analytical\FilterMetaController;
- use App\Http\Controllers\Api\Analytical\MasaTungguController;
+use App\Http\Controllers\Api\Analytical\MasaTungguController;
+use App\Http\Controllers\Api\Analytical\KesesuaianController;
+
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
  
@@ -171,5 +173,12 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('distribusi', [MasaTungguController::class, 'distribusi']);
         Route::get('drill-down', [MasaTungguController::class, 'drillDown']);
         Route::get('bandingkan', [MasaTungguController::class, 'bandingkan']);
+    });
+
+    Route::prefix('dashboard/kesesuaian')->group(function () {
+        Route::get('bar',        [KesesuaianController::class, 'bar']);
+        Route::get('pie',        [KesesuaianController::class, 'pie']);
+        Route::get('alasan',     [KesesuaianController::class, 'alasan']);
+        Route::get('drill-down', [KesesuaianController::class, 'drillDown']);
     });
 });

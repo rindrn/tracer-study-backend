@@ -2,14 +2,6 @@
 
 namespace App\DTOs\Analytical\MasaTunggu;
 
-/**
- * MasaTungguDrillDownDTO
- *
- * Output untuk GET /api/dashboard/masa-tunggu/drill-down
- * List alumni individual berdasarkan rentang masa tunggu yang diklik.
- *
- * Taruh di: app/DTOs/Analytical/MasaTunggu/MasaTungguDrillDownDTO.php
- */
 class MasaTungguDrillDownDTO
 {
     public function __construct(

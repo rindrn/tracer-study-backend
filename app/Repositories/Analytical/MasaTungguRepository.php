@@ -4,21 +4,6 @@ namespace App\Repositories\Analytical;
 
 use Illuminate\Support\Collection;
 
-/**
- * MasaTungguRepository
- *
- * Query ke Cube.js untuk segmen "Masa Tunggu Kerja Lulusan" (KPI 5):
- *   1. getBarData()             → bar/combo avg + pct cepat per prodi × tahun
- *   2. getDistribusiData()      → flat rows distribusi 3 rentang per prodi × tahun
- *   3. getDetailAlumniByRentang() → drill-down alumni per rentang (no pre-agg)
- *   4. getDistribusiPerProdi()  → bandingkan distribusi per prodi × tahun
- *
- * Pre-agg:
- *   - FactTracerStudy.utama                  → getBarData
- *   - FactTracerStudy.distribusi_masa_tunggu → getDistribusiData, getDistribusiPerProdi
- *
- * Taruh di: app/Repositories/Analytical/MasaTungguRepository.php
- */
 class MasaTungguRepository extends BaseAnalyticalRepository
 {
     // ──────────────────────────────────────────────────────────────
@@ -214,12 +199,6 @@ class MasaTungguRepository extends BaseAnalyticalRepository
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Distribusi masa tunggu per prodi untuk halaman Bandingkan.
-     * Field name sesuai spec BE.md: count_tunggu_0_3_bulan, dll + pct_cepat.
-     * Includes tahun_lulus di dimensions (sesuai spec Cube query di BE.md).
-     *
-     * Pre-agg: FactTracerStudy.distribusi_masa_tunggu ✅
-     *
      * pct_cepat = (count_0_3 + count_3_6) / total_bekerja × 100
      * (≤ 6 bulan = "cepat" sesuai standar DIKTI)
      *

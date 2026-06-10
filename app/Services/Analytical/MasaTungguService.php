@@ -8,42 +8,12 @@ use App\DTOs\Analytical\MasaTunggu\MasaTungguDrillDownDTO;
 use App\DTOs\Analytical\MasaTunggu\MasaTungguBandingkanDTO;
 use App\Repositories\Analytical\MasaTungguRepository;
 
-/**
- * MasaTungguService
- *
- * Orkestrasi data dari MasaTungguRepository (KPI 5 — Masa Tunggu Kerja):
- *   - getBar()         → bar/combo % cepat + avg per prodi per tahun
- *   - getDistribusi()  → flat rows per prodi × tahun dengan count 3 rentang
- *   - getDrillDown()   → list alumni per rentang masa tunggu (drill-down modal)
- *   - getBandingkan()  → perbandingan distribusi masa tunggu per prodi
- *
- * Taruh di: app/Services/Analytical/MasaTungguService.php
- */
 class MasaTungguService
 {
     public function __construct(
         private readonly MasaTungguRepository $repo,
     ) {}
 
-    // ──────────────────────────────────────────────────────────────
-    //  BAR — % cepat + avg masa tunggu per prodi per tahun
-    // ──────────────────────────────────────────────────────────────
-
-    /**
-     * Response persis sesuai spec BE.md:
-     * {
-     *   "filters": {},
-     *   "data": [
-     *     {
-     *       "nama_prodi", "jenjang", "jurusan", "tahun_lulus",
-     *       "count_alumni", "count_terserap", "count_masa_tunggu_cepat",
-     *       "pct_cepat", "avg_masa_tunggu_bekerja"
-     *     }
-     *   ]
-     * }
-     *
-     * pct_cepat = count_masa_tunggu_cepat / count_terserap × 100
-     */
     public function getBar(array $params): MasaTungguBarDTO
     {
         $raw = $this->repo->getBarData(
@@ -78,23 +48,6 @@ class MasaTungguService
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  DISTRIBUSI — flat rows per prodi × tahun
-    // ──────────────────────────────────────────────────────────────
-
-    /**
-     * Response persis sesuai spec BE.md:
-     * {
-     *   "filters": {},
-     *   "data": [
-     *     {
-     *       "nama_prodi", "jenjang", "tahun_lulus",
-     *       "count_tunggu_0_3_bulan", "count_tunggu_3_6_bulan", "count_tunggu_lebih_6_bulan",
-     *       "avg_masa_tunggu_bekerja", "min_masa_tunggu_bekerja", "max_masa_tunggu_bekerja"
-     *     }
-     *   ]
-     * }
-     */
     public function getDistribusi(array $params): MasaTungguDistribusiDTO
     {
         $raw = $this->repo->getDistribusiData(
@@ -124,9 +77,6 @@ class MasaTungguService
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  DRILL-DOWN — list alumni per rentang masa tunggu
-    // ──────────────────────────────────────────────────────────────
 
     public function getDrillDown(array $params): MasaTungguDrillDownDTO
     {
@@ -158,25 +108,7 @@ class MasaTungguService
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  BANDINGKAN PER PRODI
-    // ──────────────────────────────────────────────────────────────
 
-    /**
-     * Response persis sesuai spec BE.md:
-     * {
-     *   "filters": {},
-     *   "prodi_list": [...],
-     *   "data": [
-     *     {
-     *       "nama_prodi", "jenjang", "tahun_lulus",
-     *       "count_tunggu_0_3_bulan", "count_tunggu_3_6_bulan", "count_tunggu_lebih_6_bulan",
-     *       "avg_masa_tunggu_bekerja", "min_masa_tunggu_bekerja", "max_masa_tunggu_bekerja",
-     *       "pct_cepat"
-     *     }
-     *   ]
-     * }
-     */
     public function getBandingkan(array $params): MasaTungguBandingkanDTO
     {
         $prodiFilter = $params['prodi'] ?? [];
@@ -199,9 +131,6 @@ class MasaTungguService
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  PRIVATE HELPERS
-    // ──────────────────────────────────────────────────────────────
 
     private function activeFilters(array $params, array $keys = []): array
     {

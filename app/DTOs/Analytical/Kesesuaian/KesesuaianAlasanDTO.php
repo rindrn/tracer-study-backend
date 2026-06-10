@@ -1,9 +1,17 @@
 <?php
 
-namespace App\DTOs\Analytical\MasaTunggu;
+namespace App\DTOs\Analytical\Kesesuaian;
 
-
-class MasaTungguBarDTO
+/*
+ * Output 
+ * {
+ *   "filters": {},
+ *   "data": [
+ *     { "kode_field": "f1601", "label": "Belum ada lowongan sesuai", "count": 87 }
+ *   ]
+ * }
+ */
+class KesesuaianAlasanDTO
 {
     public function __construct(
         private readonly array $data,
