@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'bps' => [
+        'api_key' => env('BPS_API_KEY'),
+    ],
+
 ];

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Transactional\LamController;
 use App\Http\Controllers\Api\Transactional\LamVersionController; 
 use App\Http\Controllers\Api\Transactional\LamProgramController; 
 use App\Http\Controllers\Api\Transactional\ProgramController; 
+use App\Http\Controllers\Api\Transactional\RefUmpController;
 
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireController;
@@ -108,6 +109,16 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::post('lam-versions/{id}/thresholds/bulk', [ThresholdController::class, 'bulkStore']);
         Route::put('lam-versions/{id}/thresholds/bulk',  [ThresholdController::class, 'bulkUpdate']);
 
+    });
+
+    Route::middleware('role:admin')->prefix('ump')->group(function () {
+        Route::get('years',                              [RefUmpController::class, 'years']);
+        Route::get('template',                           [RefUmpController::class, 'template']);
+        Route::get('{tahun}',                            [RefUmpController::class, 'show']);
+        Route::get('{tahun}/fetch-bps',                  [RefUmpController::class, 'fetchBps']);
+        Route::post('import',                            [RefUmpController::class, 'import']);
+        Route::post('{tahun}/bulk-save',                 [RefUmpController::class, 'bulkSave']);
+        Route::patch('{tahun}/provinces/{idProvinsi}',   [RefUmpController::class, 'updateSingle']);
     });
 
     // ── Manajemen Staff & Tim Tracer (admin + head_tracer) ─────────────────
