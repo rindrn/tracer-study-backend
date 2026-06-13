@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
 use App\Http\Controllers\Api\Analytical\Kpi13Controller;
 // Controllers — Dashboard (OLAP page config)
 use App\Http\Controllers\Api\Analytical\KeterserapanController;
+use App\Http\Controllers\Api\Analytical\PendapatanController;
 use App\Http\Controllers\Api\Analytical\FilterMetaController;
  
 // Controllers — DataPipeline (ETL)
@@ -175,6 +176,22 @@ Route::middleware("auth:sanctum")->group(function () {
             // GET /api/dashboard/keterserapan/bandingkan
             Route::get('bandingkan', [KeterserapanController::class, 'bandingkan']);
     
+        });
+
+        Route::prefix('pendapatan')->group(function () {
+
+            // GET /api/dashboard/pendapatan/bar
+            Route::get('bar',        [PendapatanController::class, 'bar']);
+
+            // GET /api/dashboard/pendapatan/distribusi
+            Route::get('distribusi', [PendapatanController::class, 'distribusi']);
+
+            // GET /api/dashboard/pendapatan/drill-down
+            Route::get('drill-down', [PendapatanController::class, 'drillDown']);
+
+            // GET /api/dashboard/pendapatan/bandingkan
+            Route::get('bandingkan', [PendapatanController::class, 'bandingkan']);
+
         });
     });
 });
