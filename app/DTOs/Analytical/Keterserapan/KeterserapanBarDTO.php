@@ -12,8 +12,6 @@ namespace App\DTOs\Analytical\Keterserapan;
  *   - Dropdown minggu_snapshot dikelola di level global filter dashboard,
  *     bukan per-endpoint chart
  *   - Menyertakannya hanya menambah payload tanpa manfaat untuk chart ini
- *
- * Taruh di: app/DTOs/Analytical/Keterserapan/KeterserapanBarDTO.php
  */
 class KeterserapanBarDTO
 {

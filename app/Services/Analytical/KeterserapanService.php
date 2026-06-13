@@ -22,8 +22,6 @@ use Illuminate\Support\Collection;
  *
  * Semua kalkulasi persentase dan reshape dilakukan di sini atau di Repository.
  * Controller tidak melakukan kalkulasi — cukup delegasi ke Service.
- *
- * Taruh di: app/Services/Analytical/KeterserapanService.php
  */
 class KeterserapanService
 {

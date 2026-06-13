@@ -6,8 +6,6 @@ namespace App\DTOs\Analytical\Keterserapan;
  * KeterserapanPieDTO
  *
  * Response untuk grafik pie distribusi status alumni snapshot terkini.
- *
- * Taruh di: app/DTOs/Analytical/Keterserapan/KeterserapanPieDTO.php
  */
 class KeterserapanPieDTO
 {

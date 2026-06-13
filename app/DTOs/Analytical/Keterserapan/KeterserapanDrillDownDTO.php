@@ -6,8 +6,6 @@ namespace App\DTOs\Analytical\Keterserapan;
  * KeterserapanDrillDownDTO
  *
  * Response untuk modal drill-down list alumni per status dan per tahun lulus.
- *
- * Taruh di: app/DTOs/Analytical/Keterserapan/KeterserapanDrillDownDTO.php
  */
 class KeterserapanDrillDownDTO
 {

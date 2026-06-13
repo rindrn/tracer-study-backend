@@ -24,7 +24,12 @@ use App\Http\Controllers\Api\Analytical\Kpi13Controller;
 use App\Http\Controllers\Api\Analytical\KeterserapanController;
 use App\Http\Controllers\Api\Analytical\PendapatanController;
 use App\Http\Controllers\Api\Analytical\FilterMetaController;
- 
+use App\Http\Controllers\Api\Analytical\MasaTungguController;
+use App\Http\Controllers\Api\Analytical\KesesuaianController;
+use App\Http\Controllers\Api\Analytical\WirausahaController;
+use App\Http\Controllers\Api\Analytical\SebaranInstansiController;
+use App\Http\Controllers\Api\Analytical\KompetensiController;
+
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
  
@@ -177,7 +182,7 @@ Route::middleware("auth:sanctum")->group(function () {
             Route::get('bandingkan', [KeterserapanController::class, 'bandingkan']);
     
         });
-
+        // ── Segmen: Tingkat Pendapatan Lulusan ─────────────────────────
         Route::prefix('pendapatan')->group(function () {
 
             // GET /api/dashboard/pendapatan/bar
@@ -193,5 +198,39 @@ Route::middleware("auth:sanctum")->group(function () {
             Route::get('bandingkan', [PendapatanController::class, 'bandingkan']);
 
         });
+    });
+
+    Route::prefix('dashboard/masa-tunggu')->group(function () {
+        Route::get('bar',        [MasaTungguController::class, 'bar']);
+        Route::get('distribusi', [MasaTungguController::class, 'distribusi']);
+        Route::get('drill-down', [MasaTungguController::class, 'drillDown']);
+        Route::get('bandingkan', [MasaTungguController::class, 'bandingkan']);
+    });
+
+    Route::prefix('dashboard/kesesuaian')->group(function () {
+        Route::get('bar',        [KesesuaianController::class, 'bar']);
+        Route::get('pie',        [KesesuaianController::class, 'pie']);
+        Route::get('alasan',     [KesesuaianController::class, 'alasan']);
+        Route::get('drill-down', [KesesuaianController::class, 'drillDown']);
+    });
+
+    Route::prefix('dashboard/wirausaha')->group(function () {
+        Route::get('bar',        [WirausahaController::class, 'bar']);
+        Route::get('pie',        [WirausahaController::class, 'pie']);
+        Route::get('drill-down', [WirausahaController::class, 'drillDown']);
+        Route::get('bandingkan', [WirausahaController::class, 'bandingkan']);
+    });
+
+    Route::prefix('dashboard/sebaraninstansi')->group(function () {
+        Route::get('jenis',      [SebaranInstansiController::class, 'jenis']);
+        Route::get('tingkat',    [SebaranInstansiController::class, 'tingkat']);
+        Route::get('bandingkan', [SebaranInstansiController::class, 'bandingkan']);
+        Route::get('lokasi',     [SebaranInstansiController::class, 'lokasi']);
+        Route::get('drill-down', [SebaranInstansiController::class, 'drillDown']);
+    });
+
+    Route::prefix('dashboard/kompetensi')->group(function () {
+        Route::get('gap',            [KompetensiController::class, 'gap']);
+        Route::get('gap/bandingkan', [KompetensiController::class, 'bandingkan']);
     });
 });

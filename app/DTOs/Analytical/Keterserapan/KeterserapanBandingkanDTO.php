@@ -12,8 +12,6 @@ namespace App\DTOs\Analytical\Keterserapan;
  *
  * `statuses` bersifat dinamis — FE render kolom dari label yang ada.
  * Hanya STATUS_TERSERAP di Service yang hardcode (keputusan bisnis IKU 2).
- *
- * Taruh di: app/DTOs/Analytical/Keterserapan/KeterserapanBandingkanDTO.php
  */
 class KeterserapanBandingkanDTO
 {

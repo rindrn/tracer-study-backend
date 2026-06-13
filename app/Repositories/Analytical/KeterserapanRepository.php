@@ -16,8 +16,6 @@ use Illuminate\Support\Collection;
  * Pre-agg Cube.js yang dipakai: FactTracerStudy.utama
  * (sudah cover dimensi: DimProdi.*, DimStatusAlumni.label,
  *  DimAlumni.tahun_lulus, DimWaktu.minggu_snapshot)
- *
- * Taruh di: app/Repositories/Analytical/KeterserapanRepository.php
  */
 class KeterserapanRepository extends BaseAnalyticalRepository
 {

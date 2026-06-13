@@ -28,9 +28,7 @@ use Illuminate\Http\Response;
  *   GET /api/dashboard/keterserapan/bandingkan
  *       → Perbandingan keterserapan per prodi (halaman Bandingkan)
  *       Chip filter prodi berasal dari GET /api/dashboard/meta/filter-options — tidak perlu endpoint terpisah.
- *
- * Taruh di: app/Http/Controllers/Api/Analytical/KeterserapanController.php
- */
+  */
 class KeterserapanController extends Controller
 {
     public function __construct(
