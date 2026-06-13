@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\Analytical\MasaTungguController;
 use App\Http\Controllers\Api\Analytical\KesesuaianController;
 use App\Http\Controllers\Api\Analytical\WirausahaController;
 use App\Http\Controllers\Api\Analytical\SebaranInstansiController;
+use App\Http\Controllers\Api\Analytical\KompetensiController;
 
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
@@ -197,5 +198,10 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('bandingkan', [SebaranInstansiController::class, 'bandingkan']);
         Route::get('lokasi',     [SebaranInstansiController::class, 'lokasi']);
         Route::get('drill-down', [SebaranInstansiController::class, 'drillDown']);
+    });
+
+    Route::prefix('dashboard/kompetensi')->group(function () {
+        Route::get('gap',            [KompetensiController::class, 'gap']);
+        Route::get('gap/bandingkan', [KompetensiController::class, 'bandingkan']);
     });
 });
