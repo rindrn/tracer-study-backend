@@ -1,31 +1,51 @@
 <?php
 // database/seeders/UserSeeder.php
 namespace Database\Seeders;
- 
+
 use App\Models\Transactional\Program;
 use App\Models\Transactional\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
- 
+use Illuminate\Support\Str;
+
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Ambil ID prodi dari DB untuk foreign key
-        $ti = Program::where('code', 'TI')->first();
-        $si = Program::where('code', 'SI')->first();
- 
-        $users = [
-            ['name'=>'Admin Sistem',             'email'=>'admin@test.com',    'role'=>'admin', 'program_id'=>null],
-            ['name'=>'Petugas P2MPP',            'email'=>'p2mpp@test.com',    'role'=>'p2mpp', 'program_id'=>null],
-            ['name'=>'Kaprodi Teknik Informatika','email'=>'prodi.ti@test.com', 'role'=>'prodi', 'program_id'=>$ti?->id],
-            ['name'=>'Kaprodi Sistem Informasi',  'email'=>'prodi.si@test.com', 'role'=>'prodi', 'program_id'=>$si?->id],
+        // ── Akun Sistem (role global, program_id NULL) ───────
+        // Demo akun untuk coba login 5 role di luar kaprodi.
+        // Semua pakai password seragam: "password123".
+        $systemUsers = [
+            ['name' => 'Admin Sistem',         'email' => 'admin@test.com',        'role' => User::ROLE_ADMIN],
+            ['name' => 'Petugas P2MPP',        'email' => 'p2mpp@test.com',        'role' => User::ROLE_P2MPP],
+            ['name' => 'Kepala Tracer Study',  'email' => 'head.tracer@test.com',  'role' => User::ROLE_HEAD_TRACER],
+            ['name' => 'Tim Tracer 1',         'email' => 'tracer1@test.com',      'role' => User::ROLE_TRACER_TEAM],
+            ['name' => 'Tim Tracer 2',         'email' => 'tracer2@test.com',      'role' => User::ROLE_TRACER_TEAM],
+            ['name' => 'Wakil Direktur',       'email' => 'wadir@test.com',        'role' => User::ROLE_WADIR],
         ];
- 
-        foreach ($users as $data) {
+
+        foreach ($systemUsers as $data) {
             User::updateOrCreate(['email' => $data['email']], array_merge($data, [
-                'password' => Hash::make('password123'),
+                'program_id' => null,
+                'password'   => Hash::make('password123'),
             ]));
+        }
+
+        // ── Akun Kaprodi (1 per program studi) ───────────────
+        // role = 'kaprodi' (sebelumnya 'prodi'), sinkron dengan FE RBAC.
+        $programs = Program::all();
+
+        foreach ($programs as $program) {
+            $emailSlug = Str::lower(str_replace([' ', '&', '/'], ['', '', ''], $program->code));
+            $email = "prodi.{$emailSlug}@test.com";
+
+            User::updateOrCreate(['email' => $email], [
+                'name'       => "Kaprodi {$program->name}",
+                'email'      => $email,
+                'role'       => User::ROLE_KAPRODI,
+                'program_id' => $program->id,
+                'password'   => Hash::make('password123'),
+            ]);
         }
     }
 }

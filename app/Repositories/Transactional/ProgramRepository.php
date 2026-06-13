@@ -25,6 +25,17 @@ class ProgramRepository
     {
         return Program::find($id);
     }
+
+    public function findByCode(string $code): ?Program
+    {
+        return Program::where('code', $code)->first();
+    }
+
+    /** Semua program, keyed by id — dipakai ReportService untuk lookup cepat. */
+    public function allIndexedById(): \Illuminate\Database\Eloquent\Collection
+    {
+        return Program::all()->keyBy('id');
+    }
  
     public function create(array $data): Program
     {

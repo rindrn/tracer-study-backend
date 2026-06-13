@@ -1,37 +1,57 @@
 <?php
+
 namespace App\DTOs\Transactional;
- 
-// ── Response ─────────────────────────────────────────────────
+
 class ThresholdResponseDTO
 {
     public function __construct(
         public readonly int    $id,
-        public readonly string $name,
         public readonly float  $value,
-        public readonly array  $programs,
+        public readonly string $level,
+        public readonly int    $indicatorId,
+        public readonly string $indicatorKey,
+        public readonly string $indicatorName,
+        public readonly string $indicatorUnit,
+        public readonly string $indicatorOperator,
+        public readonly int    $lamVersionId,
+        public readonly int    $lamVersionYear,
         public readonly string $createdAt,
     ) {}
- 
-    // fromRow: dari raw object hasil query vw_thresholds_with_programs
-    // programs kolom sudah berupa JSON string dari JSON_AGG di View
+
     public static function fromRow(object $row): self
     {
         return new self(
-            id:        $row->threshold_id,
-            name:      $row->threshold_name,
-            value:     (float) $row->threshold_value,
-            programs:  json_decode($row->programs ?? '[]', true),
-            createdAt: $row->created_at,
+            id:                $row->threshold_id,
+            value:             (float) $row->threshold_value,
+            level:             $row->threshold_level,
+            indicatorId:       $row->indicator_id,
+            indicatorKey:      $row->indicator_key,
+            indicatorName:     $row->indicator_name,
+            indicatorUnit:     $row->indicator_unit,
+            indicatorOperator: $row->indicator_operator,
+            lamVersionId:      $row->lam_version_id,
+            lamVersionYear:    (int) $row->lam_version_year,
+            createdAt:         $row->created_at,
         );
     }
- 
+
     public function toArray(): array
     {
         return [
-            'id'         => $this->id,
-            'name'       => $this->name,
-            'value'      => $this->value,
-            'programs'   => $this->programs,
+            'id'        => $this->id,
+            'value'     => $this->value,
+            'level'     => $this->level,
+            'indicator' => [
+                'id'       => $this->indicatorId,
+                'key'      => $this->indicatorKey,
+                'name'     => $this->indicatorName,
+                'unit'     => $this->indicatorUnit,
+                'operator' => $this->indicatorOperator,
+            ],
+            'lam_version' => [
+                'id'   => $this->lamVersionId,
+                'year' => $this->lamVersionYear,
+            ],
             'created_at' => $this->createdAt,
         ];
     }

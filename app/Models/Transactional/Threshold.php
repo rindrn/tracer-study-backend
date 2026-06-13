@@ -1,31 +1,29 @@
 <?php
-// app/Models/Transactional/Threshold.php
 namespace App\Models\Transactional;
- 
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
- 
+
 class Threshold extends Model
 {
     protected $connection = 'oltp';
     protected $table      = 'thresholds';
-    protected $fillable   = ['name', 'value', 'created_by'];
-    protected $casts      = ['value' => 'decimal:2'];
- 
-    // Relasi many-to-many ke programs via threshold_programs
-    public function programs(): BelongsToMany
+    protected $fillable   = [
+        'lam_version_id',
+        'indicator_id',
+        'level',       // 'baik' | 'unggul'
+        'value',
+        'created_by',
+    ];
+    protected $casts = ['value' => 'decimal:2'];
+
+    public function indicator(): BelongsTo
     {
-        return $this->belongsToMany(
-            Program::class,
-            'threshold_programs',
-            'threshold_id',
-            'program_id'
-        )->withPivot("created_at");
+        return $this->belongsTo(ThresholdIndicator::class, 'indicator_id');
     }
- 
-    public function createdBy(): BelongsTo
+
+    public function lamVersion(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(LamVersion::class, 'lam_version_id');
     }
 }
