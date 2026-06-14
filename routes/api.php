@@ -29,6 +29,9 @@ use App\Http\Controllers\Api\Analytical\KesesuaianController;
 use App\Http\Controllers\Api\Analytical\WirausahaController;
 use App\Http\Controllers\Api\Analytical\SebaranInstansiController;
 use App\Http\Controllers\Api\Analytical\KompetensiController;
+use App\Http\Controllers\Api\Analytical\MetodePembelajaranController;
+use App\Http\Controllers\Api\Analytical\PembiayaanController;
+
 
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
@@ -232,5 +235,13 @@ Route::middleware("auth:sanctum")->group(function () {
     Route::prefix('dashboard/kompetensi')->group(function () {
         Route::get('gap',            [KompetensiController::class, 'gap']);
         Route::get('gap/bandingkan', [KompetensiController::class, 'bandingkan']);
+        Route::get('metode',            [MetodePembelajaranController::class, 'metode']);
+        Route::get('metode/bandingkan', [MetodePembelajaranController::class, 'bandingkan']);
+    });
+
+    Route::prefix('dashboard/pembiayaan')->group(function () {
+        Route::get('pie',        [PembiayaanController::class, 'pie']);
+        Route::get('per-prodi',  [PembiayaanController::class, 'perProdi']);
+        Route::get('bandingkan', [PembiayaanController::class, 'bandingkan']);
     });
 });
