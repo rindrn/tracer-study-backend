@@ -51,6 +51,43 @@ class KompetensiController extends Controller
         }
     }
 
+    public function metode(Request $request): JsonResponse
+    {
+        $params = $request->validate([
+            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jurusan'         => 'nullable|string|max:100',
+            'nama_prodi'      => 'nullable|string|max:100',
+            'tahun_lulus'     => 'nullable|string|max:5',
+            'minggu_snapshot' => 'nullable|string|max:10',
+        ]);
+
+        try {
+            $dto = $this->service->getMetode($params);
+            return response()->json(['success' => true, 'data' => $dto->toArray()]);
+        } catch (\RuntimeException $e) {
+            return $this->serviceError($e);
+        }
+    }
+
+    public function metodeBandingkan(Request $request): JsonResponse
+    {
+        $params = $request->validate([
+            'prodi'           => 'nullable|array',
+            'prodi.*'         => 'string|max:100',
+            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jurusan'         => 'nullable|string|max:100',
+            'tahun_lulus'     => 'nullable|string|max:5',
+            'minggu_snapshot' => 'nullable|string|max:10',
+        ]);
+
+        try {
+            $dto = $this->service->getMetodeBandingkan($params);
+            return response()->json(['success' => true, 'data' => $dto->toArray()]);
+        } catch (\RuntimeException $e) {
+            return $this->serviceError($e);
+        }
+    }
+
     private function serviceError(\RuntimeException $e): JsonResponse
     {
         return response()->json([

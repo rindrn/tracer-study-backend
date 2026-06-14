@@ -109,6 +109,24 @@ class PendapatanService
 
     // ──────────────────────────────────────────────────────────────
 
+    public function getKelompokBandingkan(array $params): PendapatanBandingkanDTO
+    {
+        $result = $this->repo->getKelompokGajiPerProdi(
+            prodiFilter:    $params['prodi']           ?? [],
+            jenjang:        $params['jenjang']         ?? null,
+            jurusan:        $params['jurusan']         ?? null,
+            tahunLulus:     $params['tahun_lulus']     ?? null,
+            mingguSnapshot: $params['minggu_snapshot'] ?? null,
+        );
+
+        return new PendapatanBandingkanDTO(
+            chart:     $result['chart'],
+            table:     $result['table'],
+            prodiList: $result['prodi_list'],
+            filters:   array_filter($params, fn($v, $k) => $k !== 'prodi', ARRAY_FILTER_USE_BOTH),
+        );
+    }
+
     public function getBandingkan(array $params): PendapatanBandingkanDTO
     {
         $result = $this->repo->getUmpPerProdi(

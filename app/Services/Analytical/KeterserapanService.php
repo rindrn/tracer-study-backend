@@ -35,17 +35,18 @@ class KeterserapanService
 
     /**
      * Label status yang diklasifikasikan sebagai "TERSERAP" sesuai IKU 2 Kemendikbud.
-     *
-     * IKU 2: Lulusan yang langsung bekerja / melanjutkan studi / berwirausaha
-     * dalam jangka waktu ≤1 tahun setelah kelulusan.
-     *
-     * Label di bawah disesuaikan dengan nilai aktual DimStatusAlumni.label di DW.
-     * Jika ETL mengubah label, update konstanta ini saja.
+     * Disesuaikan dengan nilai aktual DimStatusAlumni.label di OLAP.
      */
     private const STATUS_TERSERAP = [
-        'Bekerja',
-        'Wirausaha',
-        'Melanjutkan Studi',   // label aktual di DW (bukan "Studi Lanjut")
+        'Bekerja (full time / part time)',
+        'Wiraswasta',
+        'Melanjutkan Pendidikan',
+    ];
+
+    /** Label status "tidak terserap" — dipakai untuk filter drill-down. */
+    private const STATUS_TIDAK_TERSERAP = [
+        'Tidak kerja tetapi sedang mencari kerja',
+        'Belum memungkinkan bekerja',
     ];
 
     /**
@@ -174,18 +175,28 @@ class KeterserapanService
     {
         $page        = max(1, (int) ($params['page']     ?? 1));
         $perPage     = min(100, max(5, (int) ($params['per_page'] ?? 15)));
-        $statusLabel = $this->resolveStatusLabel($params['status'] ?? null);
+        $status      = $params['status'] ?? null;
+        $statusLabel = $this->resolveStatusLabel($status);
+
+        // Untuk 'terserap': gunakan IN filter ke label-label terserap.
+        // Untuk 'tidak': gunakan IN filter ke label-label tidak terserap.
+        $includeStatuses = match ($status) {
+            'terserap' => self::STATUS_TERSERAP,
+            'tidak'    => self::STATUS_TIDAK_TERSERAP,
+            default    => null,
+        };
 
         $result = $this->repo->getDetailAlumniByTahun(
-            tahunLulus:     $params['tahun_lulus']     ?? '',
-            statusLabel:    $statusLabel,
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-            search:         $params['search']          ?? null,
-            page:           $page,
-            perPage:        $perPage,
+            tahunLulus:      $params['tahun_lulus']     ?? '',
+            statusLabel:     $statusLabel,
+            includeStatuses: $includeStatuses,
+            jenjang:         $params['jenjang']         ?? null,
+            jurusan:         $params['jurusan']         ?? null,
+            namaProdi:       $params['nama_prodi']      ?? null,
+            mingguSnapshot:  $params['minggu_snapshot'] ?? null,
+            search:          $params['search']          ?? null,
+            page:            $page,
+            perPage:         $perPage,
         );
 
         return new KeterserapanDrillDownDTO(
@@ -206,19 +217,12 @@ class KeterserapanService
 
     /**
      * Resolve shorthand status dari FE ke label DW, atau null jika semua.
-     *
-     * 'terserap' → null karena filter multi-label tidak bisa pakai equals.
-     *              Repo akan pakai notEquals 'Belum Bekerja' sebagai gantinya.
-     * 'tidak'    → 'Belum Bekerja' (label DW)
-     * label lain → pakai apa adanya
      */
     private function resolveStatusLabel(?string $status): ?string
     {
         return match ($status) {
-            null, '', 'semua' => null,
-            'terserap'        => null,   // ditangani repo via excludeStatus
-            'tidak'           => 'Belum Bekerja',
-            default           => $status,
+            null, '', 'semua', 'terserap' => null,   // 'terserap' ditangani via excludeStatuses
+            default => $status,
         };
     }
 

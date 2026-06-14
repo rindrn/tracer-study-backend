@@ -271,15 +271,15 @@ class KeterserapanRepository extends BaseAnalyticalRepository
      */
     public function getDetailAlumniByTahun(
         string  $tahunLulus,
-        ?string $statusLabel    = null,
-        ?string $excludeStatus  = 'Belum Bekerja',  // aktif hanya jika $statusLabel null & FE kirim 'terserap'
-        ?string $jenjang        = null,
-        ?string $jurusan        = null,
-        ?string $namaProdi      = null,
-        ?string $mingguSnapshot = null,
-        ?string $search         = null,
-        int     $page           = 1,
-        int     $perPage        = 15,
+        ?string $statusLabel     = null,   // exact match satu label
+        ?array  $includeStatuses = null,   // IN filter: beberapa label (prioritas atas $statusLabel)
+        ?string $jenjang         = null,
+        ?string $jurusan         = null,
+        ?string $namaProdi       = null,
+        ?string $mingguSnapshot  = null,
+        ?string $search          = null,
+        int     $page            = 1,
+        int     $perPage         = 15,
     ): array {
         $extra = [
             [
@@ -289,19 +289,19 @@ class KeterserapanRepository extends BaseAnalyticalRepository
             ],
         ];
 
-        if ($statusLabel !== null && $statusLabel !== '') {
-            // Filter status spesifik
+        if (!empty($includeStatuses)) {
+            // IN filter: hanya alumni dengan status di dalam array ini
+            $extra[] = [
+                'member'   => 'DimStatusAlumni.label',
+                'operator' => 'equals',
+                'values'   => $includeStatuses,
+            ];
+        } elseif ($statusLabel !== null && $statusLabel !== '') {
+            // Filter status spesifik (single label)
             $extra[] = [
                 'member'   => 'DimStatusAlumni.label',
                 'operator' => 'equals',
                 'values'   => [$statusLabel],
-            ];
-        } elseif ($excludeStatus !== null && $excludeStatus !== '') {
-            // Shorthand 'terserap': exclude status tidak terserap
-            $extra[] = [
-                'member'   => 'DimStatusAlumni.label',
-                'operator' => 'notEquals',
-                'values'   => [$excludeStatus],
             ];
         }
 

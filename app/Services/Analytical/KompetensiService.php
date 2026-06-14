@@ -4,6 +4,8 @@ namespace App\Services\Analytical;
 
 use App\DTOs\Analytical\Kompetensi\KompetensiGapDTO;
 use App\DTOs\Analytical\Kompetensi\KompetensiGapBandingkanDTO;
+use App\DTOs\Analytical\Kompetensi\MetodePembelajaranDTO;
+use App\DTOs\Analytical\Kompetensi\MetodeBandingkanDTO;
 use App\Repositories\Analytical\KompetensiRepository;
 use Illuminate\Support\Collection;
 
@@ -71,17 +73,78 @@ class KompetensiService
         );
     }
 
+    public function getMetode(array $params): MetodePembelajaranDTO
+    {
+        $raw = $this->repo->getMetodeData(
+            jenjang:        $params['jenjang']         ?? null,
+            jurusan:        $params['jurusan']         ?? null,
+            namaProdi:      $params['nama_prodi']      ?? null,
+            tahunLulus:     $params['tahun_lulus']     ?? null,
+            mingguSnapshot: $params['minggu_snapshot'] ?? null,
+        );
+
+        $data = $raw->map(fn($r) => [
+            'kode_field'      => $r['kode_field'],
+            'label'           => $r['label'],
+            'avg_skor'        => round($r['avg_skor'], 2),
+            'count_responden' => $r['count'],
+        ])->values()->toArray();
+
+        return new MetodePembelajaranDTO(
+            data:    $data,
+            filters: $this->activeFilters($params),
+        );
+    }
+
+    public function getMetodeBandingkan(array $params): MetodeBandingkanDTO
+    {
+        $prodiFilter = $params['prodi'] ?? [];
+        if (is_string($prodiFilter)) {
+            $prodiFilter = [$prodiFilter];
+        }
+
+        $raw = $this->repo->getBandingkanMetodeData(
+            prodiFilter:    $prodiFilter,
+            jenjang:        $params['jenjang']         ?? null,
+            jurusan:        $params['jurusan']         ?? null,
+            tahunLulus:     $params['tahun_lulus']     ?? null,
+            mingguSnapshot: $params['minggu_snapshot'] ?? null,
+        );
+
+        $grouped   = $raw->groupBy('nama_prodi');
+        $data      = [];
+        $prodiList = [];
+
+        foreach ($grouped as $namaProdi => $rows) {
+            $first = $rows->first();
+            $data[] = [
+                'nama_prodi' => $namaProdi,
+                'jenjang'    => $first['jenjang'],
+                'metode'     => $rows->map(fn($r) => [
+                    'kode_field'      => $r['kode_field'],
+                    'label'           => $r['label'],
+                    'avg_skor'        => round($r['avg_skor'], 2),
+                    'count_responden' => $r['count'],
+                ])->values()->toArray(),
+            ];
+            $prodiList[] = $namaProdi;
+        }
+
+        return new MetodeBandingkanDTO(
+            data:      $data,
+            prodiList: array_values(array_unique($prodiList)),
+            filters:   $this->activeFilters($params),
+        );
+    }
+
     private function joinKategori(Collection $rows): Collection
     {
-        // Group by kode_field
-        $byKode = $rows->groupBy('kode_field');
+        // Group by label (A dan B berbagi label yang sama, beda kode_field)
+        $byLabel = $rows->groupBy('label');
 
-        return $byKode->map(function (Collection $items, string $kodeField) {
+        return $byLabel->map(function (Collection $items, string $label) {
             $rowA = $items->firstWhere('kategori', 'Kompetensi_A');
             $rowB = $items->firstWhere('kategori', 'Kompetensi_B');
-
-            // Ambil label dari salah satu (harusnya sama)
-            $label = $rowA['label'] ?? $rowB['label'] ?? '';
 
             $skorLulus      = isset($rowA) ? round($rowA['avg_skor'], 2) : null;
             $skorDibutuhkan = isset($rowB) ? round($rowB['avg_skor'], 2) : null;
@@ -95,7 +158,7 @@ class KompetensiService
             $count = $rowA['count'] ?? $rowB['count'] ?? 0;
 
             return [
-                'kode_field'      => $kodeField,
+                'kode_field'      => $rowA['kode_field'] ?? $rowB['kode_field'] ?? '',
                 'label'           => $label,
                 'skor_lulus'      => $skorLulus,
                 'skor_dibutuhkan' => $skorDibutuhkan,

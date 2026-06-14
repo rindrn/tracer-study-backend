@@ -32,7 +32,6 @@ use App\Http\Controllers\Api\Analytical\KompetensiController;
 use App\Http\Controllers\Api\Analytical\MetodePembelajaranController;
 use App\Http\Controllers\Api\Analytical\PembiayaanController;
 
-
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
  
@@ -200,6 +199,9 @@ Route::middleware("auth:sanctum")->group(function () {
             // GET /api/dashboard/pendapatan/bandingkan
             Route::get('bandingkan', [PendapatanController::class, 'bandingkan']);
 
+            // GET /api/dashboard/pendapatan/bandingkan-kelompok
+            Route::get('bandingkan-kelompok', [PendapatanController::class, 'bandingkanKelompok']);
+
         });
     });
 
@@ -232,6 +234,14 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('drill-down', [SebaranInstansiController::class, 'drillDown']);
     });
 
+    Route::prefix('dashboard/pembiayaan')->group(function () {
+        Route::get('pie',           [PembiayaanController::class, 'pie']);
+        Route::get('per-prodi',     [PembiayaanController::class, 'perProdi']);
+        Route::get('antar-periode', [PembiayaanController::class, 'antarPeriode']);
+        Route::get('drill-down',    [PembiayaanController::class, 'drillDown']);
+        Route::get('bandingkan',    [PembiayaanController::class, 'bandingkan']);
+    });
+
     Route::prefix('dashboard/kompetensi')->group(function () {
         Route::get('gap',            [KompetensiController::class, 'gap']);
         Route::get('gap/bandingkan', [KompetensiController::class, 'bandingkan']);
@@ -239,9 +249,13 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('metode/bandingkan', [MetodePembelajaranController::class, 'bandingkan']);
     });
 
-    Route::prefix('dashboard/pembiayaan')->group(function () {
-        Route::get('pie',        [PembiayaanController::class, 'pie']);
-        Route::get('per-prodi',  [PembiayaanController::class, 'perProdi']);
-        Route::get('bandingkan', [PembiayaanController::class, 'bandingkan']);
-    });
+    // Route::prefix('dashboard/pembiayaan')->group(function () {
+    //     Route::get('pie',        [PembiayaanController::class, 'pie']);
+    //     Route::get('per-prodi',  [PembiayaanController::class, 'perProdi']);
+    //     Route::get('bandingkan', [PembiayaanController::class, 'bandingkan']);
+    //     Route::get('gap',                [KompetensiController::class, 'gap']);
+    //     Route::get('gap/bandingkan',     [KompetensiController::class, 'bandingkan']);
+    //     Route::get('metode',             [KompetensiController::class, 'metode']);
+    //     Route::get('metode/bandingkan',  [KompetensiController::class, 'metodeBandingkan']);
+    // });
 });

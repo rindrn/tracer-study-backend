@@ -56,6 +56,112 @@ class KompetensiRepository extends BaseAnalyticalRepository
         ]);
     }
 
+    // Filter kategori: hanya MetodePembelajaran
+    private const FILTER_METODE = [
+        'member'   => 'DimIndikatorEvaluasi.kategori_pertanyaan',
+        'operator' => 'in',
+        'values'   => ['MetodePembelajaran'],
+    ];
+
+    /**
+     * @return Collection<array{kode_field, label, avg_skor, count}>
+     */
+    public function getMetodeData(
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $namaProdi      = null,
+        ?string $tahunLulus     = null,
+        ?string $mingguSnapshot = null,
+    ): Collection {
+        $filters = array_merge(
+            $this->buildGlobalFilters(
+                jenjang:        $jenjang,
+                jurusan:        $jurusan,
+                namaProdi:      $namaProdi,
+                tahunLulus:     $tahunLulus,
+                mingguSnapshot: $mingguSnapshot,
+            ),
+            [self::FILTER_METODE],
+        );
+
+        return $this->cube->load([
+            'measures'   => [
+                'FactRangeEvaluasi.avg_skor',
+                'FactRangeEvaluasi.count',
+            ],
+            'dimensions' => [
+                'DimIndikatorEvaluasi.kode_field',
+                'DimIndikatorEvaluasi.label_pertanyaan',
+            ],
+            'filters' => $filters,
+            'order'   => [['DimIndikatorEvaluasi.kode_field', 'asc']],
+        ])->map(fn($r) => [
+            'kode_field' => $r['DimIndikatorEvaluasi.kode_field']       ?? '',
+            'label'      => $r['DimIndikatorEvaluasi.label_pertanyaan'] ?? '',
+            'avg_skor'   => (float) ($r['FactRangeEvaluasi.avg_skor']   ?? 0),
+            'count'      => (int)   ($r['FactRangeEvaluasi.count']       ?? 0),
+        ]);
+    }
+
+    /**
+     * @param  array<string>  $prodiFilter
+     * @return Collection<array{kode_field, label, avg_skor, count, jenjang, jurusan, nama_prodi}>
+     */
+    public function getBandingkanMetodeData(
+        array   $prodiFilter    = [],
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $tahunLulus     = null,
+        ?string $mingguSnapshot = null,
+    ): Collection {
+        $extra = [];
+        if (!empty($prodiFilter)) {
+            $extra[] = [
+                'member'   => 'DimProdi.nama_prodi',
+                'operator' => 'equals',
+                'values'   => $prodiFilter,
+            ];
+        }
+
+        $filters = array_merge(
+            $this->buildGlobalFilters(
+                jenjang:        $jenjang,
+                jurusan:        $jurusan,
+                tahunLulus:     $tahunLulus,
+                mingguSnapshot: $mingguSnapshot,
+                extra:          $extra,
+            ),
+            [self::FILTER_METODE],
+        );
+
+        return $this->cube->load([
+            'measures'   => [
+                'FactRangeEvaluasi.avg_skor',
+                'FactRangeEvaluasi.count',
+            ],
+            'dimensions' => [
+                'DimIndikatorEvaluasi.kode_field',
+                'DimIndikatorEvaluasi.label_pertanyaan',
+                'DimProdi.jenjang',
+                'DimProdi.jurusan',
+                'DimProdi.nama_prodi',
+            ],
+            'filters' => $filters,
+            'order'   => [
+                ['DimProdi.nama_prodi',             'asc'],
+                ['DimIndikatorEvaluasi.kode_field', 'asc'],
+            ],
+        ])->map(fn($r) => [
+            'kode_field' => $r['DimIndikatorEvaluasi.kode_field']       ?? '',
+            'label'      => $r['DimIndikatorEvaluasi.label_pertanyaan'] ?? '',
+            'nama_prodi' => $r['DimProdi.nama_prodi']                   ?? '',
+            'jenjang'    => $r['DimProdi.jenjang']                      ?? '',
+            'jurusan'    => $r['DimProdi.jurusan']                      ?? '',
+            'avg_skor'   => (float) ($r['FactRangeEvaluasi.avg_skor']   ?? 0),
+            'count'      => (int)   ($r['FactRangeEvaluasi.count']      ?? 0),
+        ]);
+    }
+
     /**
      *
      * @param  array<string>  $prodiFilter  Kosong = semua prodi.

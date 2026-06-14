@@ -53,11 +53,12 @@ class PendapatanRepository extends BaseAnalyticalRepository
             mingguSnapshot: $mingguSnapshot,
         );
 
+        // Hanya query avg_take_home_pay — count_above_ump memerlukan kolom
+        // flag_above_ump yang belum ada di fact_tracer_study (UMP belum di-ETL).
         $raw = $this->cube->load([
             'measures' => [
                 'FactTracerStudy.avg_take_home_pay',
-                'FactTracerStudy.count_above_ump',
-                'FactTracerStudy.count_dengan_data_ump',
+                'FactTracerStudy.count_alumni',
             ],
             'dimensions' => [
                 'DimAlumni.tahun_lulus',
@@ -67,15 +68,12 @@ class PendapatanRepository extends BaseAnalyticalRepository
         ]);
 
         return $raw->map(function ($r) {
-            $total = (int) ($r['FactTracerStudy.count_dengan_data_ump'] ?? 0);
-            $above = (int) ($r['FactTracerStudy.count_above_ump']       ?? 0);
-
             return [
-                'tahun_lulus'     => $r['DimAlumni.tahun_lulus']                  ?? '',
-                'avg_gaji' => (int) round($r['FactTracerStudy.avg_take_home_pay'] ?? 0),
-                'total_alumni_ump'=> $total,
-                'count_above_ump' => $above,
-                'pct_above_ump'   => $total > 0 ? round($above / $total * 100, 1) : 0.0,
+                'tahun_lulus'      => $r['DimAlumni.tahun_lulus']                  ?? '',
+                'avg_gaji'         => (int) round($r['FactTracerStudy.avg_take_home_pay'] ?? 0),
+                'total_alumni_ump' => 0,
+                'count_above_ump'  => 0,
+                'pct_above_ump'    => null,   // null = tidak ada data UMP → line tidak dirender
             ];
         });
     }
@@ -111,31 +109,9 @@ class PendapatanRepository extends BaseAnalyticalRepository
             mingguSnapshot: $mingguSnapshot,
         );
 
-        $raw = $this->cube->load([
-            'measures' => [
-                'FactTracerStudy.count_above_ump',
-                'FactTracerStudy.count_below_ump',
-                'FactTracerStudy.count_dengan_data_ump',
-            ],
-            'dimensions' => ['DimAlumni.tahun_lulus'],
-            'filters'    => $filters,
-            'order'      => [['DimAlumni.tahun_lulus', 'asc']],
-        ]);
-
-        return $raw->map(function ($r) {
-            $total = (int) ($r['FactTracerStudy.count_dengan_data_ump'] ?? 0);
-            $above = (int) ($r['FactTracerStudy.count_above_ump']       ?? 0);
-            $below = (int) ($r['FactTracerStudy.count_below_ump']       ?? 0);
-
-            return [
-                'tahun_lulus'     => $r['DimAlumni.tahun_lulus'] ?? '',
-                'total_alumni_ump'=> $total,
-                'count_above_ump' => $above,
-                'count_below_ump' => $below,
-                'pct_above_ump'   => $total > 0 ? round($above / $total * 100, 1) : 0.0,
-                'pct_below_ump'   => $total > 0 ? round($below / $total * 100, 1) : 0.0,
-            ];
-        });
+        // Data UMP (flag_above_ump) belum ada di OLAP — return koleksi kosong
+        // agar FE menampilkan "Belum ada data" daripada 503.
+        return collect();
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -308,6 +284,125 @@ class PendapatanRepository extends BaseAnalyticalRepository
         ]);
 
         return $this->reshapeUmpPerProdi($normalized, $prodiFilter);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  5. BANDINGKAN KELOMPOK GAJI PER PRODI
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Distribusi kelompok gaji (< 5jt, 5-8jt, 8-12jt, > 12jt) per prodi.
+     * Membuat 4 Cube.js queries terfilter, satu per rentang gaji.
+     *
+     * @return array{chart: array, table: array, prodi_list: array<string>}
+     */
+    public function getKelompokGajiPerProdi(
+        array   $prodiFilter    = [],
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $tahunLulus     = null,
+        ?string $mingguSnapshot = null,
+    ): array {
+        $ranges = [
+            ['label' => '< 5 jt',  'gte' => null,       'lt'  => '5000000' ],
+            ['label' => '5-8 jt',  'gte' => '5000000',  'lt'  => '8000000' ],
+            ['label' => '8-12 jt', 'gte' => '8000000',  'lt'  => '12000000'],
+            ['label' => '> 12 jt', 'gte' => '12000000', 'lt'  => null      ],
+        ];
+
+        // Kumpulkan count per prodi per rentang
+        $perProdi = []; // [ nama_prodi => ['jenjang'=>..., 'jurusan'=>..., 'counts'=>[label=>n]] ]
+
+        foreach ($ranges as $range) {
+            $extra = [];
+            if (!empty($prodiFilter)) {
+                $extra[] = ['member' => 'DimProdi.nama_prodi', 'operator' => 'equals', 'values' => $prodiFilter];
+            }
+            if ($range['gte'] !== null) {
+                $extra[] = ['member' => 'FactTracerStudy.take_home_pay', 'operator' => 'gte', 'values' => [$range['gte']]];
+            }
+            if ($range['lt'] !== null) {
+                $extra[] = ['member' => 'FactTracerStudy.take_home_pay', 'operator' => 'lt',  'values' => [$range['lt']]];
+            }
+
+            $filters = $this->buildGlobalFilters(
+                jenjang: $jenjang, jurusan: $jurusan, tahunLulus: $tahunLulus,
+                mingguSnapshot: $mingguSnapshot, extra: $extra,
+            );
+
+            $raw = $this->cube->load([
+                'measures'   => ['FactTracerStudy.count_alumni'],
+                'dimensions' => ['DimProdi.nama_prodi', 'DimProdi.jenjang', 'DimProdi.jurusan'],
+                'filters'    => $filters,
+                'order'      => [['DimProdi.nama_prodi', 'asc']],
+            ]);
+
+            foreach ($raw as $r) {
+                $prodi = $r['DimProdi.nama_prodi'] ?? '';
+                if ($prodi === '') continue;
+                if (!isset($perProdi[$prodi])) {
+                    $perProdi[$prodi] = [
+                        'jenjang' => $r['DimProdi.jenjang'] ?? '',
+                        'jurusan' => $r['DimProdi.jurusan'] ?? '',
+                        'counts'  => [],
+                    ];
+                }
+                $perProdi[$prodi]['counts'][$range['label']] = (int) ($r['FactTracerStudy.count_alumni'] ?? 0);
+            }
+        }
+
+        // Query total + avg_gaji per prodi (satu query, tanpa filter range)
+        $extraTotal = [];
+        if (!empty($prodiFilter)) {
+            $extraTotal[] = ['member' => 'DimProdi.nama_prodi', 'operator' => 'equals', 'values' => $prodiFilter];
+        }
+        $filtersTotal = $this->buildGlobalFilters(
+            jenjang: $jenjang, jurusan: $jurusan, tahunLulus: $tahunLulus,
+            mingguSnapshot: $mingguSnapshot, extra: $extraTotal,
+        );
+        $rawTotal = $this->cube->load([
+            'measures'   => ['FactTracerStudy.count_alumni', 'FactTracerStudy.avg_take_home_pay'],
+            'dimensions' => ['DimProdi.nama_prodi', 'DimProdi.jenjang', 'DimProdi.jurusan'],
+            'filters'    => $filtersTotal,
+            'order'      => [['DimProdi.jurusan', 'asc'], ['DimProdi.nama_prodi', 'asc']],
+        ]);
+
+        $rangeLabels = array_column($ranges, 'label');
+        $chart       = [];
+
+        foreach ($rawTotal as $r) {
+            $prodi = $r['DimProdi.nama_prodi'] ?? '';
+            if ($prodi === '') continue;
+
+            $total   = (int) ($r['FactTracerStudy.count_alumni']       ?? 0);
+            $avgGaji = (int) round($r['FactTracerStudy.avg_take_home_pay'] ?? 0);
+            $counts  = $perProdi[$prodi]['counts'] ?? [];
+
+            $statuses = [];
+            foreach ($rangeLabels as $label) {
+                $cnt        = $counts[$label] ?? 0;
+                $statuses[] = [
+                    'label' => $label,
+                    'count' => $cnt,
+                    'pct'   => $total > 0 ? round($cnt / $total * 100, 1) : 0.0,
+                ];
+            }
+
+            $chart[] = [
+                'nama_prodi' => $prodi,
+                'jenjang'    => $perProdi[$prodi]['jenjang'] ?? ($r['DimProdi.jenjang'] ?? ''),
+                'jurusan'    => $perProdi[$prodi]['jurusan'] ?? ($r['DimProdi.jurusan'] ?? ''),
+                'total'      => $total,
+                'avg_gaji'   => $avgGaji,
+                'statuses'   => $statuses,
+            ];
+        }
+
+        return [
+            'chart'      => $chart,
+            'table'      => $chart,
+            'prodi_list' => array_values(array_unique(array_column($chart, 'nama_prodi'))),
+        ];
     }
 
     private function reshapeUmpPerProdi(
