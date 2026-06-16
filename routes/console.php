@@ -2,7 +2,56 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Log;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+
+/*
+|--------------------------------------------------------------------------
+| ETL Scheduling
+|--------------------------------------------------------------------------
+|
+| MODE TESTING (aktif sekarang): jalan setiap 5 menit supaya hasilnya
+| bisa dicek cepat. Setelah verifikasi OK, ganti ke MODE PRODUCTION
+| di bagian bawah (comment yang testing, uncomment yang production).
+|
+| onSuccess() memicu etl:create-preagg-indexes SETELAH etl:run selesai
+| -- TAPI perhatikan catatan timing di bawah: index baru berguna kalau
+| Cube.js SUDAH rebuild pre-aggregation dengan data terbaru. Jika
+| rebuild Cube.js berjalan async/terjadwal terpisah, panggilan index
+| ini bisa mendahului rebuild dan menjadi no-op (tabel prefix belum
+| ada / masih versi lama). Untuk SmartTracer yang ETL-nya mingguan dan
+| Cube.js refresh-nya juga mingguan, jeda singkat ini biasanya aman
+| karena CreatePreAggIndexes pakai CREATE INDEX IF NOT EXISTS dan tetap
+| bisa dijalankan ulang manual kapan saja tanpa efek samping.
+|
+*/
+
+Schedule::command('etl:run')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onSuccess(function () {
+        Log::info('ETL snapshot berhasil');
+        Artisan::call('etl:create-preagg-indexes');
+    })
+    ->onFailure(fn () => Log::error('ETL snapshot gagal'));
+
+/*
+|--------------------------------------------------------------------------
+| MODE PRODUCTION (uncomment setelah testing selesai, comment yang di atas)
+|--------------------------------------------------------------------------
+|
+| Schedule::command('etl:run')
+|     ->weeklyOn(1, '01:00') // setiap Senin jam 01:00
+|     ->withoutOverlapping()
+|     ->onSuccess(function () {
+|         Log::info('ETL snapshot mingguan berhasil');
+|         Artisan::call('etl:create-preagg-indexes');
+|     })
+|     ->onFailure(fn () => Log::error('ETL snapshot mingguan gagal'));
+|
+*/
