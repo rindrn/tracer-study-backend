@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\Analytical\SebaranInstansiController;
 use App\Http\Controllers\Api\Analytical\KompetensiController;
 use App\Http\Controllers\Api\Analytical\MetodePembelajaranController;
 use App\Http\Controllers\Api\Analytical\PembiayaanController;
+use App\Http\Controllers\Api\Analytical\ResponseRateController;
 
 
 // Controllers — DataPipeline (ETL)
@@ -214,5 +215,12 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('pie',        [PembiayaanController::class, 'pie']);
         Route::get('per-prodi',  [PembiayaanController::class, 'perProdi']);
         Route::get('bandingkan', [PembiayaanController::class, 'bandingkan']);
+    });
+
+    Route::prefix('dashboard/response-rate')->group(function () {
+        Route::get('bar',        [ResponseRateController::class, 'bar']);
+        Route::get('pie',        [ResponseRateController::class, 'pie']);
+        Route::get('trend',      [ResponseRateController::class, 'trend']);
+        Route::get('drill-down', [ResponseRateController::class, 'drillDown']);
     });
 });
