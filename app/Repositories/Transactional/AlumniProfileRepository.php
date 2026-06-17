@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Query\Builder;
 
 /**
  * AlumniProfileRepository — query persistence untuk aggregate root AlumniProfile.
@@ -216,7 +217,13 @@ class AlumniProfileRepository
     /**
      * Ambil semua alumni untuk laporan export (join programs + responses).
      *
-     * @param array{program_id?: int, questionnaire_id?: int} $filters
+     * @param array{program_id?: int, questionnaire_id?: int, graduation_year?: int} $filters
+     *
+     * Tambah filter graduation_year (tahun lulus),
+     * dipakai untuk dropdown "Pilih tahun yang ingin diunduh" di UI Unduh Data
+     * Alumni. Filter ini diterapkan ke alumni_profiles.graduation_year, BUKAN
+     * ke responses.submitted_at -- karena yang dimaksud "tahun" di UI adalah
+     * tahun KELULUSAN alumni, bukan tahun alumni mengisi kuesioner.
      */
     public function getForReport(array $filters = []): Collection
     {
@@ -230,16 +237,62 @@ class AlumniProfileRepository
                 'programs.code as program_code',
                 'programs.jurusan as jurusan_name',
             );
-
+    
         if (!empty($filters['questionnaire_id'])) {
             $query->where('responses.questionnaire_id', $filters['questionnaire_id']);
         }
         if (!empty($filters['program_id'])) {
             $query->where('alumni_profiles.program_id', $filters['program_id']);
         }
-
+        if (!empty($filters['graduation_year'])) {
+            $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
+        }
+    
         return collect($query->get());
     }
+
+    /**
+    * Sama seperti getForReport(), tapi MENGEMBALIKAN QUERY BUILDER MENTAH
+    * (belum dipanggil ->get()), bukan Collection. Dipakai oleh
+    * MinistrySheetExport yang mengimplementasikan FromQuery + WithChunkReading
+    * -- maatwebsite/excel akan menjalankan query ini sendiri dalam potongan
+    * kecil (chunk), bukan menarik semua baris ke memory PHP sekaligus.
+    *
+    * PENTING: query ini TIDAK di-order secara default. WithChunkReading
+    * Laravel/maatwebsite MEWAJIBKAN query punya urutan yang stabil (biasanya
+    * by primary key) supaya chunk tidak melewatkan/menduplikasi baris saat
+    * dibaca bertahap -- karena itu ->orderBy('alumni_profiles.id') WAJIB
+    * ada di sini, jangan dihapus.
+    *
+    * @param array{program_id?: int, questionnaire_id?: int, graduation_year?: int} $filters
+    */
+    public function getForReportQuery(array $filters = []): Builder
+    {
+        $query = DB::connection(self::CONN)->table('alumni_profiles')
+            ->leftJoin('responses', 'alumni_profiles.id', '=', 'responses.alumni_id')
+            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+            ->select(
+                'alumni_profiles.*',
+                'responses.id as response_id',
+                'programs.name as program_name',
+                'programs.code as program_code',
+                'programs.jurusan as jurusan_name',
+            )
+            ->orderBy('alumni_profiles.id');
+    
+        if (!empty($filters['questionnaire_id'])) {
+            $query->where('responses.questionnaire_id', $filters['questionnaire_id']);
+        }
+        if (!empty($filters['program_id'])) {
+            $query->where('alumni_profiles.program_id', $filters['program_id']);
+        }
+        if (!empty($filters['graduation_year'])) {
+            $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
+        }
+    
+        return $query;
+    }
+    
 
     // ═══════════════════════════════════════════════════════════
     // WRITE

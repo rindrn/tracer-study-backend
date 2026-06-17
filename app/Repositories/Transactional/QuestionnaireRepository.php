@@ -290,4 +290,37 @@ class QuestionnaireRepository
             array_merge($data, ['created_at' => $now, 'updated_at' => $now])
         );
     }
+
+    /**
+     * Ambil semua opsi untuk sekumpulan question_code, di-group by
+     * question_code (BUKAN question_id seperti getOptionsGrouped() yang
+     * sudah ada). Dipakai untuk resolve label di export Excel, di mana
+     * lookup dilakukan berdasarkan question_code + option_code SAJA --
+     * TANPA questionnaire_id -- karena filter tahun_lulus yang wajib di
+     * endpoint export menjamin satu batch data berasal dari questionnaire
+     * yang konsisten (keputusan eksplisit user, bukan asumsi business-key
+     * lintas-questionnaire seperti di pipeline ETL).
+     *
+     * PERHATIAN: jika di masa depan satu question_code yang sama punya
+     * option_code yang berarti BERBEDA di questionnaire_id yang berbeda
+     * (skenario yang justru ETL secara hati-hati hindari dengan business
+     * key 3-kolom), method ini akan mengambil label dari SALAH SATU
+     * questionnaire_id secara tidak deterministik (yang manapun match
+     * pertama). Ini diterima sebagai keputusan sadar untuk kasus export,
+     * bukan oversight.
+     */
+    public function getOptionsGroupedByCode(array $questionCodes): Collection
+    {
+        if (empty($questionCodes)) {
+            return collect();
+        }
+    
+        return collect(
+            DB::connection(self::CONN)->table('questionnaire_options as qo')
+                ->join('questionnaire_questions as qq', 'qq.id', '=', 'qo.question_id')
+                ->whereIn('qq.code', $questionCodes)
+                ->select('qq.code as question_code', 'qo.option_code', 'qo.option_label')
+                ->get()
+        )->groupBy('question_code');
+    }
 }
