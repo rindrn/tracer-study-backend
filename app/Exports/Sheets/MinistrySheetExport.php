@@ -4,6 +4,7 @@ namespace App\Exports\Sheets;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
@@ -28,11 +29,17 @@ use App\Repositories\Transactional\QuestionnaireRepository;
  *   - Field non-choice (short_text, number, date) SELALU sama untuk
  *     semua role -- tidak ada proses resolve apapun untuk jenis ini,
  *     karena tidak punya option_code untuk di-lookup.
+ *   - PENGECUALIAN: f5a1 (provinsi) dan f5a2 (kota) BUKAN field choice
+ *     kuesioner (tidak ada di questionnaire_options), melainkan berisi
+ *     foreign key NUMERIK ke tabel master tracer_oltp.provinces.id dan
+ *     tracer_oltp.cities.id. Untuk role selain head_tracer, kedua field
+ *     ini di-resolve ke provinces.name / cities.name. head_tracer tetap
+ *     melihat ID mentah, konsisten dengan field choice lainnya.
  *
- * Lookup label dilakukan berdasarkan (question_code, option_code) SAJA,
- * TANPA questionnaire_id -- keputusan sadar karena tahun_lulus WAJIB
- * di endpoint export, menjamin satu batch data berasal dari
- * questionnaire yang konsisten (lihat
+ * Lookup label (questionnaire_options) dilakukan berdasarkan
+ * (question_code, option_code) SAJA, TANPA questionnaire_id -- keputusan
+ * sadar karena tahun_lulus WAJIB di endpoint export, menjamin satu batch
+ * data berasal dari questionnaire yang konsisten (lihat
  * QuestionnaireRepository::getOptionsGroupedByCode() untuk detail
  * trade-off ini).
  */
@@ -53,6 +60,12 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
         'f1609', 'f1610', 'f1611', 'f1612', 'f1613', 'f1614',
     ];
 
+    /** question_code yang berisi FK numerik ke provinces.id / cities.id,
+     *  BUKAN option_code kuesioner -- ditangani terpisah dari
+     *  resolveDisplayValue() biasa karena sumber lookup-nya beda tabel. */
+    private const PROVINCE_CODE = 'f5a1';
+    private const CITY_CODE = 'f5a2';
+
     /** @var array<string,string> code => label pertanyaan */
     private array $questionLabels;
 
@@ -63,6 +76,12 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
      *      akan dipakai (menghindari query yang sia-sia).
      */
     private Collection $optionsByCode;
+
+    /** @var array<int,string> provinces.id => provinces.name. KOSONG jika head_tracer. */
+    private array $provinceNamesById;
+
+    /** @var array<int,string> cities.id => cities.name. KOSONG jika head_tracer. */
+    private array $cityNamesById;
 
     private bool $showRawOptionCode;
 
@@ -76,10 +95,17 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
 
         $this->showRawOptionCode = $this->user->isHeadTracer();
 
-        // Hanya load options kalau benar-benar dibutuhkan (bukan head_tracer).
-        $this->optionsByCode = $this->showRawOptionCode
-            ? collect()
-            : $this->questionnaireRepo->getOptionsGroupedByCode(self::MINISTRY_QUESTION_CODES);
+        // Hanya load options/provinces/cities kalau benar-benar
+        // dibutuhkan (bukan head_tracer) -- hindari query sia-sia.
+        if ($this->showRawOptionCode) {
+            $this->optionsByCode = collect();
+            $this->provinceNamesById = [];
+            $this->cityNamesById = [];
+        } else {
+            $this->optionsByCode = $this->questionnaireRepo->getOptionsGroupedByCode(self::MINISTRY_QUESTION_CODES);
+            $this->provinceNamesById = DB::connection('oltp')->table('provinces')->pluck('name', 'id')->toArray();
+            $this->cityNamesById = DB::connection('oltp')->table('cities')->pluck('name', 'id')->toArray();
+        }
     }
 
     public function query(): Builder
@@ -121,13 +147,12 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
 
     /**
      * Resolve nilai yang ditampilkan di sel, sesuai role:
-     *   - head_tracer: kembalikan apa adanya (option_code mentah, atau
-     *     nilai non-choice yang memang sudah mentah dari awal).
-     *   - role lain: jika question_code ini punya opsi terdaftar (berarti
-     *     ini field choice) DAN ada match option_code -> kembalikan
-     *     label. Jika TIDAK ada opsi terdaftar untuk code ini (field
-     *     non-choice seperti short_text/number) -> kembalikan apa
-     *     adanya, TIDAK ada resolve yang dipaksakan.
+     *   - head_tracer: kembalikan apa adanya (ID/option_code mentah,
+     *     atau nilai non-choice yang memang sudah mentah dari awal).
+     *   - role lain, untuk f5a1/f5a2: lookup ke provinces/cities by id.
+     *   - role lain, untuk field choice lain: lookup ke questionnaire_options.
+     *   - role lain, untuk field non-choice: kembalikan apa adanya,
+     *     tidak ada resolve yang dipaksakan.
      */
     private function resolveDisplayValue(string $code, ?string $rawValue): string
     {
@@ -137,6 +162,14 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
 
         if ($this->showRawOptionCode) {
             return $rawValue;
+        }
+
+        if ($code === self::PROVINCE_CODE) {
+            return $this->provinceNamesById[(int) $rawValue] ?? $rawValue;
+        }
+
+        if ($code === self::CITY_CODE) {
+            return $this->cityNamesById[(int) $rawValue] ?? $rawValue;
         }
 
         $optionsForCode = $this->optionsByCode->get($code);
