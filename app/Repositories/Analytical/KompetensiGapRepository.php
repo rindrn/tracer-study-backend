@@ -4,7 +4,7 @@ namespace App\Repositories\Analytical;
 
 use Illuminate\Support\Collection;
 
-class KompetensiRepository extends BaseAnalyticalRepository
+class KompetensiGapRepository extends BaseAnalyticalRepository
 {
     // Filter kategori: hanya ambil Kompetensi_A dan Kompetensi_B
     private const FILTER_KATEGORI = [

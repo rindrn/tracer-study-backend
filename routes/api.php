@@ -26,7 +26,7 @@ use App\Http\Controllers\Api\Analytical\MasaTungguController;
 use App\Http\Controllers\Api\Analytical\KesesuaianController;
 use App\Http\Controllers\Api\Analytical\WirausahaController;
 use App\Http\Controllers\Api\Analytical\SebaranInstansiController;
-use App\Http\Controllers\Api\Analytical\KompetensiController;
+use App\Http\Controllers\Api\Analytical\KompetensiGapController;
 use App\Http\Controllers\Api\Analytical\MetodePembelajaranController;
 use App\Http\Controllers\Api\Analytical\PembiayaanController;
 use App\Http\Controllers\Api\Analytical\ResponseRateController;
@@ -205,8 +205,8 @@ Route::middleware("auth:sanctum")->group(function () {
     });
 
     Route::prefix('dashboard/kompetensi')->group(function () {
-        Route::get('gap',            [KompetensiController::class, 'gap']);
-        Route::get('gap/bandingkan', [KompetensiController::class, 'bandingkan']);
+        Route::get('gap',            [KompetensiGapController::class, 'gap']);
+        Route::get('gap/bandingkan', [KompetensiGapController::class, 'bandingkan']);
         Route::get('metode',            [MetodePembelajaranController::class, 'metode']);
         Route::get('metode/bandingkan', [MetodePembelajaranController::class, 'bandingkan']);
     });

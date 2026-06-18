@@ -2,15 +2,15 @@
 
 namespace App\Services\Analytical;
 
-use App\DTOs\Analytical\Kompetensi\KompetensiGapDTO;
-use App\DTOs\Analytical\Kompetensi\KompetensiGapBandingkanDTO;
-use App\Repositories\Analytical\KompetensiRepository;
+use App\DTOs\Analytical\KompetensiGap\KompetensiGapDTO;
+use App\DTOs\Analytical\KompetensiGap\KompetensiGapBandingkanDTO;
+use App\Repositories\Analytical\KompetensiGapRepository;
 use Illuminate\Support\Collection;
 
-class KompetensiService
+class KompetensiGapService
 {
     public function __construct(
-        private readonly KompetensiRepository $repo,
+        private readonly KompetensiGapRepository $repo,
     ) {}
 
     public function getGap(array $params): KompetensiGapDTO
