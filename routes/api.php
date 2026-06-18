@@ -28,9 +28,12 @@ use App\Http\Controllers\Api\Analytical\MasaTungguController;
 use App\Http\Controllers\Api\Analytical\KesesuaianController;
 use App\Http\Controllers\Api\Analytical\WirausahaController;
 use App\Http\Controllers\Api\Analytical\SebaranInstansiController;
-use App\Http\Controllers\Api\Analytical\KompetensiController;
+use App\Http\Controllers\Api\Analytical\KompetensiGapController;
 use App\Http\Controllers\Api\Analytical\MetodePembelajaranController;
 use App\Http\Controllers\Api\Analytical\PembiayaanController;
+use App\Http\Controllers\Api\Analytical\ResponseRateController;
+use App\Http\Controllers\Api\Analytical\SummaryController;
+use App\Http\Controllers\Api\Analytical\EducationSummaryController;
 
 
 // Controllers — DataPipeline (ETL)
@@ -215,6 +218,7 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('pie',        [KesesuaianController::class, 'pie']);
         Route::get('alasan',     [KesesuaianController::class, 'alasan']);
         Route::get('drill-down', [KesesuaianController::class, 'drillDown']);
+        Route::get('bandingkan', [KesesuaianController::class, 'bandingkan']);
     });
 
     Route::prefix('dashboard/wirausaha')->group(function () {
@@ -233,8 +237,8 @@ Route::middleware("auth:sanctum")->group(function () {
     });
 
     Route::prefix('dashboard/kompetensi')->group(function () {
-        Route::get('gap',            [KompetensiController::class, 'gap']);
-        Route::get('gap/bandingkan', [KompetensiController::class, 'bandingkan']);
+        Route::get('gap',            [KompetensiGapController::class, 'gap']);
+        Route::get('gap/bandingkan', [KompetensiGapController::class, 'bandingkan']);
         Route::get('metode',            [MetodePembelajaranController::class, 'metode']);
         Route::get('metode/bandingkan', [MetodePembelajaranController::class, 'bandingkan']);
     });
@@ -243,5 +247,19 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('pie',        [PembiayaanController::class, 'pie']);
         Route::get('per-prodi',  [PembiayaanController::class, 'perProdi']);
         Route::get('bandingkan', [PembiayaanController::class, 'bandingkan']);
+        Route::get('antar-periode', [PembiayaanController::class, 'antarPeriode']);
+        Route::get('drill-down',    [PembiayaanController::class, 'drillDown']);  
+
     });
+
+    Route::prefix('dashboard/response-rate')->group(function () {
+        Route::get('bar',        [ResponseRateController::class, 'bar']);
+        Route::get('pie',        [ResponseRateController::class, 'pie']);
+        Route::get('trend',      [ResponseRateController::class, 'trend']);
+        Route::get('drill-down', [ResponseRateController::class, 'drillDown']);
+    });
+
+    Route::get('dashboard/overview/summary', [SummaryController::class, 'summary']);
+    Route::get('dashboard/education/summary',  [EducationSummaryController::class, 'summary']);
+
 });

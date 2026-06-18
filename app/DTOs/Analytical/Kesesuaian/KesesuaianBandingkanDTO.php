@@ -1,8 +1,8 @@
 <?php
 
-namespace App\DTOs\Analytical\KompetensiGap;
+namespace App\DTOs\Analytical\Kesesuaian;
 
-class KompetensiGapBandingkanDTO
+class KesesuaianBandingkanDTO
 {
     public function __construct(
         private readonly array $data,

@@ -1,11 +1,11 @@
 <?php
 
-namespace App\DTOs\Analytical\KompetensiGap;
+namespace App\DTOs\Analytical\EducationSummary;
 
-class KompetensiGapDTO
+class EducationSummaryDTO
 {
     public function __construct(
-        private readonly array $data,
+        private readonly array $cards,
         private readonly array $filters,
     ) {}
 
@@ -13,7 +13,7 @@ class KompetensiGapDTO
     {
         return [
             'filters' => $this->filters,
-            'data'    => $this->data,
+            'cards'   => $this->cards,
         ];
     }
 }

@@ -6,36 +6,37 @@ use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use App\Exports\Sheets\MinistrySheetExport;
 use App\Exports\Sheets\ProdiSheetExport;
-use Illuminate\Support\Collection;
 
+/**
+ * PERUBAHAN dari versi sebelumnya: constructor sekarang menerima
+ * MinistrySheetExport yang SUDAH DIBANGUN oleh ReportService (lengkap
+ * dengan query builder + dependency-nya), bukan Collection+array mentah
+ * yang dibangun ulang di sini. Ini karena MinistrySheetExport sekarang
+ * butuh dependency tambahan (ResponseRepository, QuestionnaireRepository)
+ * untuk resolve jawaban per-chunk -- lebih bersih dirakit di Service
+ * (yang sudah punya akses ke repository-repository itu) daripada di
+ * kelas Export ini.
+ *
+ * Sheet per-prodi TETAP dirakit di sini dari $prodiQuestionsGrouped,
+ * tidak berubah dari versi sebelumnya.
+ */
 class TracerStudyMultiSheetExport implements WithMultipleSheets
 {
     use Exportable;
 
-    protected $alumniData;
-    protected $ministryQuestions;
-    protected $prodiQuestionsGrouped; // array keyed by prodi code
+    protected MinistrySheetExport $ministrySheet;
+    protected array $prodiQuestionsGrouped;
 
-    /**
-     * @param Collection $alumniData
-     * @param array      $ministryQuestions  [['code' => ..., 'label' => ...], ...]
-     * @param array      $prodiQuestionsGrouped  ['TI3' => ['name' => ..., 'questions' => [...], 'alumni' => Collection], ...]
-     */
-    public function __construct(Collection $alumniData, array $ministryQuestions, array $prodiQuestionsGrouped)
+    public function __construct(MinistrySheetExport $ministrySheet, array $prodiQuestionsGrouped)
     {
-        $this->alumniData = $alumniData;
-        $this->ministryQuestions = $ministryQuestions;
+        $this->ministrySheet = $ministrySheet;
         $this->prodiQuestionsGrouped = $prodiQuestionsGrouped;
     }
 
     public function sheets(): array
     {
-        $sheets = [];
+        $sheets = [$this->ministrySheet];
 
-        // Sheet 1: Data Kementrian (semua alumni)
-        $sheets[] = new MinistrySheetExport($this->alumniData, $this->ministryQuestions);
-
-        // Sheet 2-N: Satu sheet per prodi yang punya data
         foreach ($this->prodiQuestionsGrouped as $prodiCode => $prodiData) {
             $prodiAlumni = $prodiData['alumni'] ?? collect();
             $prodiQuestions = $prodiData['questions'] ?? [];
@@ -46,7 +47,6 @@ class TracerStudyMultiSheetExport implements WithMultipleSheets
             }
         }
 
-        // Fallback: if no per-prodi sheets, add a single empty prodi sheet
         if (count($sheets) === 1) {
             $sheets[] = new ProdiSheetExport(collect(), [], 'Data Khusus Prodi');
         }

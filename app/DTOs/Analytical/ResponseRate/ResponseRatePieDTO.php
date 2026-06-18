@@ -1,11 +1,12 @@
 <?php
 
-namespace App\DTOs\Analytical\KompetensiGap;
+namespace App\DTOs\Analytical\ResponseRate;
 
-class KompetensiGapDTO
+class ResponseRatePieDTO
 {
     public function __construct(
         private readonly array $data,
+        private readonly int   $total,
         private readonly array $filters,
     ) {}
 
@@ -13,6 +14,7 @@ class KompetensiGapDTO
     {
         return [
             'filters' => $this->filters,
+            'total'   => $this->total,
             'data'    => $this->data,
         ];
     }

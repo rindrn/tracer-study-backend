@@ -43,9 +43,9 @@ class KeterserapanService
      * Jika ETL mengubah label, update konstanta ini saja.
      */
     private const STATUS_TERSERAP = [
-        'Bekerja',
-        'Wirausaha',
-        'Melanjutkan Studi',   // label aktual di DW (bukan "Studi Lanjut")
+        'Bekerja (full time / part time)', // label aktual di DW
+        'Wiraswasta',            // label aktual di DW
+        'Melanjutkan Pendidikan',   // label aktual di DW
     ];
 
     /**
@@ -209,7 +209,7 @@ class KeterserapanService
      *
      * 'terserap' → null karena filter multi-label tidak bisa pakai equals.
      *              Repo akan pakai notEquals 'Belum Bekerja' sebagai gantinya.
-     * 'tidak'    → 'Belum Bekerja' (label DW)
+     * 'tidak'    → 'Belum memungkinkan bekerja' (label DW)
      * label lain → pakai apa adanya
      */
     private function resolveStatusLabel(?string $status): ?string
@@ -217,7 +217,7 @@ class KeterserapanService
         return match ($status) {
             null, '', 'semua' => null,
             'terserap'        => null,   // ditangani repo via excludeStatus
-            'tidak'           => 'Belum Bekerja',
+            'tidak'           => 'Belum memungkinkan bekerja',
             default           => $status,
         };
     }

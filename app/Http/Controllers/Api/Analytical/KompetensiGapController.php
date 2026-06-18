@@ -3,15 +3,15 @@
 namespace App\Http\Controllers\Api\Analytical;
 
 use App\Http\Controllers\Controller;
-use App\Services\Analytical\KompetensiService;
+use App\Services\Analytical\KompetensiGapService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
-class KompetensiController extends Controller
+class KompetensiGapController extends Controller
 {
     public function __construct(
-        private readonly KompetensiService $service,
+        private readonly KompetensiGapService $service,
     ) {}
 
     public function gap(Request $request): JsonResponse

@@ -165,4 +165,68 @@ class PembiayaanRepository extends BaseAnalyticalRepository
             'count'        => (int) ($r['FactTracerStudy.count_alumni']       ?? 0),
         ]);
     }
+
+    public function getDetailAlumni(
+        ?string $sumberBiaya    = null,
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $namaProdi      = null,
+        ?string $tahunLulus     = null,
+        ?string $mingguSnapshot = null,
+        ?string $search         = null,
+        int     $page           = 1,
+        int     $perPage        = 15,
+    ): array {
+        $filters = $this->buildGlobalFilters(
+            jenjang:        $jenjang,
+            jurusan:        $jurusan,
+            namaProdi:      $namaProdi,
+            tahunLulus:     $tahunLulus,
+            mingguSnapshot: $mingguSnapshot,
+        );
+
+        if ($sumberBiaya !== null && $sumberBiaya !== '') {
+            $filters[] = [
+                'member'   => 'DimAlumni.label_sumber_biaya_dipolban',
+                'operator' => 'equals',
+                'values'   => [$sumberBiaya],
+            ];
+        }
+
+        if ($search) {
+            $filters[] = ['member' => 'DimAlumni.nama', 'operator' => 'contains', 'values' => [$search]];
+        }
+
+        $result = $this->cube->load([
+            'measures'   => ['FactTracerStudy.count_alumni'],
+            'dimensions' => [
+                'DimAlumni.nama',
+                'DimAlumni.nim',
+                'DimProdi.nama_prodi',
+                'DimProdi.jenjang',
+                'DimAlumni.tahun_lulus',
+                'DimAlumni.label_sumber_biaya_dipolban',
+            ],
+            'filters' => $filters,
+            'order'   => [['DimAlumni.nama', 'asc']],
+            'limit'   => $perPage,
+            'offset'  => ($page - 1) * $perPage,
+        ]);
+
+        $data = $result->map(fn($r) => [
+            'nama'         => $r['DimAlumni.nama']                            ?? '',
+            'nim'          => $r['DimAlumni.nim']                             ?? '',
+            'nama_prodi'   => $r['DimProdi.nama_prodi']                       ?? '',
+            'jenjang'      => $r['DimProdi.jenjang']                          ?? '',
+            'tahun_lulus'  => $r['DimAlumni.tahun_lulus']                     ?? '',
+            'sumber_biaya' => $r['DimAlumni.label_sumber_biaya_dipolban']     ?? '',
+        ])->toArray();
+
+        return [
+            'data'          => $data,
+            'page'          => $page,
+            'per_page'      => $perPage,
+            'total_on_page' => count($data),
+        ];
+    }
 }

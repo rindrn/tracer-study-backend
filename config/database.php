@@ -119,7 +119,7 @@ return [
             'driver'         => 'pgsql',
             'host'           => env('OLTP_DB_HOST', '127.0.0.1'),
             'port'           => env('OLTP_DB_PORT', '5432'),
-            'database'       => env('OLTP_DB_DATABASE', 'postgres'),
+            'database'       => env('OLTP_DB_DATABASE', 'example'),
             'username'       => env('OLTP_DB_USERNAME', 'postgres'),
             'password'       => env('OLTP_DB_PASSWORD', 'postgres'),
             'charset'        => 'utf8',
@@ -140,7 +140,7 @@ return [
             'charset'        => 'utf8',
             'prefix'         => '',
             'prefix_indexes' => true,
-            'search_path'    => 'tracer_olap',
+            'search_path'    => 'public',
             'sslmode'        => 'prefer',
         ],
 

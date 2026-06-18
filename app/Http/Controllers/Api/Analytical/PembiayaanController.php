@@ -69,6 +69,43 @@ class PembiayaanController extends Controller
         }
     }
 
+     public function antarPeriode(Request $request): JsonResponse
+    {
+        $params = $request->validate([
+            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jurusan'         => 'nullable|string|max:100',
+            'nama_prodi'      => 'nullable|string|max:100',
+            'minggu_snapshot' => 'nullable|string|max:10',
+        ]);
+
+        try {
+            $dto = $this->service->getAntarPeriode($params);
+            return response()->json(['success' => true, 'data' => $dto->toArray()]);
+        } catch (\RuntimeException $e) {
+            return $this->serviceError($e);
+        }
+    }
+
+    public function drillDown(Request $request): JsonResponse
+    {
+        $params = $request->validate([
+            'sumber_biaya'    => 'nullable|string|max:100',
+            'tahun_lulus'     => 'nullable|string|max:5',
+            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jurusan'         => 'nullable|string|max:100',
+            'nama_prodi'      => 'nullable|string|max:100',
+            'search'          => 'nullable|string|max:100',
+            'page'            => 'nullable|integer|min:1',
+            'per_page'        => 'nullable|integer|min:5|max:100',
+        ]);
+
+        try {
+            $dto = $this->service->getDrillDown($params);
+            return response()->json(['success' => true, 'data' => $dto->toArray()]);
+        } catch (\RuntimeException $e) {
+            return $this->serviceError($e);
+        }
+    }
 
     private function serviceError(\RuntimeException $e): JsonResponse
     {
