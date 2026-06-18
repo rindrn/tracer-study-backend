@@ -1,8 +1,8 @@
 <?php
 
-namespace App\DTOs\Analytical\KompetensiGap;
+namespace App\DTOs\Analytical\ResponseRate;
 
-class KompetensiGapDTO
+class ResponseRateTrendDTO
 {
     public function __construct(
         private readonly array $data,

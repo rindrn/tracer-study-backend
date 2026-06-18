@@ -1,6 +1,6 @@
 <?php
 
-namespace App\DTOs\Analytical\Kompetensi;
+namespace App\DTOs\Analytical\KompetensiGap;
 
 class KompetensiGapBandingkanDTO
 {
