@@ -32,11 +32,23 @@ use Illuminate\Support\Collection;
  */
 class AnswerResolverService
 {
+    /** Question_code yang isinya ID provinsi (FK ke provinces.id), bukan teks bebas. */
+    private const PROVINCE_ID_CODES = ['f5a1'];
+
+    /** Question_code yang isinya ID kota (FK ke cities.id), bukan teks bebas. */
+    private const CITY_ID_CODES = ['f5a2'];
+
     /** @var array<int, Collection> cache: questionnaire_id => questionnaire_options */
     private array $optionsCache = [];
 
     /** @var array<int, Collection> cache: questionnaire_id => question meta (type+metadata) */
     private array $questionMetaCache = [];
+
+    /** @var Collection|null cache: semua provinces (34 baris, tetap, di-load sekali) */
+    private ?Collection $provincesCache = null;
+
+    /** @var Collection|null cache: semua cities (di-load sekali) */
+    private ?Collection $citiesCache = null;
 
     public function __construct(
         private readonly OltpExtractRepository $oltpRepo,
@@ -61,9 +73,41 @@ class AnswerResolverService
      * Resolve nilai final untuk satu jawaban, sesuai question_type-nya.
      * $rawAnswer adalah row hasil getAnswersForResponses() -- hanya
      * punya properti: id, response_id, question_code, answer_text.
+     *
+     * f5a1/f5a2 DIPERLAKUKAN KHUSUS di luar percabangan question_type
+     * biasa: walau type-nya 'short_text' di skema (sehingga secara
+     * default akan diteruskan mentah), isinya SEBENARNYA adalah FK
+     * numerik ke provinces.id/cities.id -- jadi perlu lookup nama
+     * sebelum diteruskan ke dim_perusahaan/dim_wirausaha.
      */
     public function resolveValue(int $questionnaireId, string $questionCode, object $rawAnswer): mixed
     {
+        if (in_array($questionCode, self::PROVINCE_ID_CODES, true)) {
+            return $this->resolveProvinceName($rawAnswer->answer_text);
+        }
+
+        if (in_array($questionCode, self::CITY_ID_CODES, true)) {
+            return $this->resolveCityName($rawAnswer->answer_text);
+        }
+
+        // ── Cek dulu apakah question_code ini punya baris di
+        // questionnaire_options, TERLEPAS dari question_type-nya. ──
+        // Ditemukan kasus nyata: f5c (jabatan wirausaha) bertype
+        // 'number' di skema, TAPI tetap punya 4 opsi berkode
+        // (1=Staff, 2=Founder, 3=Freelancer, 4=Co-Founder) di
+        // questionnaire_options. Asumsi awal "number selalu cast ke
+        // float" SALAH untuk kasus ini -- jawabannya kode pilihan,
+        // bukan angka bebas. Mengecek opsi DULU (bukan murni
+        // berdasarkan question_type) membuat resolver ini benar untuk
+        // kombinasi question_type+opsi apapun, tanpa perlu hardcode
+        // pengecualian per question_code.
+        $options = $this->getOptionsForQuestionnaire($questionnaireId);
+        $hasOptions = $options->contains(fn ($opt) => $opt->question_code === $questionCode);
+
+        if ($hasOptions) {
+            return $this->resolveChoiceLabel($questionnaireId, $questionCode, $rawAnswer->answer_text);
+        }
+
         $meta = $this->getQuestionMeta($questionnaireId, $questionCode);
 
         if ($meta === null) {
@@ -78,6 +122,49 @@ class AnswerResolverService
             'single_choice', 'multiple_choice' => $this->resolveChoiceLabel($questionnaireId, $questionCode, $rawAnswer->answer_text),
             default => $this->truncateFreeText($rawAnswer->answer_text), // short_text, long_text, date
         };
+    }
+
+    /**
+     * Lookup nama provinsi dari ID mentah (f5a1). Mengembalikan ID
+     * mentah sebagai fallback jika tidak match (data kotor), BUKAN
+     * null -- supaya tetap ada sinyal sesuatu salah, alih-alih hilang
+     * diam-diam. Caller (AlumniFactBuilderService) tetap bisa pakai
+     * nilai ini untuk derive business key dim_perusahaan/dim_wirausaha
+     * meski isinya kebetulan ID mentah karena data kotor.
+     */
+    private function resolveProvinceName(?string $rawId): ?string
+    {
+        if ($rawId === null || $rawId === '' || !ctype_digit($rawId)) {
+            return $rawId; // bukan angka sama sekali -> kemungkinan sudah teks, teruskan apa adanya
+        }
+
+        $provinces = $this->getProvinces();
+        $match = $provinces->firstWhere('id', (int) $rawId);
+
+        return $match?->name ?? $rawId;
+    }
+
+    /** Lookup nama kota dari ID mentah (f5a2), pola sama dengan resolveProvinceName(). */
+    private function resolveCityName(?string $rawId): ?string
+    {
+        if ($rawId === null || $rawId === '' || !ctype_digit($rawId)) {
+            return $rawId;
+        }
+
+        $cities = $this->getCities();
+        $match = $cities->firstWhere('id', (int) $rawId);
+
+        return $match?->name ?? $rawId;
+    }
+
+    private function getProvinces(): Collection
+    {
+        return $this->provincesCache ??= $this->oltpRepo->getAllProvinces();
+    }
+
+    private function getCities(): Collection
+    {
+        return $this->citiesCache ??= $this->oltpRepo->getAllCities();
     }
 
     /**

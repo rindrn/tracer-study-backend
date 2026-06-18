@@ -35,7 +35,12 @@ class OltpExtractRepository
      *
      * Per kategori (lihat AlumniFactBuilderService untuk detail pemakaian):
      *   - f8       : status alumni (dim_status_alumni)
-     *   - f14      : kesesuaian bidang & level (dim_kesesuaian_bidang/level)
+     *   - f14      : kesesuaian BIDANG studi dengan pekerjaan (dim_kesesuaian_bidang)
+     *               opsi: Sangat Erat, Erat, Cukup Erat, Kurang Erat, Tidak Sama Sekali
+     *   - f15      : kesesuaian LEVEL/tingkat pendidikan dengan pekerjaan (dim_kesesuaian_level)
+     *               opsi: Setingkat Lebih Tinggi, Tingkat yang Sama, Setingkat Lebih
+     *               Rendah, Tidak Perlu Pendidikan Tinggi -- INDEPENDEN dari f14,
+     *               BUKAN turunan/FK darinya (koreksi atas asumsi awal yang salah)
      *   - f18a     : sumber biaya studi lanjut (dim_studi_lanjut.sumber_biaya, lookup option)
      *   - f18b     : perguruan tinggi studi lanjut (dim_studi_lanjut.perguruan_tinggi)
      *   - f18c     : program studi studi lanjut (dim_studi_lanjut.program_studi)
@@ -57,7 +62,7 @@ class OltpExtractRepository
      * yang bisa saling tidak sinkron.
      */
     public const RELEVANT_QUESTION_CODES = [
-        'f8', 'f14', 'f18a', 'f18b', 'f18c', 'f302', 'f502', 'f505', 'f5a1', 'f5a2', 'f5b', 'f5c', 'f5d', 'f1101',
+        'f8', 'f14', 'f15', 'f18a', 'f18b', 'f18c', 'f302', 'f502', 'f505', 'f5a1', 'f5a2', 'f5b', 'f5c', 'f5d', 'f1101', 'f1201',
         'f1761', 'f1762', 'f1763', 'f1764', 'f1765', 'f1766', 'f1767', 'f1768',
         'f1769', 'f1770', 'f1771', 'f1772', 'f1773', 'f1774',
         'f21', 'f22', 'f23', 'f24', 'f25', 'f26', 'f27',
@@ -182,6 +187,32 @@ class OltpExtractRepository
     {
         return $this->oltp()->table('ref_ump')
             ->select(['id', 'tahun', 'nilai_ump', 'nama_provinsi', 'updated_at'])
+            ->get();
+    }
+
+    /**
+     * Sumber lookup nama provinsi: f5a1 menyimpan provinces.id (FK
+     * numerik), BUKAN nama provinsi langsung -- dikonfirmasi dari
+     * struktur question_type='short_text' yang isinya ID, bukan teks
+     * bebas. Ditarik sekali di awal run dan di-cache di memory oleh
+     * AnswerResolverService, karena jumlah provinsi/kota tetap (34
+     * provinsi) dan tidak berubah antar-alumni.
+     */
+    public function getAllProvinces(): Collection
+    {
+        return $this->oltp()->table('provinces')
+            ->select(['id', 'code', 'name'])
+            ->get();
+    }
+
+    /**
+     * Sumber lookup nama kota: f5a2 menyimpan cities.id (FK numerik),
+     * sama alasannya dengan getAllProvinces().
+     */
+    public function getAllCities(): Collection
+    {
+        return $this->oltp()->table('cities')
+            ->select(['id', 'province_code', 'code', 'name'])
             ->get();
     }
 }

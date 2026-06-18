@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\DB;
  *   4. dim_ump                 (Type 1, independen, sumber ref_ump)
  *   5. dim_alumni              (SCD Type 1, hanya alumni yang relevan di batch)
  *   6. dim_status_alumni       (Type 1+append, hanya questionnaire relevan di batch)
+ *   6b. dim_kesesuaian_level   (Type 1+append, dynamic dari questionnaire_options
+ *                               f14, pola identik dim_status_alumni)
  *   7. fact_tracer_study + fact_multi_select + fact_range_evaluasi
  *      (terakhir -- dim_perusahaan & dim_wirausaha disinkronkan INLINE
  *      di tahap ini, karena business key-nya baru diketahui setelah
@@ -35,6 +37,8 @@ class EtlOrchestratorService
         private readonly ProdiDimService $prodiDim,
         private readonly AlumniDimService $alumniDim,
         private readonly StatusAlumniDimService $statusAlumniDim,
+        private readonly KesesuaianLevelDimService $kesesuaianLevelDim,
+        private readonly KesesuaianBidangDimService $kesesuaianBidangDim,
         private readonly IndikatorEvaluasiDimService $indikatorEvaluasiDim,
         private readonly UmpDimService $umpDim,
         private readonly AlumniFactBuilderService $factBuilder,
@@ -86,6 +90,18 @@ class EtlOrchestratorService
             $questionnaireIds = $responses->pluck('questionnaire_id')->unique()->all();
             $statusResult = $this->statusAlumniDim->sync($questionnaireIds);
             $summary->addStage('dim_status_alumni (Type1)', $statusResult['processed'], $statusResult['inserted'], $statusResult['updated']);
+
+            // ── Tahap 6b: dim_kesesuaian_level (Type1+append, dynamic) ──
+            // Sama pola dim_status_alumni -- dijalankan sebelum fact,
+            // supaya semua opsi f14 yang relevan di batch ini sudah
+            // ter-sync sebelum AlumniFactBuilderService butuh resolve SK.
+            $kesesuaianResult = $this->kesesuaianLevelDim->sync($questionnaireIds);
+            $summary->addStage('dim_kesesuaian_level (Type1)', $kesesuaianResult['processed'], $kesesuaianResult['inserted'], $kesesuaianResult['updated']);
+
+            // ── Tahap 6c: dim_kesesuaian_bidang (Type1+append, dynamic) ──
+            // Independen dari dim_kesesuaian_level (sumber f14, bukan f15).
+            $kesesuaianBidangResult = $this->kesesuaianBidangDim->sync($questionnaireIds);
+            $summary->addStage('dim_kesesuaian_bidang (Type1)', $kesesuaianBidangResult['processed'], $kesesuaianBidangResult['inserted'], $kesesuaianBidangResult['updated']);
 
             // ── Tahap 7: 3 fact table sekaligus, per alumni ──
             // dim_perusahaan & dim_wirausaha (SCD2) disinkronkan INLINE

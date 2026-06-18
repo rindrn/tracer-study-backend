@@ -135,8 +135,12 @@ class OlapLoadRepository
         ], 'wirausaha_sk');
     }
 
-    // ───────────────── dim_kesesuaian_level — static lookup, Type 1 ─────────────────
-    public function upsertKesesuaianLevel(int $idKesesuaianLevel, string $label): int
+    // ───────────────── dim_kesesuaian_level — Type 1 + append, dynamic ─────────────────
+    // Business key sekarang string ("{questionnaire_id}:f14:{option_code}"),
+    // pola identik dim_status_alumni. Method sentinel lama berbasis "0"
+    // integer SUDAH DIHAPUS -- sentinel sekarang juga string, lihat
+    // ensureKesesuaianLevelSentinel() di bawah.
+    public function upsertKesesuaianLevel(string $idKesesuaianLevel, string $label): int
     {
         $this->olap()->table('dim_kesesuaian_level')->updateOrInsert(
             ['id_kesesuaian_level' => $idKesesuaianLevel],
@@ -145,61 +149,67 @@ class OlapLoadRepository
         return $this->olap()->table('dim_kesesuaian_level')->where('id_kesesuaian_level', $idKesesuaianLevel)->first()->kesesuaian_level_sk;
     }
 
-    public function getKesesuaianLevelSk(int $idKesesuaianLevel): ?int
+    public function getKesesuaianLevelSk(string $idKesesuaianLevel): ?int
     {
         return $this->olap()->table('dim_kesesuaian_level')->where('id_kesesuaian_level', $idKesesuaianLevel)->first()?->kesesuaian_level_sk;
     }
 
+    /** Business key sentinel untuk dim_kesesuaian_level -- "Tidak Ada Data". */
+    public const KESESUAIAN_LEVEL_SENTINEL_KEY = '0:tidak_ada_data';
+
+    /** Business key sentinel untuk dim_kesesuaian_bidang -- "Tidak Ada Data". */
+    public const KESESUAIAN_BIDANG_SENTINEL_KEY = '0:tidak_ada_data';
+
     /**
-     * Pastikan baris sentinel (id_kesesuaian_level=0, label='Tidak Ada
-     * Data') ada. Dipanggil sekali di awal sync, idempotent (aman
-     * dipanggil berkali-kali setiap run).
+     * Sentinel sekarang pakai business key string "0:tidak_ada_data"
+     * (bukan integer 0), supaya konsisten dengan format business key
+     * dynamic yang baru. Tetap idempotent: aman dipanggil berkali-kali.
+     * Mengembalikan SK (integer) untuk dipakai langsung di fact.
      */
     public function ensureKesesuaianLevelSentinel(): int
     {
-        $existing = $this->olap()->table('dim_kesesuaian_level')->where('id_kesesuaian_level', 0)->first();
+        $existing = $this->getKesesuaianLevelSk(self::KESESUAIAN_LEVEL_SENTINEL_KEY);
         if ($existing !== null) {
-            return $existing->kesesuaian_level_sk;
+            return $existing;
         }
         return $this->olap()->table('dim_kesesuaian_level')->insertGetId([
-            'id_kesesuaian_level' => 0,
+            'id_kesesuaian_level' => self::KESESUAIAN_LEVEL_SENTINEL_KEY,
             'label'               => 'Tidak Ada Data',
         ], 'kesesuaian_level_sk');
     }
 
-    // ───────────────── dim_kesesuaian_bidang — static lookup, Type 1 ─────────────────
-    public function getKesesuaianBidangSkByLabel(string $label): ?int
+    // ───────────────── dim_kesesuaian_bidang — Type 1 + append, dynamic ─────────────────
+    // KOREKSI PENTING: dim_kesesuaian_bidang TIDAK punya hubungan dengan
+    // dim_kesesuaian_level. Keduanya independen -- f14 (kesesuaian
+    // bidang studi) dan f15 (kesesuaian level pendidikan) adalah dua
+    // pertanyaan terpisah dengan opsi berbeda. Kolom yang sebelumnya
+    // bernama id_kesesuaian_level di tabel ini sudah di-RENAME jadi
+    // id_kesesuaian_bidang (lihat migrations/004), menjadi business
+    // key MILIK dim_kesesuaian_bidang sendiri, format sama dengan
+    // dim_kesesuaian_level: "{questionnaire_id}:f14:{option_code}".
+    public function getKesesuaianBidangSk(string $idKesesuaianBidang): ?int
     {
-        return $this->olap()->table('dim_kesesuaian_bidang')->where('label', $label)->first()?->kesesuaian_bidang_sk;
+        return $this->olap()->table('dim_kesesuaian_bidang')->where('id_kesesuaian_bidang', $idKesesuaianBidang)->first()?->kesesuaian_bidang_sk;
     }
 
-    public function upsertKesesuaianBidang(string $label, ?int $idKesesuaianLevel): int
+    public function upsertKesesuaianBidang(string $idKesesuaianBidang, string $label): int
     {
-        $existing = $this->getKesesuaianBidangSkByLabel($label);
+        $this->olap()->table('dim_kesesuaian_bidang')->updateOrInsert(
+            ['id_kesesuaian_bidang' => $idKesesuaianBidang],
+            ['label' => $label]
+        );
+        return $this->olap()->table('dim_kesesuaian_bidang')->where('id_kesesuaian_bidang', $idKesesuaianBidang)->first()->kesesuaian_bidang_sk;
+    }
+
+    public function ensureKesesuaianBidangSentinel(): int
+    {
+        $existing = $this->getKesesuaianBidangSk(self::KESESUAIAN_BIDANG_SENTINEL_KEY);
         if ($existing !== null) {
-            $this->olap()->table('dim_kesesuaian_bidang')->where('kesesuaian_bidang_sk', $existing)
-                ->update(['id_kesesuaian_level' => $idKesesuaianLevel]);
             return $existing;
         }
         return $this->olap()->table('dim_kesesuaian_bidang')->insertGetId([
-            'label'               => $label,
-            'id_kesesuaian_level' => $idKesesuaianLevel,
-        ], 'kesesuaian_bidang_sk');
-    }
-
-    /**
-     * Pastikan baris sentinel (kesesuaian_bidang_sk=0, label='Tidak
-     * Ada Data') ada -- pasangan dari ensureKesesuaianLevelSentinel().
-     */
-    public function ensureKesesuaianBidangSentinel(int $idKesesuaianLevelSentinel): int
-    {
-        $existing = $this->getKesesuaianBidangSkByLabel('Tidak Ada Data');
-        if ($existing !== null) {
-            return $existing;
-        }
-        return $this->olap()->table('dim_kesesuaian_bidang')->insertGetId([
-            'label'               => 'Tidak Ada Data',
-            'id_kesesuaian_level' => $idKesesuaianLevelSentinel,
+            'id_kesesuaian_bidang' => self::KESESUAIAN_BIDANG_SENTINEL_KEY,
+            'label'                => 'Tidak Ada Data',
         ], 'kesesuaian_bidang_sk');
     }
 

@@ -41,6 +41,8 @@ class AlumniFactBuilderService
     public function __construct(
         private readonly AnswerResolverService $resolver,
         private readonly StatusAlumniDimService $statusAlumniDim,
+        private readonly KesesuaianLevelDimService $kesesuaianLevelDim,
+        private readonly KesesuaianBidangDimService $kesesuaianBidangDim,
         private readonly PerusahaanDimService $perusahaanDim,
         private readonly WirausahaDimService $wirausahaDim,
         private readonly MultiSelectFactBuilderService $multiSelectBuilder,
@@ -70,7 +72,7 @@ class AlumniFactBuilderService
         // daripada query SELECT pengecekan berulang untuk setiap alumni
         // yang sama-sama tidak punya jawaban f14/f18b/f18c. ──
         $kesesuaianLevelSentinelSk = $this->olapRepo->ensureKesesuaianLevelSentinel();
-        $kesesuaianBidangSentinelSk = $this->olapRepo->ensureKesesuaianBidangSentinel($kesesuaianLevelSentinelSk);
+        $kesesuaianBidangSentinelSk = $this->olapRepo->ensureKesesuaianBidangSentinel();
         $studiLanjutSentinelId = $this->olapRepo->ensureStudiLanjutSentinel();
 
         $processed = 0;
@@ -107,6 +109,24 @@ class AlumniFactBuilderService
             // ── Resolve alumni_sk & prodi_sk (dim harus sudah sync) ──
             $alumniRow = $this->oltpRepo->getAlumniByIds([$response->alumni_id])->first();
             $alumniSk = $alumniRow !== null ? $this->olapRepo->getAlumniSkByNim($alumniRow->nim) : null;
+
+            // ── label_sumber_biaya_dipolban dari f1201 ──
+            // Field ini adalah JAWABAN kuesioner (response-level), bukan
+            // data master alumni_profiles -- karena itu AlumniDimService
+            // (yang hanya punya akses ke alumni_profiles murni) TIDAK
+            // bisa mengisinya. Di-resolve di sini, lalu dim_alumni
+            // di-upsert ULANG dengan field ini terisi (SCD Type 1,
+            // overwrite -- konsisten dengan field lain di dim_alumni).
+            if ($alumniRow !== null && isset($resolved['f1201'])) {
+                $this->olapRepo->upsertAlumni([
+                    'nim'                          => $alumniRow->nim,
+                    'nama'                         => $alumniRow->name,
+                    'jenis_kelamin'                => null,
+                    'angkatan'                     => (string) $alumniRow->entry_year,
+                    'tahun_lulus'                  => (string) $alumniRow->graduation_year,
+                    'label_sumber_biaya_dipolban'  => $resolved['f1201'],
+                ]);
+            }
 
             $prodiSk = null;
             if ($alumniRow !== null) {
@@ -157,22 +177,45 @@ class AlumniFactBuilderService
                 'tingkat_instansi' => $resolved['f5d'] ?? null,
             ], $snapshotDate);
 
-            // ── dim_kesesuaian_level & dim_kesesuaian_bidang dari f14 ──
-            // Jika alumni TIDAK punya jawaban f14 (karena tidak bekerja,
-            // f8 != 1), isi dengan SENTINEL (sk=0, "Tidak Ada Data"),
-            // BUKAN null. Ini menjaga grain fact_tracer_study tetap utuh
-            // (1 baris per alumni per snapshot, termasuk yang melanjutkan
-            // studi) sekaligus membuat kategori "Tidak Ada Data" muncul
-            // eksplisit di chart KPI kesesuaian bidang, sesuai pola yang
-            // user contohkan dari data dummy OLAP.
-            if (isset($resolved['f14'])) {
-                $labelKesesuaian = $resolved['f14']; // sudah ter-resolve ke label (single_choice)
-                $idKesesuaianLevel = crc32($labelKesesuaian);
-                $kesesuaianLevelSk = $this->olapRepo->upsertKesesuaianLevel($idKesesuaianLevel, $labelKesesuaian);
-                $kesesuaianBidangSk = $this->olapRepo->upsertKesesuaianBidang($labelKesesuaian, $idKesesuaianLevel);
-            } else {
-                $kesesuaianLevelSk = $kesesuaianLevelSentinelSk;
-                $kesesuaianBidangSk = $kesesuaianBidangSentinelSk;
+            // ── dim_kesesuaian_bidang dari f14 (kesesuaian BIDANG studi) ──
+            // Dynamic sync (pola SAMA dengan f8/dim_status_alumni).
+            // f14 dan f15 adalah dua pertanyaan INDEPENDEN (terverifikasi
+            // dari data: f14 opsinya Sangat Erat...Tidak Sama Sekali,
+            // f15 opsinya Setingkat Lebih Tinggi...Tidak Perlu Pendidikan
+            // Tinggi) -- TIDAK ADA relasi FK antara dim_kesesuaian_bidang
+            // dan dim_kesesuaian_level, koreksi atas asumsi awal yang salah.
+            $f14Answer = $answersForThisAlumni->firstWhere('question_code', 'f14');
+            $kesesuaianBidangSk = $kesesuaianBidangSentinelSk;
+
+            if ($f14Answer !== null) {
+                $rawCodeF14 = $this->resolver->getRawOptionCode($f14Answer);
+
+                if ($rawCodeF14 !== null) {
+                    $idKesesuaianBidang = $this->kesesuaianBidangDim->resolveIdKesesuaianBidang(
+                        $response->questionnaire_id,
+                        $rawCodeF14
+                    );
+                    $kesesuaianBidangSk = $this->olapRepo->getKesesuaianBidangSk($idKesesuaianBidang)
+                        ?? $kesesuaianBidangSentinelSk;
+                }
+            }
+
+            // ── dim_kesesuaian_level dari f15 (kesesuaian LEVEL pendidikan) ──
+            // Independen dari f14, sumbernya pertanyaan terpisah.
+            $f15Answer = $answersForThisAlumni->firstWhere('question_code', 'f15');
+            $kesesuaianLevelSk = $kesesuaianLevelSentinelSk;
+
+            if ($f15Answer !== null) {
+                $rawCodeF15 = $this->resolver->getRawOptionCode($f15Answer);
+
+                if ($rawCodeF15 !== null) {
+                    $idKesesuaianLevel = $this->kesesuaianLevelDim->resolveIdKesesuaianLevel(
+                        $response->questionnaire_id,
+                        $rawCodeF15
+                    );
+                    $kesesuaianLevelSk = $this->olapRepo->getKesesuaianLevelSk($idKesesuaianLevel)
+                        ?? $kesesuaianLevelSentinelSk;
+                }
             }
 
             // ── dim_studi_lanjut dari f18b (PT) + f18c (prodi) + f18a (sumber biaya) ──
@@ -190,6 +233,11 @@ class AlumniFactBuilderService
             }
 
             // ── ump_sk + flag_above_ump ──
+            // Acuan UMP: tahun LULUS alumni (bukan tahun snapshot ETL
+            // berjalan), dikonfirmasi user. Threshold flag_above_ump
+            // adalah 1.2x UMP (bukan 1.0x seperti versi sebelumnya) --
+            // sesuai definisi "di atas UMP secara layak", bukan sekadar
+            // "memenuhi minimum UMP".
             $umpSk = null;
             $flagAboveUmp = null;
             $takeHomePay = isset($resolved['f505']) ? (int) $resolved['f505'] : null;
@@ -205,7 +253,8 @@ class AlumniFactBuilderService
                         $umpSk = $umpRow->ump_sk;
 
                         if ($takeHomePay !== null) {
-                            $flagAboveUmp = $takeHomePay >= (float) $umpRow->nilai_ump ? 1 : 0;
+                            $ambangBatas = (float) $umpRow->nilai_ump * 1.2;
+                            $flagAboveUmp = $takeHomePay >= $ambangBatas ? 1 : 0;
                         }
                     }
                 }
