@@ -67,20 +67,31 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
     private const CITY_CODE = 'f5a2';
 
     /**
-     * f1601-f1613 (AlasanKerjaTdkSesuai) semua berbagi question_text
-     * dengan prefix panjang yang sama ("Jika menurut Anda pekerjaan
-     * saat ini tidak sesuai dengan pendidikan, mengapa Anda
-     * mengambilnya? — ..."), sehingga truncate 80-karakter biasa
-     * memotong justru di bagian yang membedakan tiap field. Untuk
-     * code-code ini, header diambil dari metadata.group_label (sudah
-     * berisi HANYA bagian alasan spesifiknya, tanpa prefix berulang)
-     * -- BUKAN question_text. Field lain di MINISTRY_QUESTION_CODES
+     * f1601-f1613 (AlasanKerjaTdkSesuai) dan f401-f415 (CaraCariKerja)
+     * semua berbagi question_text dengan prefix panjang yang sama per
+     * grupnya ("Jika menurut Anda pekerjaan saat ini tidak sesuai
+     * dengan pendidikan, mengapa Anda mengambilnya? — ..." untuk grup
+     * pertama, "Bagaimana Anda mencari pekerjaan tersebut? — ..." untuk
+     * grup kedua), sehingga truncate 80-karakter biasa memotong justru
+     * di bagian yang membedakan tiap field. Untuk code-code ini, header
+     * diambil dari metadata.group_label (sudah berisi HANYA bagian
+     * spesifiknya, tanpa prefix berulang) -- BUKAN question_text.
+     *
+     * f416 SENGAJA TIDAK diikutkan: berbeda dari f401-f415, field ini
+     * question_type='short_text' (pertanyaan susulan "Sebutkan cara
+     * lainnya", muncul jika f415="Lainnya" dipilih) -- tidak punya
+     * group_code/group_label sama sekali, jadi tetap pakai question_text
+     * seperti biasa.
+     *
+     * Field lain di MINISTRY_QUESTION_CODES yang tidak disebut di sini
      * tetap pakai question_text seperti biasa (keputusan eksplisit,
      * bukan generik untuk semua field yang punya group_label).
      */
     private const HEADER_FROM_GROUP_LABEL_CODES = [
         'f1601', 'f1602', 'f1603', 'f1604', 'f1605', 'f1606', 'f1607', 'f1608',
         'f1609', 'f1610', 'f1611', 'f1612', 'f1613',
+        'f401', 'f402', 'f403', 'f404', 'f405', 'f406', 'f407', 'f408',
+        'f409', 'f410', 'f411', 'f412', 'f413', 'f414', 'f415',
     ];
 
     /** @var array<string,string> code => label header final (sudah
