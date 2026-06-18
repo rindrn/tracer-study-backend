@@ -32,6 +32,8 @@ use App\Http\Controllers\Api\Analytical\KompetensiGapController;
 use App\Http\Controllers\Api\Analytical\MetodePembelajaranController;
 use App\Http\Controllers\Api\Analytical\PembiayaanController;
 use App\Http\Controllers\Api\Analytical\ResponseRateController;
+use App\Http\Controllers\Api\Analytical\SummaryController;
+use App\Http\Controllers\Api\Analytical\EducationSummaryController;
 
 
 // Controllers — DataPipeline (ETL)
@@ -256,5 +258,8 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('trend',      [ResponseRateController::class, 'trend']);
         Route::get('drill-down', [ResponseRateController::class, 'drillDown']);
     });
+
+    Route::get('dashboard/overview/summary', [SummaryController::class, 'summary']);
+    Route::get('dashboard/education/summary',  [EducationSummaryController::class, 'summary']);
 
 });
