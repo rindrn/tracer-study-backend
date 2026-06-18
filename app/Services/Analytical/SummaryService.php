@@ -8,22 +8,26 @@ use App\Repositories\Analytical\SummaryRepository;
 /**
  * SummaryService
  *
- * Orkestrasi data dari SummaryRepository untuk 6 Summary Card di Overview Page:
+ * Orkestrasi data dari SummaryRepository untuk 5 Summary Card di Overview Page:
  *   1. Total Kuesioner   — total alumni (= total kuesioner yang "dikirim")
  *   2. Sudah Mengisi     — count submitted_at IS NOT NULL
  *   3. Response Rate     — (sudah mengisi / total) × 100%, + badge trend
  *   4. Rata-rata Waktu   — AVG(submitted_at - started_at), skip started_at null
  *   5. Belum Mengisi     — total - sudah mengisi
- *   6. Tren 5 Thn        — label "Naik konsisten" / "Menurun" / "Stabil"
+ *
+ * Catatan: card "Tren 5 Thn" yang sebelumnya ada DIHAPUS — labelnya ambigu
+ * (cuma bandingkan 2 tahun terakhir, bukan tren 5 tahun beneran) dan FE
+ * juga menghapus card ini. Badge trend di card "Response Rate" TETAP ADA,
+ * masih pakai logic year-over-year yang sama.
  *
  * Definisi penting (hasil klarifikasi):
  *   - "Sudah Mengisi" / response rate di card ini = submitted_at IS NOT NULL SAJA
  *     (BERBEDA dari KPI Response Rate /bar yang menghitung on_going+selesai
  *      sebagai "responded". Di card ini, "Sudah Mengisi" = SELESAI submit).
  *   - Rata-rata waktu pengisian HANYA dari row yang started_at terisi (skip null).
- *   - Badge trend "+5,2%" dan label "Tren 5 Thn" SAMA-SAMA dihitung dari
- *     selisih response rate antara graduation_year terbesar vs terbesar-1
- *     (tidak ada tabel snapshot, jadi pakai perbandingan antar tahun lulus).
+ *   - Badge trend "+5,2%" di card Response Rate dihitung dari selisih response
+ *     rate antara graduation_year terbesar vs terbesar-1 (tidak ada tabel
+ *     snapshot, jadi pakai perbandingan antar tahun lulus).
  *
  */
 class SummaryService
@@ -36,7 +40,7 @@ class SummaryService
     ) {}
 
     // ──────────────────────────────────────────────────────────────
-    //  SUMMARY — 6 card sekaligus
+    //  SUMMARY — 5 card sekaligus
     // ──────────────────────────────────────────────────────────────
 
     /**
@@ -58,12 +62,7 @@ class SummaryService
      *       "hint": "Pengisian",
      *       "count_with_duration": 980
      *     },
-     *     "belum_mengisi": { "value": 465, "hint": "Follow-up" },
-     *     "tren_5_tahun": {
-     *       "label": "Naik konsisten",
-     *       "direction": "up",
-     *       "hint": "Naik konsisten"
-     *     }
+     *     "belum_mengisi": { "value": 465, "hint": "Follow-up" }
      *   }
      * }
      */
@@ -94,8 +93,6 @@ class SummaryService
 
         [$trendPp, $trendDirection] = $this->computeYearOverYearTrend($ratePerYear);
 
-        $trenLabel = $this->resolveTrenLabel($trendDirection);
-
         $cards = [
             'total_kuesioner' => [
                 'value' => $total,
@@ -120,11 +117,6 @@ class SummaryService
             'belum_mengisi' => [
                 'value' => $agg['count_not_submitted'],
                 'hint'  => 'Follow-up',
-            ],
-            'tren_5_tahun' => [
-                'label'     => $trenLabel,
-                'direction' => $trendDirection,
-                'hint'      => $trenLabel,
             ],
         ];
 
@@ -167,15 +159,6 @@ class SummaryService
         };
 
         return [$diff, $direction];
-    }
-
-    private function resolveTrenLabel(string $direction): string
-    {
-        return match ($direction) {
-            'up'   => 'Naik konsisten',
-            'down' => 'Menurun',
-            default => 'Stabil',
-        };
     }
 
     private function formatFillTimeLabel(?float $hours): string

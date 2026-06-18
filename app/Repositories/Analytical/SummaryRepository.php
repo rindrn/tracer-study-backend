@@ -51,7 +51,7 @@ class SummaryRepository
                 DB::raw('SUM(CASE WHEN r.submitted_at IS NOT NULL THEN 1 ELSE 0 END) as count_submitted'),
                 // AVG durasi dalam jam, hanya baris dengan started_at terisi
                 DB::raw("AVG(CASE WHEN r.started_at IS NOT NULL AND r.submitted_at IS NOT NULL
-                            THEN EXTRACT(EPOCH FROM (r.submitted_at - r.started_at)) / 3600.0
+                            THEN EXTRACT(EPOCH FROM (submitted_at - started_at)) / 3600.0
                             ELSE NULL END) as avg_fill_hours"),
                 DB::raw("SUM(CASE WHEN r.started_at IS NOT NULL AND r.submitted_at IS NOT NULL
                             THEN 1 ELSE 0 END) as count_with_duration"),
@@ -74,7 +74,7 @@ class SummaryRepository
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  2. RESPONSE RATE PER TAHUN — untuk badge trend & Tren 5 Thn
+    //  2. RESPONSE RATE PER TAHUN — untuk badge trend di card Response Rate
     // ──────────────────────────────────────────────────────────────
 
     /**
