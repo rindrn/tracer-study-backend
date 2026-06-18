@@ -216,6 +216,7 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('pie',        [KesesuaianController::class, 'pie']);
         Route::get('alasan',     [KesesuaianController::class, 'alasan']);
         Route::get('drill-down', [KesesuaianController::class, 'drillDown']);
+        Route::get('bandingkan', [KesesuaianController::class, 'bandingkan']);
     });
 
     Route::prefix('dashboard/wirausaha')->group(function () {
