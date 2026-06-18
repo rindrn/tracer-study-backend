@@ -67,7 +67,7 @@ class AnswerResolverService
         $meta = $this->getQuestionMeta($questionnaireId, $questionCode);
 
         if ($meta === null) {
-            return $rawAnswer->answer_text;
+            return $this->truncateFreeText($rawAnswer->answer_text);
         }
 
         return match ($meta->question_type) {
@@ -76,8 +76,40 @@ class AnswerResolverService
                 : null,
             'boolean' => $this->resolveBoolean($rawAnswer->answer_text),
             'single_choice', 'multiple_choice' => $this->resolveChoiceLabel($questionnaireId, $questionCode, $rawAnswer->answer_text),
-            default => $rawAnswer->answer_text, // short_text, long_text, date
+            default => $this->truncateFreeText($rawAnswer->answer_text), // short_text, long_text, date
         };
+    }
+
+    /**
+     * Truncate defensif untuk jawaban free-text (short_text/long_text)
+     * SEBELUM masuk ke dim/fact. Ini mengatasi requirement user: alumni
+     * yang mengisi opsi "Lainnya" dengan teks sangat panjang (kalimat
+     * penuh, bukan satu kata) sebelumnya membuat ETL BERHENTI karena
+     * gagal INSERT (truncate error dari Postgres saat melebihi panjang
+     * kolom varchar).
+     *
+     * Batas 180 karakter dipilih dengan margin aman di bawah kolom
+     * terbesar yang dipakai field ini (company_name varchar(200),
+     * perguruan_tinggi varchar(200) setelah migrasi 003) -- bukan exact
+     * limit, supaya tidak gagal lagi walau migrasi belum sempat
+     * dijalankan di semua environment.
+     *
+     * "..." ditambahkan sebagai sinyal visual bahwa teks dipotong --
+     * data asli LENGKAP tetap ada di OLTP (response_answers), ETL
+     * hanya memotong representasi yang masuk ke OLAP untuk laporan KPI,
+     * bukan menghapus data sumber.
+     */
+    private function truncateFreeText(?string $value, int $maxLength = 180): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        if (mb_strlen($value) <= $maxLength) {
+            return $value;
+        }
+
+        return mb_substr($value, 0, $maxLength - 3) . '...';
     }
 
     private function resolveBoolean(?string $rawValue): ?bool

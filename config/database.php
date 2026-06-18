@@ -134,7 +134,7 @@ return [
             'driver'         => 'pgsql',
             'host'           => env('OLAP_DB_HOST', '127.0.0.1'),
             'port'           => env('OLAP_DB_PORT', '5432'),
-            'database'       => env('OLAP_DB_DATABASE', 'example'),
+            'database'       => env('OLAP_DB_DATABASE', 'postgres'),
             'username'       => env('OLAP_DB_USERNAME', 'postgres'),
             'password'       => env('OLAP_DB_PASSWORD', 'postgres'),
             'charset'        => 'utf8',
