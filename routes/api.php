@@ -244,6 +244,9 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('pie',        [PembiayaanController::class, 'pie']);
         Route::get('per-prodi',  [PembiayaanController::class, 'perProdi']);
         Route::get('bandingkan', [PembiayaanController::class, 'bandingkan']);
+        Route::get('antar-periode', [PembiayaanController::class, 'antarPeriode']);
+        Route::get('drill-down',    [PembiayaanController::class, 'drillDown']);  
+
     });
 
     Route::prefix('dashboard/response-rate')->group(function () {
@@ -252,4 +255,5 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('trend',      [ResponseRateController::class, 'trend']);
         Route::get('drill-down', [ResponseRateController::class, 'drillDown']);
     });
+
 });
