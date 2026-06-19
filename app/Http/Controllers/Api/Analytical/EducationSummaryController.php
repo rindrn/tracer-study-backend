@@ -8,6 +8,19 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
+/**
+ * EducationSummaryController
+ *
+ * Segmen: Summary Cards di Education Page (6 card di atas tabs KPI 9/10/11).
+ * Source: Cube.js / OLAP — FactRangeEvaluasi (KPI 9, 10) + FactTracerStudy (KPI 11).
+ *
+ * Route (di dalam auth:sanctum group):
+ *
+ *   GET /api/dashboard/education/summary
+ *       → 6 card: Skor Kompetensi, Gap Terbesar, Metode Terbaik,
+ *         Avg Persepsi, Mandiri/Keluarga, Beasiswa
+ *
+ */
 class EducationSummaryController extends Controller
 {
     public function __construct(

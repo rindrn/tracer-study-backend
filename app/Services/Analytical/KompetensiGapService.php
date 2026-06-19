@@ -74,9 +74,9 @@ class KompetensiGapService
     private function joinKategori(Collection $rows): Collection
     {
         // Group by kode_field
-        $byKode = $rows->groupBy('kode_field');
+        $byKode = $rows->groupBy('grup_gap');
 
-        return $byKode->map(function (Collection $items, string $kodeField) {
+        return $byKode->map(function (Collection $items, string $grupGap) {
             $rowA = $items->firstWhere('kategori', 'Kompetensi_A');
             $rowB = $items->firstWhere('kategori', 'Kompetensi_B');
 
@@ -95,7 +95,7 @@ class KompetensiGapService
             $count = $rowA['count'] ?? $rowB['count'] ?? 0;
 
             return [
-                'kode_field'      => $kodeField,
+                'grup_gap'        => $grupGap,
                 'label'           => $label,
                 'skor_lulus'      => $skorLulus,
                 'skor_dibutuhkan' => $skorDibutuhkan,

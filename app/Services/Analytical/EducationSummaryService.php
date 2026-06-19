@@ -3,13 +3,30 @@
 namespace App\Services\Analytical;
 
 use App\DTOs\Analytical\EducationSummary\EducationSummaryDTO;
-use App\Repositories\Analytical\EducationSummaryRepository;
+use App\Repositories\Analytical\KompetensiGapRepository;
+use App\Repositories\Analytical\MetodePembelajaranRepository;
+use App\Repositories\Analytical\PembiayaanRepository;
 
 /**
  * EducationSummaryService
  *
- * Orkestrasi data dari EducationSummaryRepository untuk 6 Summary Card
- * di Education Page (EducationPageContent.tsx):
+ * Orkestrasi data untuk 6 Summary Card di Education Page
+ * (EducationPageContent.tsx). TIDAK punya Repository sendiri — langsung
+ * inject Repository KPI 9/10/11 yang SUDAH ADA dan reuse method yang
+ * sudah established, supaya tidak ada duplikasi query Cube.js:
+ *
+ *   - KompetensiRepository::getGapData()   (KPI 9)  → card 1 & 2
+ *   - MetodeRepository::getMetodeData()    (KPI 10) → card 3 & 4
+ *   - PembiayaanRepository::getPieData()   (KPI 11) → card 5 & 6
+ *
+ * Keuntungan: kalau filter/measure Cube di KPI 9/10/11 berubah, Summary
+ * ini otomatis ikut konsisten — tidak perlu update 2 tempat.
+ *
+ * ⚠️ REVISI: label gap_terbesar sekarang diambil dari dimension BARU
+ * 'DimIndikatorEvaluasi.grup_gap' (bukan dari label_pertanyaan) — sudah
+ * ditambahkan di Cube schema dan KompetensiRepository::getGapData() oleh
+ * kamu. Field 'label' di hasil getGapData() tetap dipakai sebagai fallback
+ * kalau grup_gap kosong/null untuk baris tertentu.
  *
  *   1. Skor Kompetensi  — AVG semua skor_lulus (Kompetensi_A) di seluruh indikator
  *   2. Gap Terbesar     — indikator dengan gap (B - A) TERBESAR (paling perlu perbaikan)
@@ -18,8 +35,8 @@ use App\Repositories\Analytical\EducationSummaryRepository;
  *   5. Mandiri/Keluarga — pct sumber biaya "mandiri/keluarga sendiri"
  *   6. Beasiswa         — pct gabungan SEMUA jenis beasiswa (pemerintah + swasta/institusi)
  *
- * KOREKSI LABEL PENTING:
- * KPI 11 (Pembiayaan) yang sudah di buat sebelumnya pakai label "Beasiswa",
+ * ⚠️ KOREKSI LABEL PENTING:
+ * KPI 11 (Pembiayaan) yang sudah kita buat sebelumnya pakai label "Beasiswa",
  * "Orang Tua", "Biaya Sendiri" (3 kategori, dari contoh response BE.md KPI 11).
  * TAPI FE EducationPageContent.tsx menyebut card "Mandiri/Keluarga" (58%) dan
  * "Beasiswa" (36% = Pem.+Swasta) — yang justru match dengan FE Kpi11FundingSourceChart
@@ -31,6 +48,7 @@ use App\Repositories\Analytical\EducationSummaryRepository;
  * case-insensitive. CEK ULANG label asli di DimAlumni.label_sumber_biaya_dipolban
  * dan SESUAIKAN constant ini kalau hasilnya 0% / tidak terdeteksi.
  *
+ * Taruh di: app/Services/Analytical/EducationSummaryService.php
  */
 class EducationSummaryService
 {
@@ -48,7 +66,9 @@ class EducationSummaryService
     private const BEASISWA_KEYWORDS = ['beasiswa'];
 
     public function __construct(
-        private readonly EducationSummaryRepository $repo,
+        private readonly KompetensiGapRepository $kompetensiRepo,
+        private readonly MetodePembelajaranRepository      $metodeRepo,
+        private readonly PembiayaanRepository  $pembiayaanRepo,
     ) {}
 
     /**
@@ -75,7 +95,9 @@ class EducationSummaryService
      */
     public function getSummary(array $params): EducationSummaryDTO
     {
-        $kompetensiRaw = $this->repo->getKompetensiData(
+        // KPI 9 — reuse KompetensiRepository::getGapData() (method yang
+        // sama dipakai oleh KompetensiService untuk endpoint /kompetensi/gap)
+        $kompetensiRaw = $this->kompetensiRepo->getGapData(
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
@@ -83,7 +105,9 @@ class EducationSummaryService
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
         );
 
-        $metodeRaw = $this->repo->getMetodeData(
+        // KPI 10 — reuse MetodeRepository::getMetodeData() (method yang
+        // sama dipakai oleh MetodeService untuk endpoint /kompetensi/metode)
+        $metodeRaw = $this->metodeRepo->getMetodeData(
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
@@ -91,7 +115,9 @@ class EducationSummaryService
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
         );
 
-        $pembiayaanRaw = $this->repo->getPembiayaanData(
+        // KPI 11 — reuse PembiayaanRepository::getPieData() (method yang
+        // sama dipakai oleh PembiayaanService untuk endpoint /pembiayaan/pie)
+        $pembiayaanRaw = $this->pembiayaanRepo->getPieData(
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
@@ -120,24 +146,62 @@ class EducationSummaryService
      * KompetensiService::joinKategori()), lalu derive 2 card:
      *   - skor_kompetensi = AVG semua skor_lulus
      *   - gap_terbesar     = indikator dengan gap MAX (paling butuh perbaikan)
+     *
+     * Label untuk gap_terbesar diambil dari 'grup_gap' (DimIndikatorEvaluasi.grup_gap)
+     * — BUKAN dari 'label' (DimIndikatorEvaluasi.label_pertanyaan). grup_gap adalah
+     * dimension baru yang sengaja dibuat untuk pengelompokan gap yang lebih ringkas/
+     * pas untuk ditampilkan di card (misal "Bahasa Inggris" alih-alih teks pertanyaan
+     * lengkap). Fallback ke 'label' kalau grup_gap kosong, supaya tidak pecah kalau
+     * ada baris yang belum terisi grup_gap-nya.
      */
     private function buildKompetensiCards(\Illuminate\Support\Collection $raw): array
     {
-        $byKode = $raw->groupBy('kode_field');
+        // Ketika filter aktif (jenjang/prodi/tahun), Cube mengembalikan baris
+        // per kombinasi indikator × filter-dimension. Aggregate dulu ke level
+        // indikator × kategori sebelum join A+B, supaya weighted average benar.
+        $aggregated = $raw
+            ->groupBy(fn($r) => $r['kategori'] . '||' . $r['grup_gap'])
+            ->map(function ($rows) {
+                $first      = $rows->first();
+                $totalCount = $rows->sum('count');
+                $weightedAvg = $totalCount > 0
+                    ? $rows->sum(fn($r) => $r['avg_skor'] * $r['count']) / $totalCount
+                    : 0.0;
 
-        $joined = $byKode->map(function ($items, $kodeField) {
+                return [
+                    'grup_gap' => $first['grup_gap'],
+                    'label'    => $first['label'],
+                    'kategori' => $first['kategori'],
+                    'avg_skor' => $weightedAvg,
+                    'count'    => $totalCount,
+                ];
+            })
+            ->values();
+
+        // Join Kompetensi_A + Kompetensi_B per grup_gap
+        $byGrupGap = $aggregated->groupBy('grup_gap');
+
+        $joined = $byGrupGap->map(function ($items) {
             $rowA = $items->firstWhere('kategori', 'Kompetensi_A');
             $rowB = $items->firstWhere('kategori', 'Kompetensi_B');
 
-            $label = $rowA['label'] ?? $rowB['label'] ?? '';
+            $grupGap = $rowA['grup_gap'] ?? $rowB['grup_gap'] ?? '';
+            $label   = ($grupGap !== null && $grupGap !== '')
+                ? $grupGap
+                : ($rowA['label'] ?? $rowB['label'] ?? '');
+
             $skorLulus      = isset($rowA) ? $rowA['avg_skor'] : null;
             $skorDibutuhkan = isset($rowB) ? $rowB['avg_skor'] : null;
-            $gap = (isset($rowA) && isset($rowB)) ? round($skorDibutuhkan - $skorLulus, 2) : null;
+            $gap            = (isset($rowA) && isset($rowB))
+                ? round($skorDibutuhkan - $skorLulus, 2)
+                : null;
+            $count          = isset($rowA) ? ($rowA['count'] ?? 0) : 0;
 
             return [
                 'label'      => $label,
                 'skor_lulus' => $skorLulus,
                 'gap'        => $gap,
+                'count'      => $count,
             ];
         })->filter(fn($r) => $r['skor_lulus'] !== null);
 
@@ -148,7 +212,12 @@ class EducationSummaryService
             ];
         }
 
-        $avgSkorKompetensi = round($joined->avg('skor_lulus'), 1);
+        // Weighted average skor kompetensi (Kompetensi_A saja)
+        $totalCount        = $joined->sum('count');
+        $weightedSumSkor   = $joined->sum(fn($r) => $r['skor_lulus'] * $r['count']);
+        $avgSkorKompetensi = $totalCount > 0
+            ? round($weightedSumSkor / $totalCount, 2)
+            : 0.0;
 
         // Gap terbesar = gap paling POSITIF (kompetensi paling kurang vs kebutuhan industri)
         $maxGapRow = $joined->filter(fn($r) => $r['gap'] !== null)->sortByDesc('gap')->first();
@@ -212,7 +281,7 @@ class EducationSummaryService
      *   - mandiri_keluarga = pct sumber yang match MANDIRI_KEYWORDS
      *   - beasiswa         = pct GABUNGAN semua sumber yang match BEASISWA_KEYWORDS
      *
-     * Pakai partial keyword match (case-insensitive) supaya tetap jalan
+     * ⚠️ Pakai partial keyword match (case-insensitive) supaya tetap jalan
      * baik label di DB pakai istilah "Orang Tua"/"Biaya Sendiri" (versi 3-kategori
      * KPI 11 lama) ATAU "Mandiri/Keluarga" (versi FE 4-kategori baru).
      */
