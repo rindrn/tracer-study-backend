@@ -66,7 +66,36 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
     private const PROVINCE_CODE = 'f5a1';
     private const CITY_CODE = 'f5a2';
 
-    /** @var array<string,string> code => label pertanyaan */
+    /**
+     * f1601-f1613 (AlasanKerjaTdkSesuai) dan f401-f415 (CaraCariKerja)
+     * semua berbagi question_text dengan prefix panjang yang sama per
+     * grupnya ("Jika menurut Anda pekerjaan saat ini tidak sesuai
+     * dengan pendidikan, mengapa Anda mengambilnya? — ..." untuk grup
+     * pertama, "Bagaimana Anda mencari pekerjaan tersebut? — ..." untuk
+     * grup kedua), sehingga truncate 80-karakter biasa memotong justru
+     * di bagian yang membedakan tiap field. Untuk code-code ini, header
+     * diambil dari metadata.group_label (sudah berisi HANYA bagian
+     * spesifiknya, tanpa prefix berulang) -- BUKAN question_text.
+     *
+     * f416 SENGAJA TIDAK diikutkan: berbeda dari f401-f415, field ini
+     * question_type='short_text' (pertanyaan susulan "Sebutkan cara
+     * lainnya", muncul jika f415="Lainnya" dipilih) -- tidak punya
+     * group_code/group_label sama sekali, jadi tetap pakai question_text
+     * seperti biasa.
+     *
+     * Field lain di MINISTRY_QUESTION_CODES yang tidak disebut di sini
+     * tetap pakai question_text seperti biasa (keputusan eksplisit,
+     * bukan generik untuk semua field yang punya group_label).
+     */
+    private const HEADER_FROM_GROUP_LABEL_CODES = [
+        'f1601', 'f1602', 'f1603', 'f1604', 'f1605', 'f1606', 'f1607', 'f1608',
+        'f1609', 'f1610', 'f1611', 'f1612', 'f1613',
+        'f401', 'f402', 'f403', 'f404', 'f405', 'f406', 'f407', 'f408',
+        'f409', 'f410', 'f411', 'f412', 'f413', 'f414', 'f415',
+    ];
+
+    /** @var array<string,string> code => label header final (sudah
+     *  resolve group_label untuk HEADER_FROM_GROUP_LABEL_CODES) */
     private array $questionLabels;
 
     /**
@@ -91,7 +120,7 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
         private readonly QuestionnaireRepository $questionnaireRepo,
         private readonly User $user,
     ) {
-        $this->questionLabels = $this->questionnaireRepo->getQuestionLabelsByCode(self::MINISTRY_QUESTION_CODES);
+        $this->questionLabels = $this->buildQuestionLabels();
 
         $this->showRawOptionCode = $this->user->isHeadTracer();
 
@@ -111,6 +140,32 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
     public function query(): Builder
     {
         return $this->query;
+    }
+
+    /**
+     * Resolve label header final per question_code:
+     *   - Untuk code di HEADER_FROM_GROUP_LABEL_CODES: ambil
+     *     metadata.group_label (bagian spesifik saja, tanpa prefix
+     *     berulang). Fallback ke question_text jika metadata tidak ada
+     *     atau group_label tidak ditemukan di JSON-nya (data tidak
+     *     konsisten), supaya header tidak pernah kosong.
+     *   - Code lain: question_text apa adanya, seperti sebelumnya.
+     */
+    private function buildQuestionLabels(): array
+    {
+        $metaByCode = $this->questionnaireRepo->getQuestionMetaByCode(self::MINISTRY_QUESTION_CODES);
+
+        $labels = [];
+        foreach ($metaByCode as $code => $row) {
+            if (in_array($code, self::HEADER_FROM_GROUP_LABEL_CODES, strict: true)) {
+                $metadata = $row->metadata !== null ? json_decode($row->metadata, true) : null;
+                $labels[$code] = $metadata['group_label'] ?? $row->question_text;
+            } else {
+                $labels[$code] = $row->question_text;
+            }
+        }
+
+        return $labels;
     }
 
     public function chunkSize(): int

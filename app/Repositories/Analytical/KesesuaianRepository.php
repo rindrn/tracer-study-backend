@@ -12,7 +12,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Pre-agg: FactTracerStudy.distribusi_kesesuaian ✅
      *
      * @return Collection<array{nama_prodi, jenjang, tahun_lulus,
      *                          count_alumni, count_sesuai_bidang, count_tidak_sesuai_bidang}>
@@ -61,8 +60,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Hanya alumni Bekerja (status_alumni_sk = 1).
-     * Pre-agg: FactTracerStudy.distribusi_kesesuaian ✅
      *
      * @return Collection<array{label, count}>
      */
@@ -101,9 +98,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Pre-agg: FactMultiSelect.per_indikator ✅
-     * Filter kategori_pertanyaan = 'AlasanKerjaTdkSesuai'.
-     *
      * @return Collection<array{kode_field, label, count}>
      */
     public function getAlasanData(
@@ -138,6 +132,69 @@ class KesesuaianRepository extends BaseAnalyticalRepository
             'kode_field' => $r['DimIndikatorEvaluasi.kode_field']        ?? '',
             'label'      => $r['DimIndikatorEvaluasi.label_pertanyaan']  ?? '',
             'count'      => (int) ($r['FactMultiSelect.count_pilihan']   ?? 0),
+        ]);
+    }
+
+
+    // ──────────────────────────────────────────────────────────────
+    //  4. BANDINGKAN — sesuai vs tidak sesuai, scoped ke prodi terpilih
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Sama dengan getBarData(), tapi bisa di-scope ke daftar prodi tertentu
+     * untuk perbandingan berdampingan (FE: halaman "Perbandingan Kesesuaian
+     * Bidang per Prodi"). Kosongkan $prodiFilter untuk semua prodi.
+     *
+     *
+     * @param  array<string>  $prodiFilter  Kosong = semua prodi.
+     * @return Collection<array{nama_prodi, jenjang, tahun_lulus,
+     *                          count_alumni, count_sesuai_bidang, count_tidak_sesuai_bidang}>
+     */
+    public function getBandingkanData(
+        array   $prodiFilter    = [],
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $tahunLulus     = null,
+        ?string $mingguSnapshot = null,
+    ): Collection {
+        $extra = [];
+        if (!empty($prodiFilter)) {
+            $extra[] = [
+                'member'   => 'DimProdi.nama_prodi',
+                'operator' => 'equals',
+                'values'   => $prodiFilter,
+            ];
+        }
+
+        $filters = $this->buildGlobalFilters(
+            jenjang:        $jenjang,
+            jurusan:        $jurusan,
+            tahunLulus:     $tahunLulus,
+            mingguSnapshot: $mingguSnapshot,
+            extra:          $extra,
+        );
+
+        return $this->cube->load([
+            'measures' => [
+                'FactTracerStudy.count_alumni',
+                'FactTracerStudy.count_sesuai_bidang',
+                'FactTracerStudy.count_tidak_sesuai_bidang',
+            ],
+            'dimensions' => [
+                'DimProdi.jenjang',
+                'DimProdi.jurusan',
+                'DimProdi.nama_prodi',
+                'DimAlumni.tahun_lulus',
+            ],
+            'filters' => $filters,
+            'order'   => [['DimProdi.nama_prodi', 'asc']],
+        ])->map(fn($r) => [
+            'nama_prodi'                => $r['DimProdi.nama_prodi']                          ?? '',
+            'jenjang'                   => $r['DimProdi.jenjang']                              ?? '',
+            'tahun_lulus'               => $r['DimAlumni.tahun_lulus']                         ?? '',
+            'count_alumni'              => (int) ($r['FactTracerStudy.count_alumni']               ?? 0),
+            'count_sesuai_bidang'       => (int) ($r['FactTracerStudy.count_sesuai_bidang']        ?? 0),
+            'count_tidak_sesuai_bidang' => (int) ($r['FactTracerStudy.count_tidak_sesuai_bidang']  ?? 0),
         ]);
     }
 

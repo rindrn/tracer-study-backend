@@ -292,14 +292,14 @@ class MasaTungguRepository extends BaseAnalyticalRepository
 
     /**
      * Bangun filter Cube.js untuk rentang masa tunggu.
-     * Filter status di-restrict hanya Bekerja/Wirausaha (yang punya masa tunggu).
+     * Filter status di-restrict hanya Bekerja/Wiraswasta (yang punya masa tunggu).
      */
     private function buildRentangFilters(string $rentang): array
     {
         $statusFilter = [
             'member'   => 'DimStatusAlumni.label',
             'operator' => 'equals',
-            'values'   => ['Bekerja', 'Wirausaha'],
+            'values'   => ['Bekerja (full time / part time)', 'Wiraswasta'],
         ];
 
         return match ($rentang) {

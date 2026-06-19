@@ -263,16 +263,16 @@ class KeterserapanRepository extends BaseAnalyticalRepository
     /**
      * List alumni per tahun lulus untuk modal drill-down bar chart.
      *
-     * $statusLabel null   → semua status (atau exclude Belum Bekerja jika $excludeStatus diisi)
+     * $statusLabel null   → semua status (atau exclude Belum memungkinkan bekerja jika $excludeStatus diisi)
      * $statusLabel string → filter status spesifik (label DW)
-     * $excludeStatus      → dipakai saat FE kirim "terserap" (exclude Belum Bekerja)
+     * $excludeStatus      → dipakai saat FE kirim "terserap" (exclude Belum memungkinkan bekerja)
      *
      * TIDAK pakai pre-agg — data individual.
      */
     public function getDetailAlumniByTahun(
         string  $tahunLulus,
         ?string $statusLabel    = null,
-        ?string $excludeStatus  = 'Belum Bekerja',  // aktif hanya jika $statusLabel null & FE kirim 'terserap'
+        ?string $excludeStatus  = 'Belum memungkinkan bekerja',  // aktif hanya jika $statusLabel null & FE kirim 'terserap'
         ?string $jenjang        = null,
         ?string $jurusan        = null,
         ?string $namaProdi      = null,

@@ -323,4 +323,30 @@ class QuestionnaireRepository
                 ->get()
         )->groupBy('question_code');
     }
+
+    /**
+    * Ambil question_text + metadata (JSON mentah, belum di-decode) untuk
+    * sekumpulan question_code. Dipakai khusus untuk resolve header f1601-
+    * f1613 (AlasanKerjaTdkSesuai) di MinistrySheetExport, yang butuh
+    * metadata.group_label sebagai header pendek -- BUKAN question_text
+    * penuh yang punya prefix panjang berulang untuk semua field dalam
+    * grup itu.
+    *
+    * Return: array keyed by code => object{question_text, metadata}.
+    * metadata TIDAK di-decode di sini -- caller yang decode json_decode(),
+    * supaya repository tidak perlu tahu struktur internal metadata.
+    */
+    public function getQuestionMetaByCode(array $codes): array
+    {
+        if (empty($codes)) {
+            return [];
+        }
+    
+        return DB::connection(self::CONN)->table('questionnaire_questions')
+            ->whereIn('code', $codes)
+            ->select('code', 'question_text', 'metadata')
+            ->get()
+            ->keyBy('code')
+            ->toArray();
+    }
 }

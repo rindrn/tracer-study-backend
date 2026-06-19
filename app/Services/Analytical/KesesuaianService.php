@@ -6,6 +6,7 @@ use App\DTOs\Analytical\Kesesuaian\KesesuaianBarDTO;
 use App\DTOs\Analytical\Kesesuaian\KesesuaianPieDTO;
 use App\DTOs\Analytical\Kesesuaian\KesesuaianAlasanDTO;
 use App\DTOs\Analytical\Kesesuaian\KesesuaianDrillDownDTO;
+use App\DTOs\Analytical\Kesesuaian\KesesuaianBandingkanDTO;
 use App\Repositories\Analytical\KesesuaianRepository;
 
 class KesesuaianService
@@ -86,6 +87,66 @@ class KesesuaianService
             data:    $raw->values()->toArray(),
             filters: $this->activeFilters($params),
         );
+    }
+
+    public function getBandingkan(array $params): KesesuaianBandingkanDTO
+    {
+        $prodiFilter = $params['prodi'] ?? [];
+        if (is_string($prodiFilter)) {
+            $prodiFilter = [$prodiFilter];
+        }
+
+        $raw = $this->repo->getBandingkanData(
+            prodiFilter:    $prodiFilter,
+            jenjang:        $params['jenjang']         ?? null,
+            jurusan:        $params['jurusan']         ?? null,
+            tahunLulus:     $params['tahun_lulus']     ?? null,
+            mingguSnapshot: $params['minggu_snapshot'] ?? null,
+        );
+
+        $data      = $this->reshapeBandingkan($raw);
+        $prodiList = array_column($data, 'nama_prodi');
+
+        return new KesesuaianBandingkanDTO(
+            data:      $data,
+            prodiList: array_values(array_unique($prodiList)),
+            filters:   $this->activeFilters($params),
+        );
+    }
+
+    private function reshapeBandingkan(\Illuminate\Support\Collection $raw): array
+    {
+        $grouped = $raw->groupBy('nama_prodi');
+        $data    = [];
+
+        foreach ($grouped as $namaProdi => $rows) {
+            $first = $rows->first();
+            $total = $rows->sum('count_alumni');
+            $sesuai = $rows->sum('count_sesuai_bidang');
+            $tidakSesuai = $rows->sum('count_tidak_sesuai_bidang');
+
+            $breakdown = $rows->map(function ($r) {
+                $t = $r['count_alumni'];
+
+                return [
+                    'tahun_lulus'      => $r['tahun_lulus'],
+                    'count_alumni'     => $t,
+                    'pct_sesuai'       => $t > 0 ? round($r['count_sesuai_bidang']       / $t * 100, 1) : 0.0,
+                    'pct_tidak_sesuai' => $t > 0 ? round($r['count_tidak_sesuai_bidang'] / $t * 100, 1) : 0.0,
+                ];
+            })->sortBy('tahun_lulus')->values()->toArray();
+
+            $data[] = [
+                'nama_prodi'       => $namaProdi,
+                'jenjang'          => $first['jenjang'],
+                'total'            => $total,
+                'pct_sesuai'       => $total > 0 ? round($sesuai       / $total * 100, 1) : 0.0,
+                'pct_tidak_sesuai' => $total > 0 ? round($tidakSesuai / $total * 100, 1) : 0.0,
+                'breakdown'        => $breakdown,
+            ];
+        }
+
+        return $data;
     }
 
     public function getDrillDown(array $params): KesesuaianDrillDownDTO
