@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Analytical;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\Analytical\Concerns\EnforcesProdiScope;
 use App\Services\Analytical\EmploymentSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,8 @@ use Illuminate\Http\Response;
  */
 class EmploymentSummaryController extends Controller
 {
+    use EnforcesProdiScope;
+
     public function __construct(
         private readonly EmploymentSummaryService $service,
     ) {}
@@ -36,16 +39,17 @@ class EmploymentSummaryController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getSummary($params);
+            $dto = $this->service->getSummary($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);

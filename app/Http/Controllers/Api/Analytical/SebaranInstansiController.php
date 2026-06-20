@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Analytical;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\Analytical\Concerns\EnforcesProdiScope;
 use App\Services\Analytical\SebaranInstansiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,22 +11,25 @@ use Illuminate\Http\Response;
 
 class SebaranInstansiController extends Controller
 {
+    use EnforcesProdiScope;
+
     public function __construct(
         private readonly SebaranInstansiService $service,
     ) {}
 
     public function jenis(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getJenis($params);
+            $dto = $this->service->getJenis($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -34,16 +38,17 @@ class SebaranInstansiController extends Controller
 
     public function tingkat(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getTingkat($params);
+            $dto = $this->service->getTingkat($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -52,7 +57,7 @@ class SebaranInstansiController extends Controller
 
     public function bandingkan(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'prodi'           => 'nullable|array',
             'prodi.*'         => 'string|max:100',
             'jenjang'         => 'nullable|string|in:D3,D4',
@@ -60,9 +65,10 @@ class SebaranInstansiController extends Controller
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getBandingkan($params);
+            $dto = $this->service->getBandingkan($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -72,7 +78,7 @@ class SebaranInstansiController extends Controller
 
     public function lokasi(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
@@ -80,9 +86,10 @@ class SebaranInstansiController extends Controller
             'minggu_snapshot' => 'nullable|string|max:10',
             'limit'           => 'nullable|integer|min:5|max:50',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getLokasi($params);
+            $dto = $this->service->getLokasi($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -91,7 +98,7 @@ class SebaranInstansiController extends Controller
 
     public function drillDown(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenis_instansi'   => 'nullable|string|max:100',
             'tingkat_instansi' => 'nullable|string|in:Lokal,Nasional,Internasional',
             'jenjang'          => 'nullable|string|in:D3,D4',
@@ -102,9 +109,9 @@ class SebaranInstansiController extends Controller
             'page'             => 'nullable|integer|min:1',
             'per_page'         => 'nullable|integer|min:5|max:100',
         ]);
-
-        // Validasi: minimal salah satu harus diisi
-        if (empty($params['jenis_instansi']) && empty($params['tingkat_instansi'])) {
+        $p = $this->scopedParams($request);
+ 
+        if (empty($p['jenis_instansi']) && empty($p['tingkat_instansi'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Salah satu dari jenis_instansi atau tingkat_instansi wajib diisi.',
@@ -114,9 +121,9 @@ class SebaranInstansiController extends Controller
                 ],
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
-
+ 
         try {
-            $dto = $this->service->getDrillDown($params);
+            $dto = $this->service->getDrillDown($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
