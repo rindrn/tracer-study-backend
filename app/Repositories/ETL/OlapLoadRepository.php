@@ -55,8 +55,6 @@ class OlapLoadRepository
             ['nim' => $attributes['nim']],
             [
                 'nama'                         => $attributes['nama'],
-                'jenis_kelamin'                => $attributes['jenis_kelamin'],
-                'angkatan'                     => $attributes['angkatan'],
                 'tahun_lulus'                  => $attributes['tahun_lulus'],
                 'label_sumber_biaya_dipolban'  => $attributes['label_sumber_biaya_dipolban'] ?? null,
             ]
