@@ -36,8 +36,6 @@ class AlumniDimService
             $this->olapRepo->upsertAlumni([
                 'nim'                          => $alumni->nim,
                 'nama'                         => $alumni->name,
-                'jenis_kelamin'                => null, // tidak ada di alumni_profiles OLTP; isi dari sumber lain jika tersedia
-                'angkatan'                     => (string) $alumni->entry_year,
                 'tahun_lulus'                  => (string) $alumni->graduation_year,
                 'label_sumber_biaya_dipolban'  => null, // diisi dari jawaban kuesioner terkait sumber biaya jika relevan
             ]);

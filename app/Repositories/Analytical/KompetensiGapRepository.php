@@ -15,7 +15,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
 
     /**
      *
-     * @return Collection<array{kode_field, label, kategori, avg_skor, count}>
+     * @return Collection<array{grup_gap, label, kategori, avg_skor, count}>
      */
     public function getGapData(
         ?string $jenjang        = null,
@@ -35,20 +35,32 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
             [self::FILTER_KATEGORI],
         );
 
+        // Cube.js pre-agg rollup hanya aktif kalau semua dimension yang
+        // di-filter juga ada di array 'dimensions' query. Tanpa ini, Cube
+        // ignore filter atau fallback ke raw SQL tanpa rollup.
+        // Dimension ini ditambahkan kondisional — kalau filter tidak aktif,
+        // tidak perlu masuk dimensions supaya data tidak melebar per-prodi.
+        $extraDimensions = [];
+        if ($jenjang !== null && $jenjang !== '')        $extraDimensions[] = 'DimProdi.jenjang';
+        if ($jurusan !== null && $jurusan !== '')        $extraDimensions[] = 'DimProdi.jurusan';
+        if ($namaProdi !== null && $namaProdi !== '')    $extraDimensions[] = 'DimProdi.nama_prodi';
+        if ($tahunLulus !== null && $tahunLulus !== '')  $extraDimensions[] = 'DimAlumni.tahun_lulus';
+        if ($mingguSnapshot !== null && $mingguSnapshot !== '') $extraDimensions[] = 'DimWaktu.minggu_snapshot';
+
         return $this->cube->load([
             'measures'   => [
                 'FactRangeEvaluasi.avg_skor',
                 'FactRangeEvaluasi.count',
             ],
-            'dimensions' => [
+            'dimensions' => array_merge([
                 'DimIndikatorEvaluasi.label_pertanyaan',
-                'DimIndikatorEvaluasi.kode_field',
+                'DimIndikatorEvaluasi.grup_gap',
                 'DimIndikatorEvaluasi.kategori_pertanyaan',
-            ],
+            ], $extraDimensions),
             'filters' => $filters,
-            'order'   => [['DimIndikatorEvaluasi.kode_field', 'asc']],
+            'order'   => [['DimIndikatorEvaluasi.grup_gap', 'asc']],
         ])->map(fn($r) => [
-            'kode_field' => $r['DimIndikatorEvaluasi.kode_field']           ?? '',
+            'grup_gap' => $r['DimIndikatorEvaluasi.grup_gap']               ?? '',
             'label'      => $r['DimIndikatorEvaluasi.label_pertanyaan']     ?? '',
             'kategori'   => $r['DimIndikatorEvaluasi.kategori_pertanyaan']  ?? '',
             'avg_skor'   => (float) ($r['FactRangeEvaluasi.avg_skor']       ?? 0),
@@ -59,7 +71,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
     /**
      *
      * @param  array<string>  $prodiFilter  Kosong = semua prodi.
-     * @return Collection<array{kode_field, label, kategori, jenjang, jurusan, nama_prodi, tahun_lulus, avg_skor, count}>
+     * @return Collection<array{grup_gap, label, kategori, jenjang, jurusan, nama_prodi, tahun_lulus, avg_skor, count}>
      */
     public function getBandingkanData(
         array   $prodiFilter    = [],
@@ -94,7 +106,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
                 'FactRangeEvaluasi.count',
             ],
             'dimensions' => [
-                'DimIndikatorEvaluasi.kode_field',
+                'DimIndikatorEvaluasi.grup_gap',
                 'DimIndikatorEvaluasi.label_pertanyaan',
                 'DimIndikatorEvaluasi.kategori_pertanyaan',
                 'DimProdi.jenjang',
@@ -105,10 +117,10 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
             'filters' => $filters,
             'order'   => [
                 ['DimProdi.nama_prodi',             'asc'],
-                ['DimIndikatorEvaluasi.kode_field', 'asc'],
+                ['DimIndikatorEvaluasi.grup_gap', 'asc'],
             ],
         ])->map(fn($r) => [
-            'kode_field'  => $r['DimIndikatorEvaluasi.kode_field']          ?? '',
+            'grup_gap'  => $r['DimIndikatorEvaluasi.grup_gap']          ?? '',
             'label'       => $r['DimIndikatorEvaluasi.label_pertanyaan']    ?? '',
             'kategori'    => $r['DimIndikatorEvaluasi.kategori_pertanyaan'] ?? '',
             'nama_prodi'  => $r['DimProdi.nama_prodi']                      ?? '',

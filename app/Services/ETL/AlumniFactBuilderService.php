@@ -121,8 +121,6 @@ class AlumniFactBuilderService
                 $this->olapRepo->upsertAlumni([
                     'nim'                          => $alumniRow->nim,
                     'nama'                         => $alumniRow->name,
-                    'jenis_kelamin'                => null,
-                    'angkatan'                     => (string) $alumniRow->entry_year,
                     'tahun_lulus'                  => (string) $alumniRow->graduation_year,
                     'label_sumber_biaya_dipolban'  => $resolved['f1201'],
                 ]);

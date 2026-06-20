@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Analytical;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\Analytical\Concerns\EnforcesProdiScope;
 use App\Services\Analytical\PembiayaanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,22 +11,25 @@ use Illuminate\Http\Response;
 
 class PembiayaanController extends Controller
 {
+    use EnforcesProdiScope;
+
     public function __construct(
         private readonly PembiayaanService $service,
     ) {}
 
     public function pie(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getPie($params);
+            $dto = $this->service->getPie($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -34,16 +38,17 @@ class PembiayaanController extends Controller
 
     public function perProdi(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getPerProdi($params);
+            $dto = $this->service->getPerProdi($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -52,7 +57,7 @@ class PembiayaanController extends Controller
 
     public function bandingkan(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'prodi'           => 'nullable|array',
             'prodi.*'         => 'string|max:100',
             'jenjang'         => 'nullable|string|in:D3,D4',
@@ -60,26 +65,28 @@ class PembiayaanController extends Controller
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getBandingkan($params);
+            $dto = $this->service->getBandingkan($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
         }
     }
 
-     public function antarPeriode(Request $request): JsonResponse
+    public function antarPeriode(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getAntarPeriode($params);
+            $dto = $this->service->getAntarPeriode($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -88,7 +95,7 @@ class PembiayaanController extends Controller
 
     public function drillDown(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'sumber_biaya'    => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'jenjang'         => 'nullable|string|in:D3,D4',
@@ -98,9 +105,10 @@ class PembiayaanController extends Controller
             'page'            => 'nullable|integer|min:1',
             'per_page'        => 'nullable|integer|min:5|max:100',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getDrillDown($params);
+            $dto = $this->service->getDrillDown($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);

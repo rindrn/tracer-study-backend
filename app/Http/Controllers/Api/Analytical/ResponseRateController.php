@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Analytical;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\Analytical\Concerns\EnforcesProdiScope;
 use App\Services\Analytical\ResponseRateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,8 @@ use Illuminate\Http\Response;
 
 class ResponseRateController extends Controller
 {
+    use EnforcesProdiScope;
+
     public function __construct(
         private readonly ResponseRateService $service,
     ) {}
@@ -31,15 +34,16 @@ class ResponseRateController extends Controller
      */
     public function bar(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'nama_prodi'      => 'nullable|string|max:100',
             'graduation_year' => 'nullable|string|max:5',
             'sort'            => 'nullable|string|in:valueDesc,valueAsc,name',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getBar($params);
+            $dto = $this->service->getBar($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -59,14 +63,15 @@ class ResponseRateController extends Controller
      */
     public function pie(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'nama_prodi'      => 'nullable|string|max:100',
             'graduation_year' => 'nullable|string|max:5',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getPie($params);
+            $dto = $this->service->getPie($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -75,14 +80,15 @@ class ResponseRateController extends Controller
 
     public function trend(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => 'nullable|string|in:D3,D4',
             'nama_prodi'      => 'nullable|string|max:100',
             'graduation_year' => 'nullable|string|max:5',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getTrend($params);
+            $dto = $this->service->getTrend($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
@@ -91,7 +97,7 @@ class ResponseRateController extends Controller
 
     public function drillDown(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'status'          => 'required|string|in:belum_mengisi,on_going,selesai',
             'jenjang'         => 'nullable|string|in:D3,D4',
             'nama_prodi'      => 'nullable|string|max:100',
@@ -100,9 +106,10 @@ class ResponseRateController extends Controller
             'page'            => 'nullable|integer|min:1',
             'per_page'        => 'nullable|integer|min:5|max:100',
         ]);
-
+        $p = $this->scopedParams($request);
+ 
         try {
-            $dto = $this->service->getDrillDown($params);
+            $dto = $this->service->getDrillDown($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);

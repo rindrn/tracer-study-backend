@@ -55,8 +55,6 @@ class OlapLoadRepository
             ['nim' => $attributes['nim']],
             [
                 'nama'                         => $attributes['nama'],
-                'jenis_kelamin'                => $attributes['jenis_kelamin'],
-                'angkatan'                     => $attributes['angkatan'],
                 'tahun_lulus'                  => $attributes['tahun_lulus'],
                 'label_sumber_biaya_dipolban'  => $attributes['label_sumber_biaya_dipolban'] ?? null,
             ]
@@ -283,8 +281,7 @@ class OlapLoadRepository
         return $this->olap()->table('dim_ump')->where('tahun', $tahun)->where('nama_provinsi', $namaProvinsi)->first();
     }
 
-    // ───────────────── dim_indikator_evaluasi — Type 1, business key kode_field ─────────────────
-    public function upsertIndikatorEvaluasi(string $kodeField, string $labelPertanyaan, string $kategoriPertanyaan, string $jenisSkala): void
+    public function upsertIndikatorEvaluasi(string $kodeField, string $labelPertanyaan, string $kategoriPertanyaan, string $jenisSkala, string $grupGap): void
     {
         $this->olap()->table('dim_indikator_evaluasi')->updateOrInsert(
             ['kode_field' => $kodeField],
@@ -292,6 +289,7 @@ class OlapLoadRepository
                 'label_pertanyaan'    => $labelPertanyaan,
                 'kategori_pertanyaan' => $kategoriPertanyaan,
                 'jenis_skala'         => $jenisSkala,
+                'grup_gap'            => $grupGap,
             ]
         );
     }
