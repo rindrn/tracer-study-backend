@@ -67,8 +67,6 @@ return new class extends Migration
             $table->increments('id_alumni');
             $table->string('nim', 20)->unique();                // business key -- UNIQUE di OLTP
             $table->string('nama', 100)->nullable();
-            $table->integer('jenis_kelamin')->nullable();       // 1=Laki, 2=Perempuan (sesuai OLTP)
-            $table->string('angkatan', 5)->nullable();          // tahun masuk
             $table->string('tahun_lulus', 5)->nullable();       // dipakai lookup UMP untuk flag_above_ump
             $table->string('label_sumber_biaya_dipolban', 100)->nullable(); // label f1201 (single_choice)
         });
@@ -150,6 +148,7 @@ return new class extends Migration
             $table->string('label_pertanyaan', 255)->nullable(); // diperbesar dari 100 (rawan overflow)
             $table->string('kategori_pertanyaan', 50)->nullable(); // 'multi_select' | 'range_evaluasi'
             $table->string('jenis_skala', 50)->nullable();       // 'boolean' | 'likert_5' | dst
+            $table->string('grup_gap', 100)->nullable(); // kompetensi yang sama untuk gap analysis (f1761-f1774), atau group_code untuk f1601
         });
 
         // dim_perusahaan — SCD Type 2.

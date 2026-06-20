@@ -66,6 +66,7 @@ class IndikatorEvaluasiDimService
                 $resolved['label_pertanyaan'],
                 $resolved['kategori_pertanyaan'],
                 $resolved['jenis_skala'],
+                $resolved['grup_gap'],
             );
 
             $existingId === null ? $inserted++ : $updated++;
@@ -86,6 +87,9 @@ class IndikatorEvaluasiDimService
             'label_pertanyaan'    => $metadata['group_label'] ?? $row->question_text,
             'kategori_pertanyaan' => $this->deriveKategoriFromGroupCode($metadata['group_code']),
             'jenis_skala'         => 'multi_select',
+            // Boolean (AlasanKerjaTdkSesuai) tidak punya prefix "X — " di label,
+            // grup_gap diisi tetap "Alasan" untuk semua multi_select alasan.
+            'grup_gap'            => 'Alasan',
         ];
     }
 
@@ -100,10 +104,16 @@ class IndikatorEvaluasiDimService
         //   - MetodePembelajaran: ada 'method', tanpa dimension
         if (isset($metadata['competency'], $metadata['dimension'])) {
             $suffix = $metadata['dimension'] === 'saat_lulus' ? 'A' : 'B';
+            $labelPertanyaan = $metadata['competency'] . ' — ' . ($metadata['dimension'] === 'saat_lulus' ? 'dikuasai saat lulus' : 'dibutuhkan di pekerjaan');
             return [
-                'label_pertanyaan'    => $metadata['competency'] . ' — ' . ($metadata['dimension'] === 'saat_lulus' ? 'dikuasai saat lulus' : 'dibutuhkan di pekerjaan'),
+                'label_pertanyaan'    => $labelPertanyaan,
                 'kategori_pertanyaan' => "Kompetensi_{$suffix}",
                 'jenis_skala'         => 'range',
+                // grup_gap = bagian sebelum " — " di label_pertanyaan,
+                // contoh: "Etika — dikuasai saat lulus" → "Etika"
+                // Ini yang dipakai untuk menggabungkan Kompetensi_A dan
+                // Kompetensi_B dalam satu baris chart gap per kompetensi.
+                'grup_gap'            => $this->deriveGrupGap($labelPertanyaan, 'Kompetensi'),
             ];
         }
 
@@ -112,6 +122,9 @@ class IndikatorEvaluasiDimService
                 'label_pertanyaan'    => $metadata['method'],
                 'kategori_pertanyaan' => 'MetodePembelajaran',
                 'jenis_skala'         => 'range',
+                // MetodePembelajaran tidak punya prefix "X — " di label;
+                // grup_gap diisi "Metode" secara flat untuk semua metode.
+                'grup_gap'            => 'Metode',
             ];
         }
 
@@ -122,6 +135,7 @@ class IndikatorEvaluasiDimService
             'label_pertanyaan'    => $row->question_text,
             'kategori_pertanyaan' => 'Lainnya_Range',
             'jenis_skala'         => 'range',
+            'grup_gap'            => $this->deriveGrupGap($row->question_text, 'Lainnya'),
         ];
     }
 
@@ -140,5 +154,26 @@ class IndikatorEvaluasiDimService
                 ->replace(' ', '')
                 ->toString(),
         };
+    }
+
+    /**
+     * Derive grup_gap dari label_pertanyaan.
+     *
+     * Aturan: kalau label mengandung " — " (separator Kompetensi_A/B),
+     * ambil bagian SEBELUM separator itu sebagai grup — ini yang
+     * menyatukan "Etika — dikuasai saat lulus" (Kompetensi_A) dengan
+     * "Etika — dibutuhkan di pekerjaan" (Kompetensi_B) ke grup_gap
+     * yang sama ("Etika"), sehingga chart gap kompetensi bisa
+     * menampilkan dua bar berdampingan per kompetensi.
+     *
+     * Kalau tidak ada separator, gunakan $fallback (misal "Metode",
+     * "Alasan", atau "Lainnya" sesuai konteks pemanggil).
+     */
+    private function deriveGrupGap(string $labelPertanyaan, string $fallback): string
+    {
+        if (str_contains($labelPertanyaan, ' — ')) {
+            return trim(explode(' — ', $labelPertanyaan, 2)[0]);
+        }
+        return $fallback;
     }
 }
