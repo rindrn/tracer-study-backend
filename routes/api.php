@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\Analytical\PembiayaanController;
 use App\Http\Controllers\Api\Analytical\ResponseRateController;
 use App\Http\Controllers\Api\Analytical\SummaryController;
 use App\Http\Controllers\Api\Analytical\EducationSummaryController;
+use App\Http\Controllers\Api\Analytical\EmploymentSummaryController;
 
 
 // Controllers — DataPipeline (ETL)
@@ -261,5 +262,6 @@ Route::middleware("auth:sanctum")->group(function () {
 
     Route::get('dashboard/overview/summary', [SummaryController::class, 'summary']);
     Route::get('dashboard/education/summary',  [EducationSummaryController::class, 'summary']);
+    Route::get('dashboard/employment/summary', [EmploymentSummaryController::class, 'summary']);
 
 });

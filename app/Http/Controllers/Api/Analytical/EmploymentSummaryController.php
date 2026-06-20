@@ -3,32 +3,29 @@
 namespace App\Http\Controllers\Api\Analytical;
 
 use App\Http\Controllers\Controller;
-use App\Services\Analytical\EducationSummaryService;
+use App\Services\Analytical\EmploymentSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * EducationSummaryController
+ * EmploymentSummaryController
  *
- * Segmen: Summary Cards di Education Page (6 card di atas tabs KPI 9/10/11).
- * Source: Cube.js / OLAP — FactRangeEvaluasi (KPI 9, 10) + FactTracerStudy (KPI 11).
+ * Segmen: Summary Cards di Employment Page (6 card di atas tabs KPI 4-12).
+ * Source: Cube.js / OLAP — lewat EmploymentSummaryRepository yang reuse
+ * Repository KPI 4/5/6/7/8/12 yang sudah established.
  *
  * Route (di dalam auth:sanctum group):
- *
- *   GET /api/dashboard/education/summary
- *       → 6 card: Skor Kompetensi, Gap Terbesar, Metode Terbaik,
- *         Avg Persepsi, Mandiri/Keluarga, Beasiswa
- *
+ *   GET /api/dashboard/employment/summary
  */
-class EducationSummaryController extends Controller
+class EmploymentSummaryController extends Controller
 {
     public function __construct(
-        private readonly EducationSummaryService $service,
+        private readonly EmploymentSummaryService $service,
     ) {}
 
     /**
-     * GET /api/dashboard/education/summary
+     * GET /api/dashboard/employment/summary
      *
      * Query params (semua opsional):
      *   jenjang          string   D3 | D4
