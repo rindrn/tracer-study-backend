@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Analytical;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\Analytical\Concerns\EnforcesProdiScope;
 use App\Services\Analytical\WirausahaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,8 @@ use Illuminate\Http\Response;
 
 class WirausahaController extends Controller
 {
+    use EnforcesProdiScope;
+    
     public function __construct(
         private readonly WirausahaService $service,
     ) {}
