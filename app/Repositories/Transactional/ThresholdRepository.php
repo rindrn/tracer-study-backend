@@ -73,14 +73,22 @@ class ThresholdRepository
         $createdBy = auth()->id();
         $now       = now();
 
-        // Siapkan semua rows (baik + unggul per indicator)
+        // Ambil nama indikator dari DB sekaligus untuk semua indicator_id
+        $indicatorIds = array_unique(array_column($thresholds, 'indicator_id'));
+        $indicators = DB::connection('oltp')
+            ->table('threshold_indicators')
+            ->whereIn('id', $indicatorIds)
+            ->pluck('name', 'id'); // ['id' => 'name']
+
         $rows = [];
         foreach ($thresholds as $item) {
+            $name = $indicators[$item['indicator_id']] ?? null;
             $rows[] = [
                 'lam_version_id' => $lamVersionId,
                 'indicator_id'   => $item['indicator_id'],
                 'level'          => 'baik',
                 'value'          => $item['baik'],
+                'name'           => $name,
                 'created_by'     => $createdBy,
                 'created_at'     => $now,
                 'updated_at'     => $now,
@@ -90,16 +98,15 @@ class ThresholdRepository
                 'indicator_id'   => $item['indicator_id'],
                 'level'          => 'unggul',
                 'value'          => $item['unggul'],
+                'name'           => $name,
                 'created_by'     => $createdBy,
                 'created_at'     => $now,
                 'updated_at'     => $now,
             ];
         }
 
-        // Insert semua sekaligus dalam 1 query
         DB::connection('oltp')->table('thresholds')->insert($rows);
 
-        // Return hasil via view
         return $this->byVersion($lamVersionId);
     }
 
