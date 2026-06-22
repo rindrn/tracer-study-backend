@@ -238,7 +238,8 @@ class AlumniFactBuilderService
             // "memenuhi minimum UMP".
             $umpSk = null;
             $flagAboveUmp = null;
-            $takeHomePay = isset($resolved['f505']) ? (int) $resolved['f505'] : null;
+            $rawThp = isset($resolved['f505']) ? (int) $resolved['f505'] : null;
+            $takeHomePay = ($rawThp !== null && $rawThp >= 100000) ? $rawThp : null; // jika nilai 0 atau <100rb, dianggap tidak valid (bukan THP sebenarnya)
 
             if ($alumniRow !== null && $perusahaanSk !== null) {
                 $tahunLulus = (string) $alumniRow->graduation_year;
