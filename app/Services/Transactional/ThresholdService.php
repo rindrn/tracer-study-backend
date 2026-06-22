@@ -1,13 +1,21 @@
 <?php
+// app/Services/Transactional/ThresholdService.php
 namespace App\Services\Transactional;
 
 use App\DTOs\Transactional\ThresholdResponseDTO;
 use App\Exceptions\BusinessException;
 use App\Repositories\Transactional\ThresholdRepository;
 use App\Repositories\Transactional\LamVersionRepository;
+use App\Traits\WithCache;
+use Illuminate\Support\Facades\DB;
 
 class ThresholdService
 {
+    use WithCache;
+
+    private const TTL      = 1800;  // 30 menit — untuk data per-version/per-chart
+    private const TTL_META = 3600; // 1 jam  — untuk metadata indikator (jarang berubah)
+
     public function __construct(
         private readonly ThresholdRepository  $repo,
         private readonly LamVersionRepository $versionRepo,
@@ -44,32 +52,49 @@ class ThresholdService
         if (! $version) {
             throw new BusinessException("LAM Version ID {$lamVersionId} tidak ditemukan.", 404);
         }
-        $rows = $this->repo->byVersion($lamVersionId);
-        return $this->formatGroupedResponse($version, $rows);
+
+        return $this->remember("thresholds:by_version:{$lamVersionId}", function () use ($version, $lamVersionId) {
+            $rows = $this->repo->byVersion($lamVersionId);
+            return $this->formatGroupedResponse($version, $rows);
+        }, self::TTL);
     }
 
     public function create(array $validated): ThresholdResponseDTO
     {
-        // Cek duplikat (lam_version + indicator + level)
-        $existing = DB::connection('oltp')  // via constraint di DB sudah handle ini
-            ?? null; // Laravel akan throw QueryException jika duplicate, tangkap di Handler
-        return ThresholdResponseDTO::fromRow($this->repo->create($validated));
+        $result = ThresholdResponseDTO::fromRow($this->repo->create($validated));
+
+        $this->forget("thresholds:by_version:{$validated['lam_version_id']}");
+        $this->forgetTag('thresholds');
+
+        return $result;
     }
 
     public function update(int $id, array $validated): ThresholdResponseDTO
     {
-        if (! $this->repo->findById($id)) {
+        $existing = $this->repo->findById($id);
+        if (! $existing) {
             throw new BusinessException("Threshold ID {$id} tidak ditemukan.", 404);
         }
-        return ThresholdResponseDTO::fromRow($this->repo->update($id, $validated));
+
+        $result = ThresholdResponseDTO::fromRow($this->repo->update($id, $validated));
+
+        $this->forget("thresholds:by_version:{$existing->lam_version_id}");
+        $this->forgetTag('thresholds');
+
+        return $result;
     }
 
     public function delete(int $id): void
     {
-        if (! $this->repo->findById($id)) {
+        $existing = $this->repo->findById($id);
+        if (! $existing) {
             throw new BusinessException("Threshold ID {$id} tidak ditemukan.", 404);
         }
+
         $this->repo->delete($id);
+
+        $this->forget("thresholds:by_version:{$existing->lam_version_id}");
+        $this->forgetTag('thresholds');
     }
 
     public function bulkCreate(int $lamVersionId, array $validated): array
@@ -79,9 +104,14 @@ class ThresholdService
             throw new BusinessException("LAM Version ID {$lamVersionId} tidak ditemukan.", 404);
         }
 
-        $rows = $this->repo->bulkCreate($lamVersionId, $validated['thresholds']);
+        $rows   = $this->repo->bulkCreate($lamVersionId, $validated['thresholds']);
+        $result = $this->formatGroupedResponse($version, $rows);
 
-        return $this->formatGroupedResponse($version, $rows);
+        // Bust semua cache yang berkaitan
+        $this->forget("thresholds:by_version:{$lamVersionId}");
+        $this->forgetTag('thresholds', 'lams');
+
+        return $result;
     }
 
     public function bulkUpdate(int $lamVersionId, array $validated): array
@@ -93,12 +123,92 @@ class ThresholdService
 
         $this->repo->bulkUpdate($validated['thresholds']);
 
-        // Re-fetch untuk response terbaru
-        $rows = $this->repo->byVersion($lamVersionId);
-        return $this->formatGroupedResponse($version, $rows);
+        $rows   = $this->repo->byVersion($lamVersionId);
+        $result = $this->formatGroupedResponse($version, $rows);
+
+        $this->forget("thresholds:by_version:{$lamVersionId}");
+        $this->forgetTag('thresholds', 'lams');
+
+        return $result;
     }
 
-    // Private helper: hindari duplikasi logic grouped response
+    public function forChart(?int $prodiId, string $indicatorKey): array
+    {
+        $key = 'thresholds:chart:' . ($prodiId ?? 'all') . ':' . $indicatorKey;
+
+        return $this->remember($key, function () use ($prodiId, $indicatorKey) {
+            return $this->doForChart($prodiId, $indicatorKey);
+        }, self::TTL);
+    }
+
+    // ── Private helpers ───────────────────────────────────────
+
+    private function doForChart(?int $prodiId, string $indicatorKey): array
+    {
+        if (! $prodiId) {
+            return [
+                'context'   => 'all_prodi',
+                'lam'       => null,
+                'indicator' => $this->resolveIndicatorMeta($indicatorKey),
+                'versions'  => [],
+            ];
+        }
+
+        $result = $this->repo->byProdiAndIndicator($prodiId, $indicatorKey);
+
+        // Prodi tidak punya LAM
+        if (! $result) {
+            return [
+                'context'   => 'prodi',
+                'lam'       => null,
+                'indicator' => $this->resolveIndicatorMeta($indicatorKey),
+                'versions'  => [],
+            ];
+        }
+
+        // Group rows per version
+        $versions = collect($result->rows)
+            ->groupBy('version_id')
+            ->map(function ($items) use ($result) {
+                $first      = $items->first();
+                $thresholds = [];
+                foreach ($items as $item) {
+                    $thresholds[$item->threshold_level] = [
+                        'threshold_id' => $item->threshold_id,
+                        'value'        => (float) $item->threshold_value,
+                    ];
+                }
+                return [
+                    'id'           => $first->version_id,
+                    'year'         => $first->year,
+                    'version_name' => $first->version_name,
+                    'label'        => $result->lam->lam_name . ' ' . $first->year,
+                    'is_active'    => (bool) $first->is_active,
+                    'thresholds'   => $thresholds,
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        $firstRow = $result->rows->first();
+
+        return [
+            'context'   => 'prodi',
+            'lam'       => [
+                'id'   => $result->lam->lam_id,
+                'name' => $result->lam->lam_name,
+                'code' => $result->lam->lam_code,
+            ],
+            'indicator' => [
+                'key'      => $firstRow->indicator_key,
+                'name'     => $firstRow->indicator_name,
+                'unit'     => $firstRow->indicator_unit,
+                'operator' => $firstRow->indicator_operator,
+            ],
+            'versions' => $versions,
+        ];
+    }
+
     private function formatGroupedResponse(object $version, \Illuminate\Support\Collection $rows): array
     {
         $grouped = $rows->groupBy('indicator_id')
@@ -129,89 +239,22 @@ class ThresholdService
         ];
     }
 
-    public function forChart(?int $prodiId, string $indicatorKey): array
-    {
-        // Mode agregasi semua prodi
-        if (! $prodiId) {
-            return [
-                'context'   => 'all_prodi',
-                'lam'       => null,
-                'indicator' => $this->resolveIndicatorMeta($indicatorKey),
-                'versions'  => [],
-            ];
-        }
-
-        $result = $this->repo->byProdiAndIndicator($prodiId, $indicatorKey);
-
-        // Prodi tidak punya LAM
-        if (! $result) {
-            return [
-                'context'   => 'prodi',
-                'lam'       => null,
-                'indicator' => $this->resolveIndicatorMeta($indicatorKey),
-                'versions'  => [],
-            ];
-        }
-
-        // Group rows per version
-        $versions = collect($result->rows)
-            ->groupBy('version_id')
-            ->map(function ($items) use ($result) {
-                $first = $items->first();
-                $thresholds = [];
-                foreach ($items as $item) {
-                    $thresholds[$item->threshold_level] = [
-                        'threshold_id' => $item->threshold_id,
-                        'value'        => (float) $item->threshold_value,
-                    ];
-                }
-                return [
-                    'id'         => $first->version_id,
-                    'year'       => $first->year,
-                    'version_name' => $first->version_name,
-                    'label'      => $result->lam->lam_name . ' ' . $first->year,
-                    'is_active'  => (bool) $first->is_active,
-                    'thresholds' => $thresholds,
-                ];
-            })
-            ->values()
-            ->toArray();
-
-        $firstRow = $result->rows->first();
-
-        return [
-            'context'   => 'prodi',
-            'lam'       => [
-                'id'   => $result->lam->lam_id,
-                'name' => $result->lam->lam_name,
-                'code' => $result->lam->lam_code,
-            ],
-            'indicator' => [
-                'key'      => $firstRow->indicator_key,
-                'name'     => $firstRow->indicator_name,
-                'unit'     => $firstRow->indicator_unit,
-                'operator' => $firstRow->indicator_operator,
-            ],
-            'versions' => $versions,
-        ];
-    }
-
     private function resolveIndicatorMeta(string $key): array
     {
-        // Untuk mode all_prodi, tetap kembalikan metadata indicator
-        // agar FE bisa tahu unit/operator-nya
-        $row = DB::connection('oltp')
-            ->table('threshold_indicators')
-            ->where('key', $key)
-            ->first();
+        return $this->remember("threshold_indicators:meta:{$key}", function () use ($key) {
+            $row = DB::connection('oltp')
+                ->table('threshold_indicators')
+                ->where('key', $key)
+                ->first();
 
-        if (! $row) return ['key' => $key, 'name' => null, 'unit' => null, 'operator' => null];
+            if (! $row) return ['key' => $key, 'name' => null, 'unit' => null, 'operator' => null];
 
-        return [
-            'key'      => $row->key,
-            'name'     => $row->name,
-            'unit'     => $row->unit,
-            'operator' => $row->operator,
-        ];
+            return [
+                'key'      => $row->key,
+                'name'     => $row->name,
+                'unit'     => $row->unit,
+                'operator' => $row->operator,
+            ];
+        }, self::TTL_META);
     }
 }
