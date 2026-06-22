@@ -5,9 +5,12 @@ namespace App\Services\Transactional;
 use App\Exceptions\BusinessException;
 use App\Repositories\Transactional\LamProgramRepository;
 use App\Repositories\Transactional\LamRepository;
+use App\Traits\WithCache;
 
 class LamProgramService
 {
+    use WithCache;
+
     public function __construct(
         private readonly LamProgramRepository $repo,
         private readonly LamRepository        $lamRepo,
@@ -31,6 +34,10 @@ class LamProgramService
 
         $this->repo->syncAdd($data['lam_id'], $data['program_ids']);
 
+        // Bust cache LAM karena relasi programs berubah
+        $this->forget("lams:show:{$data['lam_id']}");
+        $this->forgetTag('lams');
+
         return [
             'lam'      => ['id' => $lam->id, 'name' => $lam->name],
             'programs' => $this->repo->byLam($data['lam_id'])->toArray(),
@@ -43,5 +50,9 @@ class LamProgramService
         if (! $lam) throw new BusinessException("LAM ID {$data['lam_id']} tidak ditemukan.", 404);
 
         $this->repo->detach($data['lam_id'], $data['program_id']);
+
+        // Bust cache LAM karena relasi programs berubah
+        $this->forget("lams:show:{$data['lam_id']}");
+        $this->forgetTag('lams');
     }
 }

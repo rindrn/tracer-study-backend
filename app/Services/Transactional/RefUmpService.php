@@ -14,11 +14,16 @@ namespace App\Services\Transactional;
 use App\DTOs\Transactional\UmpRowDTO;
 use App\Exceptions\BusinessException;
 use App\Repositories\Transactional\RefUmpRepository;
+use App\Traits\WithCache;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 
 class RefUmpService
 {
+    use WithCache;
+
+    private const TTL = 1800; // 30 menit
+
     public function __construct(
         private readonly RefUmpRepository $repo,
         private readonly UmpBpsService    $bpsService,
@@ -30,64 +35,47 @@ class RefUmpService
     /** Tahun yang sudah punya data UMP */
     public function availableYears(): array
     {
-        return $this->repo->availableYears();
+        return $this->remember('ump:years', function () {
+            return $this->repo->availableYears();
+        }, self::TTL);
     }
 
-    /**
-     * Data UMP untuk satu tahun.
-     * Kalau tahun belum ada di DB → return 34 baris kosong (provinsi dari master).
-     *
-     * @return array{
-     *     tahun: int,
-     *     sudah_tersimpan: bool,
-     *     rows: array
-     * }
-     */
     public function getByTahun(int $tahun): array
     {
-        $saved = $this->repo->byTahun($tahun);
+        return $this->remember("ump:tahun:{$tahun}", function () use ($tahun) {
+            $saved = $this->repo->byTahun($tahun);
 
-        if ($saved->isEmpty()) {
-            // Tahun baru — kembalikan baris kosong dari master provinsi
-            $rows = $this->repo->allProvinces()->map(
-                fn($p) => UmpRowDTO::preview(
-                    tahun:        $tahun,
-                    idProvinsi:   $p->id,
-                    namaProvinsi: $p->name,
-                    nilaiUmp:     null,
-                    sumber:       'KOSONG',
-                )->toArray()
-            );
+            if ($saved->isEmpty()) {
+                $rows = $this->repo->allProvinces()->map(
+                    fn($p) => UmpRowDTO::preview(
+                        tahun:        $tahun,
+                        idProvinsi:   $p->id,
+                        namaProvinsi: $p->name,
+                        nilaiUmp:     null,
+                        sumber:       'KOSONG',
+                    )->toArray()
+                );
+
+                return [
+                    'tahun'           => $tahun,
+                    'sudah_tersimpan' => false,
+                    'rows'            => $rows->values()->toArray(),
+                ];
+            }
 
             return [
-                'tahun'          => $tahun,
-                'sudah_tersimpan'=> false,
-                'rows'           => $rows->values()->toArray(),
+                'tahun'           => $tahun,
+                'sudah_tersimpan' => true,
+                'rows'            => $saved->map(
+                    fn($r) => UmpRowDTO::fromModel($r)->toArray()
+                )->values()->toArray(),
             ];
-        }
-
-        return [
-            'tahun'          => $tahun,
-            'sudah_tersimpan'=> true,
-            'rows'           => $saved->map(
-                fn($r) => UmpRowDTO::fromModel($r)->toArray()
-            )->values()->toArray(),
-        ];
+        }, self::TTL);
     }
 
     // ── FETCH BPS ─────────────────────────────────────────────
+    // Preview tidak di-cache — hasilnya fresh dari BPS setiap kali dipanggil
 
-    /**
-     * Fetch UMP dari BPS dan return preview (belum simpan).
-     * FE menampilkan preview → admin review → kirim ke bulkSave.
-     *
-     * @return array{
-     *     tahun: int,
-     *     ok_count: int,
-     *     fail_count: int,
-     *     rows: array
-     * }
-     */
     public function previewBps(int $tahun): array
     {
         $rows = $this->bpsService->previewByTahun($tahun);
@@ -101,17 +89,8 @@ class RefUmpService
     }
 
     // ── IMPORT EXCEL ──────────────────────────────────────────
+    // Preview import juga tidak di-cache — file beda setiap upload
 
-    /**
-     * Parse file Excel/CSV dan return preview (belum simpan).
-     *
-     * @return array{
-     *     tahun: int|null,
-     *     ok_count: int,
-     *     unrecognized: string[],
-     *     rows: array
-     * }
-     */
     public function previewImport(UploadedFile $file): array
     {
         $result = $this->importService->parseFile($file);
@@ -147,9 +126,8 @@ class RefUmpService
 
         // Lookup provinsi untuk validasi id_provinsi dan ambil nama_provinsi
         $provinces = $this->repo->allProvinces()->keyBy('id');
-
-        $prepared = [];
-        $skipped  = 0;
+        $prepared  = [];
+        $skipped   = 0;
 
         foreach ($rows as $row) {
             $idProvinsi = (int) ($row['id_provinsi'] ?? 0);
@@ -157,11 +135,7 @@ class RefUmpService
                 ? (int) $row['nilai_ump']
                 : null;
 
-            // Skip kalau nilai kosong
-            if ($nilaiUmp === null) {
-                $skipped++;
-                continue;
-            }
+            if ($nilaiUmp === null) { $skipped++; continue; }
 
             // Validasi id_provinsi ada di master
             $province = $provinces->get($idProvinsi);
@@ -172,21 +146,23 @@ class RefUmpService
             // Validasi nilai masuk akal (min 500rb, max 50jt)
             if ($nilaiUmp < 500_000 || $nilaiUmp > 50_000_000) {
                 throw new BusinessException(
-                    "Nilai UMP untuk {$province->name} tidak masuk akal: Rp " . number_format($nilaiUmp),
-                    422
+                    "Nilai UMP untuk {$province->name} tidak masuk akal: Rp " . number_format($nilaiUmp), 422
                 );
             }
 
             $prepared[] = [
                 'tahun'         => $tahun,
                 'id_provinsi'   => $idProvinsi,
-                'nama_provinsi' => $province->name,  // selalu dari master
+                'nama_provinsi' => $province->name,
                 'nilai_ump'     => $nilaiUmp,
                 'sumber'        => $row['sumber'] ?? 'MANUAL',
             ];
         }
 
         $savedCount = $this->repo->bulkUpsert($prepared);
+
+        // Bust cache tahun ini dan daftar tahun
+        $this->forget("ump:tahun:{$tahun}", 'ump:years');
 
         return [
             'tahun'         => $tahun,
@@ -222,6 +198,9 @@ class RefUmpService
             nilaiUmp:     $nilaiUmp,
             sumber:       'MANUAL',
         );
+
+        // Bust cache data tahun ini
+        $this->forget("ump:tahun:{$tahun}");
 
         return UmpRowDTO::fromModel($saved);
     }
