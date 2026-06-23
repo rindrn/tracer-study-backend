@@ -6,7 +6,6 @@ use App\DTOs\Analytical\Kesesuaian\KesesuaianBarDTO;
 use App\DTOs\Analytical\Kesesuaian\KesesuaianPieDTO;
 use App\DTOs\Analytical\Kesesuaian\KesesuaianAlasanDTO;
 use App\DTOs\Analytical\Kesesuaian\KesesuaianDrillDownDTO;
-use App\DTOs\Analytical\Kesesuaian\KesesuaianBandingkanDTO;
 use App\Repositories\Analytical\KesesuaianRepository;
 
 class KesesuaianService
@@ -89,71 +88,45 @@ class KesesuaianService
         );
     }
 
-    public function getBandingkan(array $params): KesesuaianBandingkanDTO
-    {
-        $prodiFilter = $params['prodi'] ?? [];
-        if (is_string($prodiFilter)) {
-            $prodiFilter = [$prodiFilter];
-        }
-
-        $raw = $this->repo->getBandingkanData(
-            prodiFilter:    $prodiFilter,
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
-
-        $data      = $this->reshapeBandingkan($raw);
-        $prodiList = array_column($data, 'nama_prodi');
-
-        return new KesesuaianBandingkanDTO(
-            data:      $data,
-            prodiList: array_values(array_unique($prodiList)),
-            filters:   $this->activeFilters($params),
-        );
-    }
-
-    private function reshapeBandingkan(\Illuminate\Support\Collection $raw): array
-    {
-        $grouped = $raw->groupBy('nama_prodi');
-        $data    = [];
-
-        foreach ($grouped as $namaProdi => $rows) {
-            $first = $rows->first();
-            $total = $rows->sum('count_alumni');
-            $sesuai = $rows->sum('count_sesuai_bidang');
-            $tidakSesuai = $rows->sum('count_tidak_sesuai_bidang');
-
-            $breakdown = $rows->map(function ($r) {
-                $t = $r['count_alumni'];
-
-                return [
-                    'tahun_lulus'      => $r['tahun_lulus'],
-                    'count_alumni'     => $t,
-                    'pct_sesuai'       => $t > 0 ? round($r['count_sesuai_bidang']       / $t * 100, 1) : 0.0,
-                    'pct_tidak_sesuai' => $t > 0 ? round($r['count_tidak_sesuai_bidang'] / $t * 100, 1) : 0.0,
-                ];
-            })->sortBy('tahun_lulus')->values()->toArray();
-
-            $data[] = [
-                'nama_prodi'       => $namaProdi,
-                'jenjang'          => $first['jenjang'],
-                'total'            => $total,
-                'pct_sesuai'       => $total > 0 ? round($sesuai       / $total * 100, 1) : 0.0,
-                'pct_tidak_sesuai' => $total > 0 ? round($tidakSesuai / $total * 100, 1) : 0.0,
-                'breakdown'        => $breakdown,
-            ];
-        }
-
-        return $data;
-    }
-
     public function getDrillDown(array $params): KesesuaianDrillDownDTO
     {
-        $page         = max(1, (int) ($params['page']          ?? 1));
-        $perPage      = min(100, max(5, (int) ($params['per_page'] ?? 15)));
-        $kesesuaianSk = (int) $params['kesesuaian_sk'];
+        $page            = max(1, (int) ($params['page']     ?? 1));
+        $perPage         = min(100, max(5, (int) ($params['per_page'] ?? 15)));
+        $kesesuaianSk    = isset($params['kesesuaian_sk'])    && $params['kesesuaian_sk']    !== ''
+            ? (int) $params['kesesuaian_sk'] : null;
+        $labelPertanyaan = isset($params['label_pertanyaan']) && $params['label_pertanyaan'] !== ''
+            ? $params['label_pertanyaan'] : null;
+
+        if ($labelPertanyaan !== null) {
+            // Mode alasan: dari chart alasan kerja tidak sesuai (FactMultiSelect)
+            $result = $this->repo->getDetailAlumniByAlasan(
+                labelPertanyaan: $labelPertanyaan,
+                jenjang:         $params['jenjang']         ?? null,
+                namaProdi:       $params['nama_prodi']      ?? null,
+                tahunLulus:      $params['tahun_lulus']     ?? null,
+                mingguSnapshot:  $params['minggu_snapshot'] ?? null,
+                search:          $params['search']          ?? null,
+                page:            $page,
+                perPage:         $perPage,
+            );
+
+            return new KesesuaianDrillDownDTO(
+                data:            $result['data'],
+                kesesuaianSk:    null,
+                kesesuaianLabel: null,
+                labelPertanyaan: $labelPertanyaan,
+                page:            $page,
+                perPage:         $perPage,
+                totalOnPage:     $result['total_on_page'],
+                filters:         $this->activeFilters(
+                    array_merge($params, ['label_pertanyaan' => $labelPertanyaan]),
+                    ['label_pertanyaan', 'jenjang', 'nama_prodi', 'tahun_lulus', 'minggu_snapshot'],
+                ),
+            );
+        }
+
+        // Mode kesesuaian: dari chart kesesuaian bidang (FactTracerStudy)
+        $kesesuaianSk = $kesesuaianSk ?? 1;
 
         $result = $this->repo->getDetailAlumni(
             kesesuaianSk:   $kesesuaianSk,
@@ -170,6 +143,7 @@ class KesesuaianService
             data:            $result['data'],
             kesesuaianSk:    $kesesuaianSk,
             kesesuaianLabel: $this->skToLabel($kesesuaianSk),
+            labelPertanyaan: null,
             page:            $page,
             perPage:         $perPage,
             totalOnPage:     $result['total_on_page'],
@@ -178,7 +152,6 @@ class KesesuaianService
             ]),
         );
     }
-
     private function skToLabel(int $sk): string
     {
         return match ($sk) {
