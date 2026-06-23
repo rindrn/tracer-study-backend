@@ -112,6 +112,10 @@ class KompetensiGapService
             // Ambil label dari salah satu (harusnya sama)
             $label = $rowA['label'] ?? $rowB['label'] ?? '';
 
+            $kodeField = $rowA['kode_field']
+                ?? $rowB['kode_field']
+                ?? '';
+
             $skorLulus      = isset($rowA) ? round($rowA['avg_skor'], 2) : null;
             $skorDibutuhkan = isset($rowB) ? round($rowB['avg_skor'], 2) : null;
 
@@ -124,6 +128,7 @@ class KompetensiGapService
             $count = $rowA['count'] ?? $rowB['count'] ?? 0;
 
             return [
+                'kode_field'      => $kodeField,
                 'grup_gap'        => $grupGap,
                 'label'           => $label,
                 'skor_lulus'      => $skorLulus,
