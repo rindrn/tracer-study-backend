@@ -30,9 +30,9 @@ class ResponseRateRepository
                 'p.name as nama_prodi',
                 'p.degree as jenjang',
                 DB::raw('COUNT(ap.id) as total'),
-                DB::raw("SUM(CASE WHEN r.submitted_at IS NOT NULL THEN 1 ELSE 0 END) as count_selesai"),
-                DB::raw("SUM(CASE WHEN r.submitted_at IS NULL AND r.status = 'started' THEN 1 ELSE 0 END) as count_on_going"),
-                DB::raw("SUM(CASE WHEN r.submitted_at IS NULL AND (r.status IS NULL OR r.status != 'started') THEN 1 ELSE 0 END) as count_belum_mengisi"),
+                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_selesai"),
+                DB::raw("SUM(CASE WHEN r.status = 'ongoing' THEN 1 ELSE 0 END) as count_on_going"),
+                DB::raw("SUM(CASE WHEN r.status = 'started' OR r.status IS NULL THEN 1 ELSE 0 END) as count_belum_mengisi"),
             ])
             ->groupBy('p.id', 'p.name', 'p.degree');
 
@@ -68,9 +68,9 @@ class ResponseRateRepository
             ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
             ->select([
                 DB::raw('COUNT(ap.id) as total'),
-                DB::raw("SUM(CASE WHEN r.submitted_at IS NOT NULL THEN 1 ELSE 0 END) as count_selesai"),
-                DB::raw("SUM(CASE WHEN r.submitted_at IS NULL AND r.status = 'started' THEN 1 ELSE 0 END) as count_on_going"),
-                DB::raw("SUM(CASE WHEN r.submitted_at IS NULL AND (r.status IS NULL OR r.status != 'started') THEN 1 ELSE 0 END) as count_belum_mengisi"),
+                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_selesai"),
+                DB::raw("SUM(CASE WHEN r.status = 'ongoing' THEN 1 ELSE 0 END) as count_on_going"),
+                DB::raw("SUM(CASE WHEN r.status = 'started' OR r.status IS NULL THEN 1 ELSE 0 END) as count_belum_mengisi"),
             ]);
 
         $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
@@ -90,10 +90,10 @@ class ResponseRateRepository
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Hitung response rate (% sudah merespons = on_going + selesai) per
-     * graduation_year, untuk chart tren antar periode.
+     * Hitung response rate (% sudah submit) per graduation_year,
+     * untuk chart tren antar periode.
      *
-     * @return Collection<array{graduation_year, total, count_responded, count_selesai, count_on_going, count_belum_mengisi}>
+     * @return Collection<array{graduation_year, total, count_selesai, count_on_going, count_belum_mengisi}>
      */
     public function getTrendData(
         ?string $jenjang         = null,
@@ -106,9 +106,9 @@ class ResponseRateRepository
             ->select([
                 'ap.graduation_year as graduation_year',
                 DB::raw('COUNT(ap.id) as total'),
-                DB::raw("SUM(CASE WHEN r.submitted_at IS NOT NULL THEN 1 ELSE 0 END) as count_selesai"),
-                DB::raw("SUM(CASE WHEN r.submitted_at IS NULL AND r.status = 'started' THEN 1 ELSE 0 END) as count_on_going"),
-                DB::raw("SUM(CASE WHEN r.submitted_at IS NULL AND (r.status IS NULL OR r.status != 'started') THEN 1 ELSE 0 END) as count_belum_mengisi"),
+                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_selesai"),
+                DB::raw("SUM(CASE WHEN r.status = 'ongoing' THEN 1 ELSE 0 END) as count_on_going"),
+                DB::raw("SUM(CASE WHEN r.status = 'started' OR r.status IS NULL THEN 1 ELSE 0 END) as count_belum_mengisi"),
             ])
             ->groupBy('ap.graduation_year');
 
@@ -168,7 +168,6 @@ class ResponseRateRepository
             });
         }
 
-        // Hitung total sebelum pagination
         $totalCount = $query->clone()->count();
 
         $rows = $query
@@ -178,14 +177,14 @@ class ResponseRateRepository
             ->get();
 
         $data = collect($rows)->map(fn($r) => [
-            'nama'             => $r->nama,
-            'nim'              => $r->nim,
-            'nama_prodi'       => $r->nama_prodi,
-            'jenjang'          => $r->jenjang,
-            'graduation_year'  => $r->graduation_year,
-            'status'           => $this->resolveStatusLabel($r->raw_status, $r->submitted_at),
-            'started_at'       => $r->started_at,
-            'submitted_at'     => $r->submitted_at,
+            'nama'            => $r->nama,
+            'nim'             => $r->nim,
+            'nama_prodi'      => $r->nama_prodi,
+            'jenjang'         => $r->jenjang,
+            'graduation_year' => $r->graduation_year,
+            'status'          => $this->resolveStatusLabel($r->raw_status),
+            'started_at'      => $r->started_at,
+            'submitted_at'    => $r->submitted_at,
         ])->toArray();
 
         return [
@@ -225,42 +224,30 @@ class ResponseRateRepository
 
     /**
      * Terapkan filter WHERE sesuai status yang diminta.
-     * submitted_at adalah pivot utama; status='started' hanya pembeda
-     * antara belum_mengisi vs on_going untuk yang belum submit.
+     * Murni berdasarkan nilai kolom r.status.
      */
     private function applyStatusFilter($query, string $status)
     {
         return match ($status) {
-            'selesai' => $query->whereNotNull('r.submitted_at'),
-
-            'on_going' => $query
-                ->whereNull('r.submitted_at')
-                ->where('r.status', 'started'),
-
-            'belum_mengisi' => $query
-                ->whereNull('r.submitted_at')
-                ->where(function ($q) {
-                    $q->whereNull('r.status')
-                      ->orWhere('r.status', '!=', 'started');
-                }),
-
+            'selesai'       => $query->where('r.status', 'submitted'),
+            'on_going'      => $query->where('r.status', 'ongoing'),
+            'belum_mengisi' => $query->where(function ($q) {
+                                   $q->where('r.status', 'started')
+                                     ->orWhereNull('r.status');
+                               }),
             default => $query,
         };
     }
 
     /**
-     * Resolve label status manusiawi dari raw_status + submitted_at.
+     * Resolve label status manusiawi dari nilai kolom r.status.
      */
-    private function resolveStatusLabel(?string $rawStatus, ?string $submittedAt): string
+    private function resolveStatusLabel(?string $rawStatus): string
     {
-        if ($submittedAt !== null) {
-            return 'Selesai';
-        }
-
-        if ($rawStatus === 'started') {
-            return 'On Going';
-        }
-
-        return 'Belum Mengisi';
+        return match ($rawStatus) {
+            'submitted' => 'Selesai',
+            'ongoing'   => 'On Going',
+            default     => 'Belum Mengisi', // 'started' atau null
+        };
     }
 }
