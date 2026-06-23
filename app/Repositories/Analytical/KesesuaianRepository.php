@@ -148,7 +148,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
      * @return array{data: array, page: int, per_page: int, total_on_page: int}
      */
     public function getDetailAlumni(
-        int     $kesesuaianSk,
+        ?string $labelKesesuaian,
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
@@ -164,9 +164,9 @@ class KesesuaianRepository extends BaseAnalyticalRepository
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
             ),
-            [['member'   => 'FactTracerStudy.kesesuaian_bidang_sk',
+            [['member'   => 'DimKesesuaianBidang.label',
               'operator' => 'equals',
-              'values'   => [(string) $kesesuaianSk]]],
+              'values'   => [$labelKesesuaian]]],
         );
 
         if ($search !== null && $search !== '') {

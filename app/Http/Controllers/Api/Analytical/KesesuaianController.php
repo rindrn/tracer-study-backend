@@ -75,7 +75,7 @@ class KesesuaianController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'kesesuaian_sk'    => 'nullable|integer|min:1|max:5',
+            'kesesuaian_label'    => 'nullable|string',
             'label_pertanyaan' => 'nullable|string|max:500',
             'jenjang'          => 'nullable|string|in:D3,D4',
             'nama_prodi'       => 'nullable|string|max:100',
@@ -88,7 +88,7 @@ class KesesuaianController extends Controller
 
         // scopedParams() hanya meneruskan global filters — params spesifik diambil langsung
         $p = array_merge($this->scopedParams($request), [
-            'kesesuaian_sk'    => $request->input('kesesuaian_sk'),
+            'kesesuaian_label'    => $request->input('kesesuaian_label'),
             'label_pertanyaan' => $request->input('label_pertanyaan'),
             'search'           => $request->input('search'),
             'page'             => $request->input('page'),

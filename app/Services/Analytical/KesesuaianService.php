@@ -92,8 +92,8 @@ class KesesuaianService
     {
         $page            = max(1, (int) ($params['page']     ?? 1));
         $perPage         = min(100, max(5, (int) ($params['per_page'] ?? 15)));
-        $kesesuaianSk    = isset($params['kesesuaian_sk'])    && $params['kesesuaian_sk']    !== ''
-            ? (int) $params['kesesuaian_sk'] : null;
+        $labelKesesuaian = isset($params['kesesuaian_label'])    && $params['kesesuaian_label']    !== ''
+            ? $params['kesesuaian_label'] : null;
         $labelPertanyaan = isset($params['label_pertanyaan']) && $params['label_pertanyaan'] !== ''
             ? $params['label_pertanyaan'] : null;
 
@@ -126,10 +126,10 @@ class KesesuaianService
         }
 
         // Mode kesesuaian: dari chart kesesuaian bidang (FactTracerStudy)
-        $kesesuaianSk = $kesesuaianSk ?? 1;
+        $labelKesesuaian = $labelKesesuaian ?? 1;
 
         $result = $this->repo->getDetailAlumni(
-            kesesuaianSk:   $kesesuaianSk,
+            labelKesesuaian: $labelKesesuaian,
             jenjang:        $params['jenjang']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
             tahunLulus:     $params['tahun_lulus']     ?? null,
@@ -141,8 +141,8 @@ class KesesuaianService
 
         return new KesesuaianDrillDownDTO(
             data:            $result['data'],
-            kesesuaianSk:    $kesesuaianSk,
-            kesesuaianLabel: $this->skToLabel($kesesuaianSk),
+            kesesuaianSk:    null,
+            kesesuaianLabel: $labelKesesuaian,
             labelPertanyaan: null,
             page:            $page,
             perPage:         $perPage,
@@ -151,17 +151,6 @@ class KesesuaianService
                 'jenjang', 'nama_prodi', 'tahun_lulus', 'minggu_snapshot',
             ]),
         );
-    }
-    private function skToLabel(int $sk): string
-    {
-        return match ($sk) {
-            1 => 'Sangat Erat',
-            2 => 'Erat',
-            3 => 'Cukup Erat',
-            4 => 'Kurang Erat',
-            5 => 'Tidak Sama Sekali',
-            default => 'Tidak Diketahui',
-        };
     }
 
     private function activeFilters(array $params, array $keys = []): array
