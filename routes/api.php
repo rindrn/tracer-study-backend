@@ -240,6 +240,7 @@ Route::middleware("auth:sanctum")->group(function () {
     Route::prefix('dashboard/kompetensi')->group(function () {
         Route::get('gap',            [KompetensiGapController::class, 'gap']);
         Route::get('gap/bandingkan', [KompetensiGapController::class, 'bandingkan']);
+        Route::get('gap/drill-down', [KompetensiGapController::class, 'drillDown']);
         Route::get('metode',            [MetodePembelajaranController::class, 'metode']);
         Route::get('metode/bandingkan', [MetodePembelajaranController::class, 'bandingkan']);
     });

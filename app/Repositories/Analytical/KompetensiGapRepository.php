@@ -131,4 +131,101 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
             'count'       => (int)   ($r['FactRangeEvaluasi.count']         ?? 0),
         ]);
     }
+
+    /**
+     * Drill-down: data individual alumni per indikator yang diklik.
+     * TIDAK pakai pre-agg — query ke FactRangeEvaluasi raw.
+     *
+     * Setiap alumni punya 2 baris (Kompetensi_A & Kompetensi_B) per kode_field.
+     * Query ambil kedua kategori sekaligus, lalu join per alumni di PHP
+     * untuk dapat skor_lulus + skor_dibutuhkan berdampingan.
+     *
+     * @return array{data: array, page: int, per_page: int, total_on_page: int}
+     */
+    public function getDetailAlumni(
+        string  $kodeField,
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $namaProdi      = null,
+        ?string $tahunLulus     = null,
+        ?string $mingguSnapshot = null,
+        ?string $search         = null,
+        int     $page           = 1,
+        int     $perPage        = 15,
+    ): array {
+        $filters = array_merge(
+            $this->buildGlobalFilters(
+                jenjang:        $jenjang,
+                jurusan:        $jurusan,
+                namaProdi:      $namaProdi,
+                tahunLulus:     $tahunLulus,
+                mingguSnapshot: $mingguSnapshot,
+            ),
+            [
+                [
+                    'member'   => 'DimIndikatorEvaluasi.kode_field',
+                    'operator' => 'equals',
+                    'values'   => [$kodeField],
+                ],
+                self::FILTER_KATEGORI,
+            ],
+        );
+
+        if ($search !== null && $search !== '') {
+            $filters[] = [
+                'member'   => 'DimAlumni.nama',
+                'operator' => 'contains',
+                'values'   => [$search],
+            ];
+        }
+
+        $result = $this->cube->load([
+            'measures'   => ['FactRangeEvaluasi.avg_skor'],
+            'dimensions' => [
+                'DimAlumni.nama',
+                'DimAlumni.nim',
+                'DimProdi.nama_prodi',
+                'DimProdi.jenjang',
+                'DimAlumni.tahun_lulus',
+                'DimIndikatorEvaluasi.kategori_pertanyaan',
+                'DimIndikatorEvaluasi.kode_field',
+            ],
+            'filters' => $filters,
+            'order'   => [['DimAlumni.nama', 'asc']],
+            'limit'   => $perPage * 2, // ×2 karena setiap alumni ada 2 baris (A+B)
+            'offset'  => ($page - 1) * $perPage * 2,
+        ]);
+
+        // Join baris A+B per alumni → 1 row dengan skor_lulus + skor_dibutuhkan
+        $byAlumni = $result->groupBy(
+            fn($r) => ($r['DimAlumni.nim'] ?? '') . '||' . ($r['DimAlumni.nama'] ?? '')
+        );
+
+        $data = $byAlumni->map(function ($rows) {
+            $rowA  = $rows->firstWhere('DimIndikatorEvaluasi.kategori_pertanyaan', 'Kompetensi_A');
+            $rowB  = $rows->firstWhere('DimIndikatorEvaluasi.kategori_pertanyaan', 'Kompetensi_B');
+            $first = $rows->first();
+
+            return [
+                'nama'            => $first['DimAlumni.nama']        ?? '',
+                'nim'             => $first['DimAlumni.nim']         ?? '',
+                'nama_prodi'      => $first['DimProdi.nama_prodi']   ?? '',
+                'jenjang'         => $first['DimProdi.jenjang']      ?? '',
+                'tahun_lulus'     => $first['DimAlumni.tahun_lulus'] ?? '',
+                'skor_lulus'      => isset($rowA)
+                    ? round((float) ($rowA['FactRangeEvaluasi.avg_skor'] ?? 0), 2)
+                    : null,
+                'skor_dibutuhkan' => isset($rowB)
+                    ? round((float) ($rowB['FactRangeEvaluasi.avg_skor'] ?? 0), 2)
+                    : null,
+            ];
+        })->values()->toArray();
+
+        return [
+            'data'          => $data,
+            'page'          => $page,
+            'per_page'      => $perPage,
+            'total_on_page' => count($data),
+        ];
+    }
 }
