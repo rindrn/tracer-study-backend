@@ -34,7 +34,8 @@ class ResponseRateService
      *   ]
      * }
      *
-     * responded/notResponded dalam PERSEN (0-100), sesuai domain [0,100] di FE.
+     * responded    = % submitted / total
+     * notResponded = % (ongoing + belum_mengisi) / total
      */
     public function getBar(array $params): ResponseRateBarDTO
     {
@@ -47,12 +48,10 @@ class ResponseRateService
         );
 
         $data = $raw->map(function ($r) {
-            $total     = $r['total'];
-            $countResp = $r['count_on_going'] + $r['count_selesai'];
-            $countNotR = $r['count_belum_mengisi'];
+            $total = $r['total'];
 
-            $pctResponded    = $total > 0 ? round($countResp / $total * 100, 1) : 0.0;
-            $pctNotResponded = $total > 0 ? round($countNotR / $total * 100, 1) : 0.0;
+            $pctResponded    = $total > 0 ? round($r['count_selesai'] / $total * 100, 1) : 0.0;
+            $pctNotResponded = $total > 0 ? round(($r['count_on_going'] + $r['count_belum_mengisi']) / $total * 100, 1) : 0.0;
 
             return [
                 'prodi'        => $r['nama_prodi'],
@@ -91,10 +90,6 @@ class ResponseRateService
      *     { "name": "Belum Mengisi",   "value": 297, "pct": 27.2 }
      *   ]
      * }
-     *
-     * Field "name" dan "value" persis sesuai dataKey yang dipakai FE
-     * Kpi2CompletionStatusChart (Pie dataKey="value" nameKey="name").
-     * Urutan tetap: Selesai, Sedang Mengisi, Belum Mengisi (sesuai FE defaultData).
      */
     public function getPie(array $params): ResponseRatePieDTO
     {
@@ -148,10 +143,7 @@ class ResponseRateService
      *   ]
      * }
      *
-     * "rate" = % responded (on_going + selesai) / total, persis dataKey "rate"
-     * yang dipakai FE Kpi3ParticipationTrendChart untuk bar + line.
-     * "year" memetakan dari graduation_year — nama field FE tetap "year"
-     * supaya konsisten dengan defaultData FE, walau sumbernya graduation_year.
+     * "rate" = % submitted / total
      */
     public function getTrend(array $params): ResponseRateTrendDTO
     {
@@ -162,9 +154,8 @@ class ResponseRateService
         );
 
         $data = $raw->map(function ($r) {
-            $total     = $r['total'];
-            $countResp = $r['count_on_going'] + $r['count_selesai'];
-            $rate      = $total > 0 ? round($countResp / $total * 100, 1) : 0.0;
+            $total = $r['total'];
+            $rate  = $total > 0 ? round($r['count_selesai'] / $total * 100, 1) : 0.0;
 
             return [
                 'year'      => $r['graduation_year'],
@@ -183,6 +174,10 @@ class ResponseRateService
             filters: $this->activeFilters($params),
         );
     }
+
+    // ──────────────────────────────────────────────────────────────
+    //  DRILL-DOWN
+    // ──────────────────────────────────────────────────────────────
 
     public function getDrillDown(array $params): ResponseRateDrillDownDTO
     {
@@ -215,9 +210,6 @@ class ResponseRateService
     //  PRIVATE HELPERS
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * Sort sesuai dropdown FE Kpi1: valueDesc (default), valueAsc, name.
-     */
     private function applySort(\Illuminate\Support\Collection $data, string $sort): \Illuminate\Support\Collection
     {
         return match ($sort) {
