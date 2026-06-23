@@ -172,13 +172,14 @@ class KeterserapanService
      */
     private function getDrillDownTahun(array $params): KeterserapanDrillDownDTO
     {
-        $page        = max(1, (int) ($params['page']     ?? 1));
-        $perPage     = min(100, max(5, (int) ($params['per_page'] ?? 15)));
-        $statusLabel = $this->resolveStatusLabel($params['status'] ?? null);
+        $page    = max(1, (int) ($params['page']     ?? 1));
+        $perPage = min(100, max(5, (int) ($params['per_page'] ?? 15)));
+        
+        $statusFilter = $this->resolveStatusFilter($params['status'] ?? null);
 
         $result = $this->repo->getDetailAlumniByTahun(
             tahunLulus:     $params['tahun_lulus']     ?? '',
-            statusLabel:    $statusLabel,
+            statusFilter:   $statusFilter,  // ← BARU: bisa array atau string
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
@@ -200,25 +201,19 @@ class KeterserapanService
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  PRIVATE HELPERS (tambah resolveStatusLabel)
-    // ──────────────────────────────────────────────────────────────
-
     /**
-     * Resolve shorthand status dari FE ke label DW, atau null jika semua.
-     *
-     * 'terserap' → null karena filter multi-label tidak bisa pakai equals.
-     *              Repo akan pakai notEquals 'Belum Bekerja' sebagai gantinya.
-     * 'tidak'    → 'Belum memungkinkan bekerja' (label DW)
-     * label lain → pakai apa adanya
+     *Resolve status bisa return:
+     *   - null        : semua status
+     *   - array       : include hanya status dalam array (untuk 'terserap')
+     *   - string      : include single status
      */
-    private function resolveStatusLabel(?string $status): ?string
+    private function resolveStatusFilter(?string $status)
     {
         return match ($status) {
-            null, '', 'semua' => null,
-            'terserap'        => null,   // ditangani repo via excludeStatus
-            'tidak'           => 'Belum memungkinkan bekerja',
-            default           => $status,
+            null, '', 'semua'    => null,
+            'terserap'           => self::STATUS_TERSERAP,  // ← ARRAY, bukan null!
+            'tidak'              => 'Belum memungkinkan bekerja',
+            default              => $status,
         };
     }
 

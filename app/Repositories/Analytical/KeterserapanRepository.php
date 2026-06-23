@@ -271,15 +271,14 @@ class KeterserapanRepository extends BaseAnalyticalRepository
      */
     public function getDetailAlumniByTahun(
         string  $tahunLulus,
-        ?string $statusLabel    = null,
-        ?string $excludeStatus  = 'Belum memungkinkan bekerja',  // aktif hanya jika $statusLabel null & FE kirim 'terserap'
-        ?string $jenjang        = null,
-        ?string $jurusan        = null,
-        ?string $namaProdi      = null,
+        $statusFilter         = null,  // ← UBAH: bisa array atau string
+        ?string $jenjang      = null,
+        ?string $jurusan      = null,
+        ?string $namaProdi    = null,
         ?string $mingguSnapshot = null,
-        ?string $search         = null,
-        int     $page           = 1,
-        int     $perPage        = 15,
+        ?string $search       = null,
+        int     $page         = 1,
+        int     $perPage      = 15,
     ): array {
         $extra = [
             [
@@ -289,20 +288,23 @@ class KeterserapanRepository extends BaseAnalyticalRepository
             ],
         ];
 
-        if ($statusLabel !== null && $statusLabel !== '') {
-            // Filter status spesifik
-            $extra[] = [
-                'member'   => 'DimStatusAlumni.label',
-                'operator' => 'equals',
-                'values'   => [$statusLabel],
-            ];
-        } elseif ($excludeStatus !== null && $excludeStatus !== '') {
-            // Shorthand 'terserap': exclude status tidak terserap
-            $extra[] = [
-                'member'   => 'DimStatusAlumni.label',
-                'operator' => 'notEquals',
-                'values'   => [$excludeStatus],
-            ];
+        //Handle array atau string
+        if ($statusFilter !== null) {
+            if (is_array($statusFilter)) {
+                // Multiple status (terserap = include Bekerja + Wiraswasta + Studi Lanjut)
+                $extra[] = [
+                    'member'   => 'DimStatusAlumni.label',
+                    'operator' => 'equals',
+                    'values'   => $statusFilter,  // ← include semua status terserap
+                ];
+            } else {
+                // Single status string
+                $extra[] = [
+                    'member'   => 'DimStatusAlumni.label',
+                    'operator' => 'equals',
+                    'values'   => [$statusFilter],
+                ];
+            }
         }
 
         $filters = $this->buildGlobalFilters(
@@ -329,7 +331,7 @@ class KeterserapanRepository extends BaseAnalyticalRepository
                 'DimProdi.nama_prodi',
                 'DimProdi.jenjang',
                 'DimAlumni.tahun_lulus',
-                'DimStatusAlumni.label',  // tampil di kolom tabel modal
+                'DimStatusAlumni.label',
             ],
             'filters' => $filters,
             'order'   => [['DimAlumni.nama', 'asc']],
@@ -353,7 +355,6 @@ class KeterserapanRepository extends BaseAnalyticalRepository
             'total_on_page' => count($data),
         ];
     }
-
     // ──────────────────────────────────────────────────────────────
     //  METADATA HELPERS (untuk available_tahun di response bar)
     // ──────────────────────────────────────────────────────────────
