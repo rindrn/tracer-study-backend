@@ -56,6 +56,37 @@ class MetodePembelajaranController extends Controller
         }
     }
 
+    public function drillDown(Request $request): JsonResponse
+    {
+        $request->validate([
+            'kode_field'      => 'required|string|max:50',
+            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jurusan'         => 'nullable|string|max:100',
+            'nama_prodi'      => 'nullable|string|max:100',
+            'tahun_lulus'     => 'nullable|string|max:5',
+            'minggu_snapshot' => 'nullable|string|max:10',
+            'search'          => 'nullable|string|max:100',
+            'page'            => 'nullable|integer|min:1',
+            'per_page'        => 'nullable|integer|min:5|max:100',
+        ]);
+
+        // scopedParams() hanya meneruskan global filters — params spesifik
+        // endpoint diambil langsung dari request dan di-merge
+        $p = array_merge($this->scopedParams($request), [
+            'kode_field' => $request->input('kode_field'),
+            'search'     => $request->input('search'),
+            'page'       => $request->input('page'),
+            'per_page'   => $request->input('per_page'),
+        ]);
+
+        try {
+            $dto = $this->service->getDrillDown($p);
+            return response()->json(['success' => true, 'data' => $dto->toArray()]);
+        } catch (\RuntimeException $e) {
+            return $this->serviceError($e);
+        }
+    }
+
     private function serviceError(\RuntimeException $e): JsonResponse
     {
         return response()->json([

@@ -243,6 +243,7 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get('gap/drill-down', [KompetensiGapController::class, 'drillDown']);
         Route::get('metode',            [MetodePembelajaranController::class, 'metode']);
         Route::get('metode/bandingkan', [MetodePembelajaranController::class, 'bandingkan']);
+        Route::get('metode/drill-down', [MetodePembelajaranController::class, 'drillDown']);
     });
 
     Route::prefix('dashboard/pembiayaan')->group(function () {
