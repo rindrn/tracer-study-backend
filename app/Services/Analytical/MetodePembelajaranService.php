@@ -4,6 +4,7 @@ namespace App\Services\Analytical;
 
 use App\DTOs\Analytical\MetodePembelajaran\MetodePembelajaranDTO;
 use App\DTOs\Analytical\MetodePembelajaran\MetodePembelajaranBandingkanDTO;
+use App\DTOs\Analytical\MetodePembelajaran\MetodePembelajaranDrillDownDTO;
 use App\Repositories\Analytical\MetodePembelajaranRepository;
 
 class MetodePembelajaranService
@@ -78,6 +79,36 @@ class MetodePembelajaranService
             data:      $data,
             prodiList: array_values(array_unique($prodiList)),
             filters:   $this->activeFilters($params),
+        );
+    }
+
+    public function getDrillDown(array $params): MetodePembelajaranDrillDownDTO
+    {
+        $page      = max(1, (int) ($params['page']     ?? 1));
+        $perPage   = min(100, max(5, (int) ($params['per_page'] ?? 15)));
+        $kodeField = $params['kode_field'] ?? '';
+
+        $result = $this->repo->getDetailAlumni(
+            kodeField:      $kodeField,
+            jenjang:        $params['jenjang']         ?? null,
+            jurusan:        $params['jurusan']         ?? null,
+            namaProdi:      $params['nama_prodi']      ?? null,
+            tahunLulus:     $params['tahun_lulus']     ?? null,
+            mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            search:         $params['search']          ?? null,
+            page:           $page,
+            perPage:        $perPage,
+        );
+
+        return new MetodePembelajaranDrillDownDTO(
+            data:        $result['data'],
+            page:        $page,
+            perPage:     $perPage,
+            totalOnPage: $result['total_on_page'],
+            filters:     $this->activeFilters(
+                array_merge($params, ['kode_field' => $kodeField]),
+                ['kode_field', 'jenjang', 'jurusan', 'nama_prodi', 'tahun_lulus', 'minggu_snapshot'],
+            ),
         );
     }
 
