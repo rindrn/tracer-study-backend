@@ -98,7 +98,7 @@ class ResponseRateController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'status'          => 'required|string|in:belum_mengisi,on_going,selesai',
+            'status'          => 'required|string|in:started,on_going,submitted',
             'jenjang'         => 'nullable|string|in:D3,D4',
             'nama_prodi'      => 'nullable|string|max:100',
             'graduation_year' => 'nullable|string|max:5',
