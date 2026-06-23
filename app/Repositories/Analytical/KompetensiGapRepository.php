@@ -54,6 +54,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
             ],
             'dimensions' => array_merge([
                 'DimIndikatorEvaluasi.label_pertanyaan',
+                'DimIndikatorEvaluasi.kode_field',
                 'DimIndikatorEvaluasi.grup_gap',
                 'DimIndikatorEvaluasi.kategori_pertanyaan',
             ], $extraDimensions),
@@ -61,6 +62,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
             'order'   => [['DimIndikatorEvaluasi.grup_gap', 'asc']],
         ])->map(fn($r) => [
             'grup_gap' => $r['DimIndikatorEvaluasi.grup_gap']               ?? '',
+            'kode_field' => $r['DimIndikatorEvaluasi.kode_field']           ?? '',
             'label'      => $r['DimIndikatorEvaluasi.label_pertanyaan']     ?? '',
             'kategori'   => $r['DimIndikatorEvaluasi.kategori_pertanyaan']  ?? '',
             'avg_skor'   => (float) ($r['FactRangeEvaluasi.avg_skor']       ?? 0),
