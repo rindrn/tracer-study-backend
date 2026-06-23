@@ -5,18 +5,18 @@ namespace App\DTOs\Analytical\Wirausaha;
 class WirausahaDrillDownDTO
 {
     public function __construct(
-        private readonly array  $data,
-        private readonly string $tingkat,
-        private readonly int    $page,
-        private readonly int    $perPage,
-        private readonly int    $totalOnPage,
-        private readonly array  $filters,
+        private readonly array   $data,
+        private readonly ?string $tingkat,  // null = semua tingkat (tidak difilter)
+        private readonly int     $page,
+        private readonly int     $perPage,
+        private readonly int     $totalOnPage,
+        private readonly array   $filters,
     ) {}
 
     public function toArray(): array
     {
         return [
-            'tingkat'    => $this->tingkat,
+            'tingkat'    => $this->tingkat, 
             'filters'    => $this->filters,
             'pagination' => [
                 'page'          => $this->page,

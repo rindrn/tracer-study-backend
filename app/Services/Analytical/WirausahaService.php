@@ -112,7 +112,7 @@ class WirausahaService
     {
         $page    = max(1, (int) ($params['page']     ?? 1));
         $perPage = min(100, max(5, (int) ($params['per_page'] ?? 15)));
-        $tingkat = $params['tingkat'];
+        $tingkat = $params['tingkat'] ?? null; // opsional — null = semua tingkat
 
         $result = $this->repo->getDetailAlumni(
             tingkat:        $tingkat,

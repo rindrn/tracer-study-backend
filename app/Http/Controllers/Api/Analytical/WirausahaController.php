@@ -61,7 +61,7 @@ class WirausahaController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'tingkat'         => 'required|string|in:Lokal,Nasional,Internasional',
+            'tingkat'         => 'nullable|string|in:Lokal,Nasional,Internasional',
             'jenjang'         => 'nullable|string|in:D3,D4',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -70,8 +70,16 @@ class WirausahaController extends Controller
             'page'            => 'nullable|integer|min:1',
             'per_page'        => 'nullable|integer|min:5|max:100',
         ]);
-        $p = $this->scopedParams($request);
- 
+
+        // scopedParams() hanya meneruskan global filters — params spesifik
+        // endpoint diambil langsung dari request dan di-merge
+        $p = array_merge($this->scopedParams($request), [
+            'tingkat'  => $request->input('tingkat'),
+            'search'   => $request->input('search'),
+            'page'     => $request->input('page'),
+            'per_page' => $request->input('per_page'),
+        ]);
+
         try {
             $dto = $this->service->getDrillDown($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);

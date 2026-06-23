@@ -178,7 +178,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
      * @return array{data: array, page: int, per_page: int, total_on_page: int}
      */
     public function getDetailAlumni(
-        string  $tingkat,
+        ?string $tingkat        = null, // null = semua tingkat
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
@@ -187,6 +187,19 @@ class WirausahaRepository extends BaseAnalyticalRepository
         int     $page           = 1,
         int     $perPage        = 15,
     ): array {
+        $extra = [
+            ['member' => 'FactTracerStudy.status_alumni_sk', 'operator' => 'equals', 'values' => ['3']],
+        ];
+
+        // Filter tingkat hanya kalau dikirim (opsional)
+        if ($tingkat !== null && $tingkat !== '') {
+            $extra[] = [
+                'member'   => 'DimWirausaha.label_tingkat_instansi',
+                'operator' => 'equals',
+                'values'   => [$tingkat],
+            ];
+        }
+
         $filters = array_merge(
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
@@ -194,10 +207,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
             ),
-            [
-                ['member' => 'FactTracerStudy.status_alumni_sk',          'operator' => 'equals', 'values' => ['3']],
-                ['member' => 'DimWirausaha.label_tingkat_instansi',       'operator' => 'equals', 'values' => [$tingkat]],
-            ],
+            $extra,
         );
 
         if ($search !== null && $search !== '') {
