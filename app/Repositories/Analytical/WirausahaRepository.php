@@ -145,12 +145,21 @@ class WirausahaRepository extends BaseAnalyticalRepository
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
-        $filters = $this->buildGlobalFilters(
-            jenjang:        $jenjang,
-            jurusan:        $jurusan,
-            namaProdi:      $namaProdi,
-            tahunLulus:     $tahunLulus,
-            mingguSnapshot: $mingguSnapshot,
+        $filters = array_merge(
+            $this->buildGlobalFilters(
+                jenjang: $jenjang,
+                jurusan: $jurusan,
+                namaProdi: $namaProdi,
+                tahunLulus: $tahunLulus,
+                mingguSnapshot: $mingguSnapshot,
+            ),
+            [
+                [
+                    'member' => 'DimStatusAlumni.id_status_alumni',
+                    'operator' => 'contains',
+                    'values' => [':f8:3'],
+                ]
+            ]
         );
 
         return $this->cube->load([
@@ -178,7 +187,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
      * @return array{data: array, page: int, per_page: int, total_on_page: int}
      */
     public function getDetailAlumni(
-        ?string $tingkat        = null, // null = semua tingkat
+        ?string $jabatan        = null,
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
@@ -191,12 +200,12 @@ class WirausahaRepository extends BaseAnalyticalRepository
             ['member' => 'FactTracerStudy.status_alumni_sk', 'operator' => 'equals', 'values' => ['3']],
         ];
 
-        // Filter tingkat hanya kalau dikirim (opsional)
-        if ($tingkat !== null && $tingkat !== '') {
+        // Filter jabatan hanya ditambahkan kalau tidak null
+        if ($jabatan !== null && $jabatan !== '') {
             $extra[] = [
-                'member'   => 'DimWirausaha.label_tingkat_instansi',
+                'member'   => 'DimWirausaha.jabatan',
                 'operator' => 'equals',
-                'values'   => [$tingkat],
+                'values'   => [$jabatan],
             ];
         }
 
@@ -228,7 +237,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
                 'DimAlumni.tahun_lulus',
                 'DimWirausaha.nama_kota',
                 'DimWirausaha.nama_provinsi',
-                'DimWirausaha.label_tingkat_instansi',
+                'DimWirausaha.jabatan',
                 'FactTracerStudy.masa_tunggu_wirausaha',
             ],
             'filters' => $filters,
@@ -245,7 +254,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
             'tahun_lulus'          => $r['DimAlumni.tahun_lulus']                      ?? '',
             'nama_kota'            => $r['DimWirausaha.nama_kota']                     ?? '',
             'nama_provinsi'        => $r['DimWirausaha.nama_provinsi']                 ?? '',
-            'tingkat_instansi'     => $r['DimWirausaha.label_tingkat_instansi']        ?? '',
+            'jabatan'              => $r['DimWirausaha.jabatan']                       ?? '',
             'masa_tunggu_wirausaha'=> (int) ($r['FactTracerStudy.masa_tunggu_wirausaha'] ?? 0),
         ])->toArray();
 
@@ -310,20 +319,20 @@ class WirausahaRepository extends BaseAnalyticalRepository
                 'DimProdi.jenjang',
                 'DimProdi.jurusan',
                 'DimProdi.nama_prodi',
-                'DimWirausaha.label_tingkat_instansi',
+                'DimWirausaha.jabatan',
                 'DimAlumni.tahun_lulus',
             ],
             'filters' => $filters,
             'order'   => [
                 ['DimProdi.nama_prodi',                'asc'],
-                ['DimWirausaha.label_tingkat_instansi','asc'],
+                ['DimWirausaha.jabatan','asc'],
             ],
         ])->map(fn($r) => [
             'nama_prodi'        => $r['DimProdi.nama_prodi']                            ?? '',
             'jenjang'           => $r['DimProdi.jenjang']                               ?? '',
             'jurusan'           => $r['DimProdi.jurusan']                               ?? '',
             'tahun_lulus'       => $r['DimAlumni.tahun_lulus']                          ?? '',
-            'label_tingkat'     => $r['DimWirausaha.label_tingkat_instansi']            ?? '',
+            'jabatan'           => $r['DimWirausaha.jabatan']                           ?? '',
             'count_wirausaha'   => (int)   ($r['FactTracerStudy.count_alumni']                  ?? 0),
             'avg_masa_tunggu'   => (float) ($r['FactTracerStudy.avg_masa_tunggu_wirausaha']      ?? 0),
             'min_masa_tunggu'   => (int)   ($r['FactTracerStudy.min_masa_tunggu_wirausaha']      ?? 0),

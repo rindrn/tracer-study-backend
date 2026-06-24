@@ -112,10 +112,10 @@ class WirausahaService
     {
         $page    = max(1, (int) ($params['page']     ?? 1));
         $perPage = min(100, max(5, (int) ($params['per_page'] ?? 15)));
-        $tingkat = $params['tingkat'] ?? null; // opsional — null = semua tingkat
+        $jabatan = $params['jabatan'] ?? null; // opsional — null = semua jabatan
 
         $result = $this->repo->getDetailAlumni(
-            tingkat:        $tingkat,
+            jabatan:        $jabatan,
             jenjang:        $params['jenjang']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
             tahunLulus:     $params['tahun_lulus']     ?? null,
@@ -127,7 +127,7 @@ class WirausahaService
 
         return new WirausahaDrillDownDTO(
             data:        $result['data'],
-            tingkat:     $tingkat,
+            jabatan:     $jabatan,
             page:        $page,
             perPage:     $perPage,
             totalOnPage: $result['total_on_page'],
@@ -179,8 +179,8 @@ class WirausahaService
             $weightedSum = $rows->sum(fn($r) => $r['avg_masa_tunggu'] * $r['count_wirausaha']);
             $avgMasTunggu = $countWir > 0 ? round($weightedSum / $countWir, 1) : 0.0;
 
-            // Breakdown per tingkat
-            $tingkatBreakdown = $rows->groupBy('label_tingkat')->map(function ($tRows, $label) use ($countWir) {
+            // Breakdown per jabatan
+            $jabatanBreakdown = $rows->groupBy('jabatan')->map(function ($tRows, $label) use ($countWir) {
                 $tCount = $tRows->sum('count_wirausaha');
                 return [
                     'label' => $label,
@@ -196,7 +196,7 @@ class WirausahaService
                 'count_wirausaha'          => $countWir,
                 'pct_wirausaha'            => $pctWir,
                 'avg_masa_tunggu_wirausaha'=> $avgMasTunggu,
-                'tingkat'                  => $tingkatBreakdown,
+                'jabatan'                  => $jabatanBreakdown,
             ];
 
             $prodiList[] = $namaProdi;
