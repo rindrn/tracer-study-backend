@@ -8,204 +8,238 @@ use App\DTOs\Analytical\SebaranInstansi\SebaranInstansiBandingkanDTO;
 use App\DTOs\Analytical\SebaranInstansi\SebaranInstansiLokasiDTO;
 use App\DTOs\Analytical\SebaranInstansi\SebaranInstansiDrillDownDTO;
 use App\Repositories\Analytical\SebaranInstansiRepository;
+use App\Traits\WithCache;
 
 class SebaranInstansiService
 {
+    use WithCache;
+
+    /**
+     * TTL dalam detik.
+     * Samakan dengan interval ETL agar cache tidak stale lebih dari satu siklus.
+     * Default: 1 jam. Ganti ke 3600 * 24 * 7 kalau ETL mingguan.
+     */
+    private const TTL = 3600;
+
+    /**
+     * DrillDown tidak di-cache — hasilnya sangat bervariasi
+     * (page, search, filter per-request) dan jarang di-hit ulang
+     * dengan parameter yang sama persis.
+     */
+    private const CACHE_DRILLDOWN = false;
+
     public function __construct(
         private readonly SebaranInstansiRepository $repo,
     ) {}
 
+    // ──────────────────────────────────────────────────────────────
+
     public function getJenis(array $params): SebaranInstansiJenisDTO
     {
-        $raw = $this->repo->getJenisData(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $key = $this->key('sebaran_instansi:jenis', $params);
 
-        $total = $raw->sum('count');
+        $cached = $this->remember($key, function () use ($params) {
+            $raw   = $this->repo->getJenisData(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        $data = $raw->map(fn($r) => [
-            'jenis' => $r['jenis'],
-            'count' => $r['count'],
-            'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
-        ])->values()->toArray();
+            $total = $raw->sum('count');
+
+            return [
+                'data'  => $raw->map(fn($r) => [
+                    'jenis' => $r['jenis'],
+                    'count' => $r['count'],
+                    'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
+                ])->values()->toArray(),
+                'total' => $total,
+            ];
+        }, self::TTL);
 
         return new SebaranInstansiJenisDTO(
-            data:    $data,
-            total:   $total,
+            data:    $cached['data'],
+            total:   $cached['total'],
             filters: $this->activeFilters($params),
         );
     }
 
+    // ──────────────────────────────────────────────────────────────
 
     public function getTingkat(array $params): SebaranInstansiTingkatDTO
     {
-        $perProdiRaw = $this->repo->getTingkatData(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $key = $this->key('sebaran_instansi:tingkat', $params);
 
-        $perTahunRaw = $this->repo->getTingkatPerTahun(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $cached = $this->remember($key, function () use ($params) {
+            $perProdiRaw = $this->repo->getTingkatData(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        // Reshape perProdi → nested tingkat[] per prodi
-        $grouped = $perProdiRaw->groupBy('nama_prodi');
-        $data = [];
+            $perTahunRaw = $this->repo->getTingkatPerTahun(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        foreach ($grouped as $namaProdi => $rows) {
-            $first       = $rows->first();
-            $totalProdi  = $rows->sum('count');
+            $data = [];
+            foreach ($perProdiRaw->groupBy('nama_prodi') as $namaProdi => $rows) {
+                $first      = $rows->first();
+                $totalProdi = $rows->sum('count');
 
-            $tingkat = $rows->map(fn($r) => [
-                'label' => $r['label_tingkat'],
-                'count' => $r['count'],
-                'pct'   => $totalProdi > 0 ? round($r['count'] / $totalProdi * 100, 1) : 0.0,
-            ])->values()->toArray();
+                $data[] = [
+                    'nama_prodi' => $namaProdi,
+                    'jenjang'    => $first['jenjang'],
+                    'tingkat'    => $rows->map(fn($r) => [
+                        'label' => $r['label_tingkat'],
+                        'count' => $r['count'],
+                        'pct'   => $totalProdi > 0 ? round($r['count'] / $totalProdi * 100, 1) : 0.0,
+                    ])->values()->toArray(),
+                ];
+            }
 
-            $data[] = [
-                'nama_prodi' => $namaProdi,
-                'jenjang'    => $first['jenjang'],
-                'tingkat'    => $tingkat,
-            ];
-        }
+            $groupedBar = [];
+            foreach ($perTahunRaw->groupBy('tahun_lulus') as $tahun => $rows) {
+                $totalTahun    = $rows->sum('count');
+                $countLokal    = $rows->firstWhere('label_tingkat', 'Lokal')['count']         ?? 0;
+                $countNasional = $rows->firstWhere('label_tingkat', 'Nasional')['count']      ?? 0;
+                $countInter    = $rows->firstWhere('label_tingkat', 'Internasional')['count'] ?? 0;
 
-        // Reshape perTahun → grouped_bar (lokal/nasional/internasional per tahun)
-        $groupedBar = [];
-        $tahunGroups = $perTahunRaw->groupBy('tahun_lulus');
+                $groupedBar[] = [
+                    'tahun_lulus'       => $tahun,
+                    'lokal'             => $countLokal,
+                    'lokal_pct'         => $totalTahun > 0 ? round($countLokal    / $totalTahun * 100, 1) : 0.0,
+                    'nasional'          => $countNasional,
+                    'nasional_pct'      => $totalTahun > 0 ? round($countNasional / $totalTahun * 100, 1) : 0.0,
+                    'internasional'     => $countInter,
+                    'internasional_pct' => $totalTahun > 0 ? round($countInter    / $totalTahun * 100, 1) : 0.0,
+                ];
+            }
 
-        foreach ($tahunGroups as $tahun => $rows) {
-            $totalTahun    = $rows->sum('count');
-            $countLokal    = $rows->firstWhere('label_tingkat', 'Lokal')['count']         ?? 0;
-            $countNasional = $rows->firstWhere('label_tingkat', 'Nasional')['count']      ?? 0;
-            $countInter    = $rows->firstWhere('label_tingkat', 'Internasional')['count'] ?? 0;
-
-            $groupedBar[] = [
-                'tahun_lulus'        => $tahun,
-                'lokal'              => $countLokal,
-                'lokal_pct'          => $totalTahun > 0 ? round($countLokal    / $totalTahun * 100, 1) : 0.0,
-                'nasional'           => $countNasional,
-                'nasional_pct'       => $totalTahun > 0 ? round($countNasional / $totalTahun * 100, 1) : 0.0,
-                'internasional'      => $countInter,
-                'internasional_pct'  => $totalTahun > 0 ? round($countInter    / $totalTahun * 100, 1) : 0.0,
-            ];
-        }
+            return ['data' => $data, 'groupedBar' => $groupedBar];
+        }, self::TTL);
 
         return new SebaranInstansiTingkatDTO(
-            data:       $data,
-            groupedBar: $groupedBar,
+            data:       $cached['data'],
+            groupedBar: $cached['groupedBar'],
             filters:    $this->activeFilters($params),
         );
     }
 
+    // ──────────────────────────────────────────────────────────────
+
     public function getBandingkan(array $params): SebaranInstansiBandingkanDTO
     {
-        $prodiFilter = $params['prodi'] ?? [];
-        if (is_string($prodiFilter)) {
-            $prodiFilter = [$prodiFilter];
-        }
+        $key = $this->key('sebaran_instansi:bandingkan', $params);
 
-        $jenisRaw   = $this->repo->getBandingkanJenis(
-            prodiFilter:    $prodiFilter,
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $cached = $this->remember($key, function () use ($params) {
+            $prodiFilter = is_string($params['prodi'] ?? null)
+                ? [$params['prodi']]
+                : ($params['prodi'] ?? []);
 
-        $tingkatRaw = $this->repo->getBandingkanTingkat(
-            prodiFilter:    $prodiFilter,
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+            $jenisRaw   = $this->repo->getBandingkanJenis(
+                prodiFilter:    $prodiFilter,
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        // Index by nama_prodi
-        $jenisGrouped   = $jenisRaw->groupBy('nama_prodi');
-        $tingkatGrouped = $tingkatRaw->groupBy('nama_prodi');
+            $tingkatRaw = $this->repo->getBandingkanTingkat(
+                prodiFilter:    $prodiFilter,
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        $allProdi  = $jenisGrouped->keys()->merge($tingkatGrouped->keys())->unique()->sort()->values();
-        $data      = [];
-        $prodiList = [];
+            $jenisGrouped   = $jenisRaw->groupBy('nama_prodi');
+            $tingkatGrouped = $tingkatRaw->groupBy('nama_prodi');
+            $allProdi       = $jenisGrouped->keys()->merge($tingkatGrouped->keys())->unique()->sort()->values();
 
-        foreach ($allProdi as $namaProdi) {
-            $jenisRows   = $jenisGrouped->get($namaProdi, collect());
-            $tingkatRows = $tingkatGrouped->get($namaProdi, collect());
+            $data      = [];
+            $prodiList = [];
 
-            $first       = $jenisRows->first() ?? $tingkatRows->first();
-            $totalJenis  = $jenisRows->sum('count');
-            $totalTingkat= $tingkatRows->sum('count');
-            $total       = max($totalJenis, $totalTingkat); // sama sumber, ambil max
+            foreach ($allProdi as $namaProdi) {
+                $jenisRows   = $jenisGrouped->get($namaProdi, collect());
+                $tingkatRows = $tingkatGrouped->get($namaProdi, collect());
+                $first       = $jenisRows->first() ?? $tingkatRows->first();
+                $total       = max($jenisRows->sum('count'), $tingkatRows->sum('count'));
 
-            $jenisList = $jenisRows->map(fn($r) => [
-                'label' => $r['label_jenis'],
-                'count' => $r['count'],
-                'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
-            ])->values()->toArray();
+                $data[] = [
+                    'nama_prodi' => $namaProdi,
+                    'jenjang'    => $first['jenjang'] ?? '',
+                    'total'      => $total,
+                    'jenis'      => $jenisRows->map(fn($r) => [
+                        'label' => $r['label_jenis'],
+                        'count' => $r['count'],
+                        'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
+                    ])->values()->toArray(),
+                    'tingkat'    => $tingkatRows->map(fn($r) => [
+                        'label' => $r['label_tingkat'],
+                        'count' => $r['count'],
+                        'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
+                    ])->values()->toArray(),
+                ];
 
-            $tingkatList = $tingkatRows->map(fn($r) => [
-                'label' => $r['label_tingkat'],
-                'count' => $r['count'],
-                'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
-            ])->values()->toArray();
+                $prodiList[] = $namaProdi;
+            }
 
-            $data[] = [
-                'nama_prodi' => $namaProdi,
-                'jenjang'    => $first['jenjang'] ?? '',
-                'total'      => $total,
-                'jenis'      => $jenisList,
-                'tingkat'    => $tingkatList,
-            ];
-
-            $prodiList[] = $namaProdi;
-        }
+            return ['data' => $data, 'prodiList' => $prodiList];
+        }, self::TTL);
 
         return new SebaranInstansiBandingkanDTO(
-            data:      $data,
-            prodiList: $prodiList,
+            data:      $cached['data'],
+            prodiList: $cached['prodiList'],
             filters:   $this->activeFilters($params),
         );
     }
 
+    // ──────────────────────────────────────────────────────────────
+
     public function getLokasi(array $params): SebaranInstansiLokasiDTO
     {
         $limit = min(50, max(5, (int) ($params['limit'] ?? 15)));
+        $key   = $this->key('sebaran_instansi:lokasi', array_merge($params, ['limit' => $limit]));
 
-        $topKota = $this->repo->getTopKota(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-            limit:          $limit,
-        );
-
-        $topProvinsi = $this->repo->getTopProvinsi(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-            limit:          $limit,
-        );
+        $cached = $this->remember($key, function () use ($params, $limit) {
+            return [
+                'topKota'     => $this->repo->getTopKota(
+                    jenjang:        $params['jenjang']         ?? null,
+                    jurusan:        $params['jurusan']         ?? null,
+                    namaProdi:      $params['nama_prodi']      ?? null,
+                    tahunLulus:     $params['tahun_lulus']     ?? null,
+                    mingguSnapshot: $params['minggu_snapshot'] ?? null,
+                    limit:          $limit,
+                )->values()->toArray(),
+                'topProvinsi' => $this->repo->getTopProvinsi(
+                    jenjang:        $params['jenjang']         ?? null,
+                    jurusan:        $params['jurusan']         ?? null,
+                    namaProdi:      $params['nama_prodi']      ?? null,
+                    tahunLulus:     $params['tahun_lulus']     ?? null,
+                    mingguSnapshot: $params['minggu_snapshot'] ?? null,
+                    limit:          $limit,
+                )->values()->toArray(),
+            ];
+        }, self::TTL);
 
         return new SebaranInstansiLokasiDTO(
-            topKota:     $topKota->values()->toArray(),
-            topProvinsi: $topProvinsi->values()->toArray(),
+            topKota:     $cached['topKota'],
+            topProvinsi: $cached['topProvinsi'],
             filters:     $this->activeFilters($params),
         );
     }
+
+    // ──────────────────────────────────────────────────────────────
+    // DrillDown tidak di-cache (terlalu variatif per request)
+    // ──────────────────────────────────────────────────────────────
 
     public function getDrillDown(array $params): SebaranInstansiDrillDownDTO
     {
@@ -238,6 +272,22 @@ class SebaranInstansiService
                 'jenjang', 'nama_prodi', 'tahun_lulus', 'minggu_snapshot',
             ]),
         );
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Buat cache key deterministik dari prefix + params.
+     * Parameter di-sort supaya urutan berbeda tetap menghasilkan key yang sama.
+     */
+    private function key(string $prefix, array $params): string
+    {
+        // Buang key yang tidak relevan untuk cache (page, search, per_page)
+        $relevant = array_diff_key($params, array_flip(['page', 'per_page', 'search']));
+        ksort($relevant);
+        return $prefix . ':' . md5(json_encode($relevant));
     }
 
     private function activeFilters(array $params, array $keys = []): array
