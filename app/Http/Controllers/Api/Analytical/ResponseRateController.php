@@ -17,20 +17,8 @@ class ResponseRateController extends Controller
         private readonly ResponseRateService $service,
     ) {}
 
-    // ──────────────────────────────────────────────────────────────
-
     /**
      * GET /api/dashboard/response-rate/bar
-     *
-     * Stacked bar horizontal per prodi:
-     *   - responded     (% Sudah Merespons = on_going + selesai)
-     *   - notResponded  (% Belum Merespons)
-     *
-     * Query params (semua opsional):
-     *   jenjang          string   D3 | D4 (kolom asli: programs.degree)
-     *   nama_prodi       string   Nama program studi (exact match, programs.name)
-     *   graduation_year  string   Filter tahun lulus alumni (kolom asli: alumni_profiles.graduation_year)
-     *   sort             string   valueDesc (default) | valueAsc | name
      */
     public function bar(Request $request): JsonResponse
     {
@@ -41,7 +29,7 @@ class ResponseRateController extends Controller
             'sort'            => 'nullable|string|in:valueDesc,valueAsc,name',
         ]);
         $p = $this->scopedParams($request);
- 
+
         try {
             $dto = $this->service->getBar($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
@@ -50,16 +38,8 @@ class ResponseRateController extends Controller
         }
     }
 
-    // ──────────────────────────────────────────────────────────────
-
     /**
      * GET /api/dashboard/response-rate/pie
-     *
-     * Pie 3 status pengisian survei (aggregate keseluruhan, BUKAN per prodi):
-     *   Selesai, Sedang Mengisi, Belum Mengisi.
-     *
-     * Query params (semua opsional):
-     *   jenjang, nama_prodi, graduation_year — sama seperti /bar
      */
     public function pie(Request $request): JsonResponse
     {
@@ -69,7 +49,7 @@ class ResponseRateController extends Controller
             'graduation_year' => 'nullable|string|max:5',
         ]);
         $p = $this->scopedParams($request);
- 
+
         try {
             $dto = $this->service->getPie($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
@@ -78,6 +58,9 @@ class ResponseRateController extends Controller
         }
     }
 
+    /**
+     * GET /api/dashboard/response-rate/trend
+     */
     public function trend(Request $request): JsonResponse
     {
         $request->validate([
@@ -86,7 +69,7 @@ class ResponseRateController extends Controller
             'graduation_year' => 'nullable|string|max:5',
         ]);
         $p = $this->scopedParams($request);
- 
+
         try {
             $dto = $this->service->getTrend($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
@@ -95,10 +78,18 @@ class ResponseRateController extends Controller
         }
     }
 
+    /**
+     * GET /api/dashboard/response-rate/drill-down
+     *
+     * status: nilai langsung dari DB — submitted | ongoing | started
+     *   submitted = Selesai
+     *   ongoing   = Sedang Mengisi
+     *   started   = Belum Mengisi
+     */
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'status'          => 'required|string|in:started,on_going,submitted',
+            'status'          => 'required|string|in:submitted,ongoing,started',  // ← sesuai nilai DB
             'jenjang'         => 'nullable|string|in:D3,D4',
             'nama_prodi'      => 'nullable|string|max:100',
             'graduation_year' => 'nullable|string|max:5',
@@ -107,7 +98,7 @@ class ResponseRateController extends Controller
             'per_page'        => 'nullable|integer|min:5|max:100',
         ]);
         $p = $this->scopedParams($request);
- 
+
         try {
             $dto = $this->service->getDrillDown($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
