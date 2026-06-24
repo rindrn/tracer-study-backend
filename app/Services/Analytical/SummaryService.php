@@ -4,24 +4,13 @@ namespace App\Services\Analytical;
 
 use App\DTOs\Analytical\Summary\SummaryDTO;
 use App\Repositories\Analytical\SummaryRepository;
+use App\Traits\WithCache;
 
-/**
- * SummaryService
- *
- * Orkestrasi data dari SummaryRepository untuk 5 Summary Card di Overview Page:
- *   1. Total Kuesioner   — total alumni
- *   2. Sudah Mengisi     — count r.status = 'submitted'
- *   3. Response Rate     — (sudah mengisi / total) × 100%, + badge trend
- *   4. Rata-rata Waktu   — AVG(submitted_at - started_at), skip started_at null
- *   5. Belum Mengisi     — count r.status = 'started' OR r.status IS NULL
- *
- * Definisi status (murni dari kolom r.status):
- *   submitted = Sudah Mengisi
- *   started   = Belum Mengisi (termasuk alumni tanpa row responses)
- *   ongoing   = Sedang Mengisi (tidak ditampilkan di card, tapi masuk total)
- */
 class SummaryService
 {
+    use WithCache;
+
+    private const TTL                = 3600;
     private const STABLE_THRESHOLD_PP = 1.0;
 
     public function __construct(
@@ -57,72 +46,70 @@ class SummaryService
      */
     public function getSummary(array $params): SummaryDTO
     {
-        $jenjang   = $params['jenjang']         ?? null;
-        $namaProdi = $params['nama_prodi']      ?? null;
-        $gradYear  = $params['graduation_year'] ?? null;
+        $key = $this->key('summary:cards', $params);
 
-        $agg = $this->repo->getAggregate(
-            jenjang:        $jenjang,
-            namaProdi:      $namaProdi,
-            graduationYear: $gradYear,
-        );
+        $cached = $this->remember($key, function () use ($params) {
+            $jenjang   = $params['jenjang']         ?? null;
+            $namaProdi = $params['nama_prodi']      ?? null;
+            $gradYear  = $params['graduation_year'] ?? null;
 
-        $ratePerYear = $this->repo->getRatePerYear(
-            jenjang:        $jenjang,
-            namaProdi:      $namaProdi,
-            graduationYear: $gradYear,
-        );
+            $agg = $this->repo->getAggregate(
+                jenjang:        $jenjang,
+                namaProdi:      $namaProdi,
+                graduationYear: $gradYear,
+            );
 
-        $total          = $agg['total'];
-        $countSubmitted = $agg['count_submitted'];
+            $ratePerYear = $this->repo->getRatePerYear(
+                jenjang:        $jenjang,
+                namaProdi:      $namaProdi,
+                graduationYear: $gradYear,
+            );
 
-        $responseRate = $total > 0
-            ? round($countSubmitted / $total * 100, 1)
-            : 0.0;
+            $total          = $agg['total'];
+            $countSubmitted = $agg['count_submitted'];
 
-        [$trendPp, $trendDirection] = $this->computeYearOverYearTrend($ratePerYear);
+            $responseRate = $total > 0
+                ? round($countSubmitted / $total * 100, 1)
+                : 0.0;
 
-        $cards = [
-            'total_kuesioner' => [
-                'value' => $total,
-                'hint'  => 'Dikirim',
-            ],
-            'sudah_mengisi' => [
-                'value' => $countSubmitted,
-                'hint'  => 'Response masuk',
-            ],
-            'response_rate' => [
-                'value'           => $responseRate,
-                'hint'            => 'Tingkat respons',
-                'trend_pp'        => $trendPp,
-                'trend_direction' => $trendDirection,
-            ],
-            'rata_rata_waktu' => [
-                'value_hours'         => $agg['avg_fill_hours'] !== null ? round($agg['avg_fill_hours'], 1) : null,
-                'label'               => $this->formatFillTimeLabel($agg['avg_fill_hours']),
-                'hint'                => 'Pengisian',
-                'count_with_duration' => $agg['count_with_duration'],
-            ],
-            'belum_mengisi' => [
-                'value' => $agg['count_not_submitted'],  // r.status = 'started' OR NULL
-                'hint'  => 'Follow-up',
-            ],
-        ];
+            [$trendPp, $trendDirection] = $this->computeYearOverYearTrend($ratePerYear);
+
+            return [
+                'total_kuesioner' => [
+                    'value' => $total,
+                    'hint'  => 'Dikirim',
+                ],
+                'sudah_mengisi' => [
+                    'value' => $countSubmitted,
+                    'hint'  => 'Response masuk',
+                ],
+                'response_rate' => [
+                    'value'           => $responseRate,
+                    'hint'            => 'Tingkat respons',
+                    'trend_pp'        => $trendPp,
+                    'trend_direction' => $trendDirection,
+                ],
+                'rata_rata_waktu' => [
+                    'value_hours'         => $agg['avg_fill_hours'] !== null ? round($agg['avg_fill_hours'], 1) : null,
+                    'label'               => $this->formatFillTimeLabel($agg['avg_fill_hours']),
+                    'hint'                => 'Pengisian',
+                    'count_with_duration' => $agg['count_with_duration'],
+                ],
+                'belum_mengisi' => [
+                    'value' => $agg['count_not_submitted'],
+                    'hint'  => 'Follow-up',
+                ],
+            ];
+        }, self::TTL);
 
         return new SummaryDTO(
-            cards:   $cards,
+            cards:   $cached,
             filters: $this->activeFilters($params),
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  PRIVATE HELPERS
-    // ──────────────────────────────────────────────────────────────
+    // ── Private helpers ───────────────────────────────────────────
 
-    /**
-     * @param  array<int, array{graduation_year:string,total:int,count_submitted:int,rate:float}>  $ratePerYear
-     * @return array{0: float|null, 1: string}
-     */
     private function computeYearOverYearTrend(array $ratePerYear): array
     {
         $n = count($ratePerYear);
@@ -133,8 +120,7 @@ class SummaryService
 
         $latest   = $ratePerYear[$n - 1];
         $previous = $ratePerYear[$n - 2];
-
-        $diff = round($latest['rate'] - $previous['rate'], 1);
+        $diff     = round($latest['rate'] - $previous['rate'], 1);
 
         $direction = match (true) {
             $diff > self::STABLE_THRESHOLD_PP  => 'up',
@@ -147,20 +133,20 @@ class SummaryService
 
     private function formatFillTimeLabel(?float $hours): string
     {
-        if ($hours === null) {
-            return '-';
-        }
+        if ($hours === null) return '-';
+        return number_format(round($hours, 1), 1, ',', '.') . ' jam';
+    }
 
-        $rounded   = round($hours, 1);
-        $formatted = number_format($rounded, 1, ',', '.');
-
-        return "{$formatted} jam";
+    private function key(string $prefix, array $params): string
+    {
+        $relevant = array_diff_key($params, array_flip(['page', 'per_page', 'search']));
+        ksort($relevant);
+        return $prefix . ':' . md5(json_encode($relevant));
     }
 
     private function activeFilters(array $params): array
     {
         $keys = ['jenjang', 'nama_prodi', 'graduation_year'];
-
         return array_filter(
             array_intersect_key($params, array_flip($keys)),
             fn($v) => $v !== null && $v !== '' && $v !== [],
