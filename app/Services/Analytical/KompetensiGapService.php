@@ -76,10 +76,10 @@ class KompetensiGapService
     {
         $page      = max(1, (int) ($params['page']     ?? 1));
         $perPage   = min(100, max(5, (int) ($params['per_page'] ?? 15)));
-        $kodeField = $params['kode_field'] ?? '';
+        $grupGap = $params['grup_gap'] ?? '';
 
         $result = $this->repo->getDetailAlumni(
-            kodeField:      $kodeField,
+            grupGap:      $grupGap,
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
@@ -95,8 +95,8 @@ class KompetensiGapService
             page:        $page,
             perPage:     $perPage,
             totalOnPage: $result['total_on_page'],
-            filters:     $this->activeFilters(array_merge($params, ['kode_field' => $kodeField]),
-                ['kode_field', 'jenjang', 'jurusan', 'nama_prodi', 'tahun_lulus', 'minggu_snapshot']),
+            filters:     $this->activeFilters(array_merge($params, ['grup_gap' => $grupGap]),
+                ['grup_gap', 'jenjang', 'jurusan', 'nama_prodi', 'tahun_lulus', 'minggu_snapshot']),
         );
     }
 

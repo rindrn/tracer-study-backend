@@ -59,7 +59,7 @@ class KompetensiGapController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'kode_field'      => 'required|string|max:50',
+            'grup_gap'        => 'required|string|max:200',
             'jenjang'         => 'nullable|string|in:D3,D4',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
@@ -69,8 +69,15 @@ class KompetensiGapController extends Controller
             'page'            => 'nullable|integer|min:1',
             'per_page'        => 'nullable|integer|min:5|max:100',
         ]);
-        $p = $this->scopedParams($request);
- 
+
+        // scopedParams() hanya meneruskan global filters — params spesifik diambil langsung
+        $p = array_merge($this->scopedParams($request), [
+            'grup_gap' => $request->input('grup_gap'),
+            'search'   => $request->input('search'),
+            'page'     => $request->input('page'),
+            'per_page' => $request->input('per_page'),
+        ]);
+
         try {
             $dto = $this->service->getDrillDown($p);
             return response()->json(['success' => true, 'data' => $dto->toArray()]);
