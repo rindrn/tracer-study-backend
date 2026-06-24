@@ -296,25 +296,39 @@ class MasaTungguRepository extends BaseAnalyticalRepository
      */
     private function buildRentangFilters(string $rentang): array
     {
+        // IKU 2 Kemendikbud: Terserap = bekerja + wirausaha + studi lanjut
+        //   option_code "1" = Bekerja (full time / part time)
+        //   option_code "3" = Wiraswasta
+        //   option_code "6" = Melanjutkan pendidikan sambil bekerja
+        //   option_code "7" = Melanjutkan pendidikan sambil wiraswasta
         $statusFilter = [
             'member'   => 'DimStatusAlumni.label',
             'operator' => 'equals',
-            'values'   => ['Bekerja (full time / part time)', 'Wiraswasta'],
+            'values'   => ['Bekerja (full time / part time)', 'Wiraswasta', 'Melanjutkan pendidikan sambil bekerja', 'Melanjutkan pendidikan sambil wiraswasta'],
+        ];
+
+        // ── tambahkan ini ──
+        $notNullFilter = [
+            'member'   => 'FactTracerStudy.masa_tunggu_bekerja',
+            'operator' => 'set',   // Cube.js: "set" = IS NOT NULL
         ];
 
         return match ($rentang) {
             '0-3' => [
                 $statusFilter,
+                $notNullFilter,                                                          // ← tambah
                 ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'gte', 'values' => ['0']],
                 ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'lt',  'values' => ['3']],
             ],
             '3-6' => [
                 $statusFilter,
+                $notNullFilter,                                                          // ← tambah
                 ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'gte', 'values' => ['3']],
                 ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'lte', 'values' => ['6']],
             ],
             '>6' => [
                 $statusFilter,
+                $notNullFilter,                                                          // ← tambah
                 ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'gt',  'values' => ['6']],
             ],
             default => [],
