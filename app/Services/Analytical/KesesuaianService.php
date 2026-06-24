@@ -25,9 +25,9 @@ class KesesuaianService
         );
 
         $data = $raw->map(function ($r) {
-            $total        = $r['count_alumni'];
-            $pctSesuai    = $total > 0 ? round($r['count_sesuai_bidang']       / $total * 100, 1) : 0.0;
-            $pctTidak     = $total > 0 ? round($r['count_tidak_sesuai_bidang'] / $total * 100, 1) : 0.0;
+            $total     = $r['count_alumni'];
+            $pctSesuai = $total > 0 ? round($r['count_sesuai_bidang']       / $total * 100, 1) : 0.0;
+            $pctTidak  = $total > 0 ? round($r['count_tidak_sesuai_bidang'] / $total * 100, 1) : 0.0;
 
             return [
                 'nama_prodi'               => $r['nama_prodi'],
@@ -90,10 +90,23 @@ class KesesuaianService
 
     public function getDrillDown(array $params): KesesuaianDrillDownDTO
     {
-        $page            = max(1, (int) ($params['page']     ?? 1));
-        $perPage         = min(100, max(5, (int) ($params['per_page'] ?? 15)));
-        $labelKesesuaian = isset($params['kesesuaian_label'])    && $params['kesesuaian_label']    !== ''
-            ? $params['kesesuaian_label'] : null;
+        $page    = max(1, (int) ($params['page']     ?? 1));
+        $perPage = min(100, max(5, (int) ($params['per_page'] ?? 15)));
+
+        // ── parse kesesuaian_label: "Sangat Erat,Erat" → ["Sangat Erat", "Erat"] ──
+        $labelKesesuaian = null;
+        $rawLabel        = $params['kesesuaian_label'] ?? null;
+
+        if (!empty($rawLabel)) {
+            if (is_string($rawLabel)) {
+                $labelKesesuaian = array_values(array_filter(array_map('trim', explode(',', $rawLabel))));
+            } elseif (is_array($rawLabel)) {
+                $labelKesesuaian = array_values(array_filter(array_map('trim', $rawLabel)));
+            }
+
+            if (empty($labelKesesuaian)) $labelKesesuaian = null;
+        }
+
         $labelPertanyaan = isset($params['label_pertanyaan']) && $params['label_pertanyaan'] !== ''
             ? $params['label_pertanyaan'] : null;
 
@@ -126,23 +139,23 @@ class KesesuaianService
         }
 
         // Mode kesesuaian: dari chart kesesuaian bidang (FactTracerStudy)
-        $labelKesesuaian = $labelKesesuaian ?? 1;
-
         $result = $this->repo->getDetailAlumni(
             labelKesesuaian: $labelKesesuaian,
-            jenjang:        $params['jenjang']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-            search:         $params['search']          ?? null,
-            page:           $page,
-            perPage:        $perPage,
+            jenjang:         $params['jenjang']         ?? null,
+            namaProdi:       $params['nama_prodi']      ?? null,
+            tahunLulus:      $params['tahun_lulus']     ?? null,
+            mingguSnapshot:  $params['minggu_snapshot'] ?? null,
+            search:          $params['search']          ?? null,
+            page:            $page,
+            perPage:         $perPage,
         );
 
         return new KesesuaianDrillDownDTO(
             data:            $result['data'],
             kesesuaianSk:    null,
-            kesesuaianLabel: $labelKesesuaian,
+            kesesuaianLabel: is_array($labelKesesuaian)
+                                ? implode(', ', $labelKesesuaian)
+                                : $labelKesesuaian,
             labelPertanyaan: null,
             page:            $page,
             perPage:         $perPage,

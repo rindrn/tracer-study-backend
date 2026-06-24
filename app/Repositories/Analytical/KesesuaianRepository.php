@@ -47,11 +47,11 @@ class KesesuaianRepository extends BaseAnalyticalRepository
             'filters' => $filters,
             'order'   => [['DimProdi.nama_prodi', 'asc']],
         ])->map(fn($r) => [
-            'nama_prodi'               => $r['DimProdi.nama_prodi']                         ?? '',
-            'jenjang'                  => $r['DimProdi.jenjang']                            ?? '',
-            'tahun_lulus'              => $r['DimAlumni.tahun_lulus']                       ?? '',
-            'count_alumni'             => (int) ($r['FactTracerStudy.count_alumni']              ?? 0),
-            'count_sesuai_bidang'      => (int) ($r['FactTracerStudy.count_sesuai_bidang']       ?? 0),
+            'nama_prodi'               => $r['DimProdi.nama_prodi']                          ?? '',
+            'jenjang'                  => $r['DimProdi.jenjang']                             ?? '',
+            'tahun_lulus'              => $r['DimAlumni.tahun_lulus']                        ?? '',
+            'count_alumni'             => (int) ($r['FactTracerStudy.count_alumni']           ?? 0),
+            'count_sesuai_bidang'      => (int) ($r['FactTracerStudy.count_sesuai_bidang']    ?? 0),
             'count_tidak_sesuai_bidang'=> (int) ($r['FactTracerStudy.count_tidak_sesuai_bidang'] ?? 0),
         ]);
     }
@@ -81,7 +81,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
             ),
-            // hanya alumni bekerja (status_alumni_sk = 1)
             [['member' => 'FactTracerStudy.status_alumni_sk', 'operator' => 'equals', 'values' => ['1']]],
         );
 
@@ -91,7 +90,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
             'filters'    => $filters,
             'order'      => [['FactTracerStudy.count_alumni', 'desc']],
         ])->map(fn($r) => [
-            'label' => $r['DimKesesuaianBidang.label']      ?? '',
+            'label' => $r['DimKesesuaianBidang.label']           ?? '',
             'count' => (int) ($r['FactTracerStudy.count_alumni'] ?? 0),
         ]);
     }
@@ -135,28 +134,39 @@ class KesesuaianRepository extends BaseAnalyticalRepository
             'filters' => $filters,
             'order'   => [['FactMultiSelect.count_pilihan', 'desc']],
         ])->map(fn($r) => [
-            'kode_field' => $r['DimIndikatorEvaluasi.kode_field']        ?? '',
-            'label'      => $r['DimIndikatorEvaluasi.label_pertanyaan']  ?? '',
-            'count'      => (int) ($r['FactMultiSelect.count_pilihan']   ?? 0),
+            'kode_field' => $r['DimIndikatorEvaluasi.kode_field']       ?? '',
+            'label'      => $r['DimIndikatorEvaluasi.label_pertanyaan'] ?? '',
+            'count'      => (int) ($r['FactMultiSelect.count_pilihan']  ?? 0),
         ]);
     }
 
+    // ──────────────────────────────────────────────────────────────
+    //  4. DETAIL ALUMNI — per kesesuaian bidang
+    // ──────────────────────────────────────────────────────────────
 
     /**
      * TIDAK pakai pre-agg — data individual alumni.
+     * $labelKesesuaian bisa string tunggal atau array (multi-select dari FE).
      *
      * @return array{data: array, page: int, per_page: int, total_on_page: int}
      */
     public function getDetailAlumni(
-        ?string $labelKesesuaian,
-        ?string $jenjang        = null,
-        ?string $namaProdi      = null,
-        ?string $tahunLulus     = null,
-        ?string $mingguSnapshot = null,
-        ?string $search         = null,
-        int     $page           = 1,
-        int     $perPage        = 15,
+        array|string|null $labelKesesuaian,
+        ?string           $jenjang        = null,
+        ?string           $namaProdi      = null,
+        ?string           $tahunLulus     = null,
+        ?string           $mingguSnapshot = null,
+        ?string           $search         = null,
+        int               $page           = 1,
+        int               $perPage        = 15,
     ): array {
+        // normalisasi ke array
+        $labels = match(true) {
+            is_array($labelKesesuaian)  => $labelKesesuaian,
+            is_string($labelKesesuaian) => [$labelKesesuaian],
+            default                     => [],
+        };
+
         $filters = array_merge(
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
@@ -164,9 +174,11 @@ class KesesuaianRepository extends BaseAnalyticalRepository
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
             ),
-            [['member'   => 'DimKesesuaianBidang.label',
-              'operator' => 'equals',
-              'values'   => [$labelKesesuaian]]],
+            !empty($labels) ? [[
+                'member'   => 'DimKesesuaianBidang.label',
+                'operator' => 'equals',   // Cube.js: equals + multiple values = IN (...)
+                'values'   => $labels,
+            ]] : [],
         );
 
         if ($search !== null && $search !== '') {
@@ -195,13 +207,13 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         ]);
 
         $data = $result->map(fn($r) => [
-            'nama'              => $r['DimAlumni.nama']              ?? '',
-            'nim'               => $r['DimAlumni.nim']               ?? '',
-            'nama_prodi'        => $r['DimProdi.nama_prodi']         ?? '',
-            'jenjang'           => $r['DimProdi.jenjang']            ?? '',
-            'tahun_lulus'       => $r['DimAlumni.tahun_lulus']       ?? '',
-            'kesesuaian_bidang' => $r['DimKesesuaianBidang.label']   ?? '',
-            'status'            => $r['DimStatusAlumni.label']       ?? '',
+            'nama'              => $r['DimAlumni.nama']            ?? '',
+            'nim'               => $r['DimAlumni.nim']             ?? '',
+            'nama_prodi'        => $r['DimProdi.nama_prodi']       ?? '',
+            'jenjang'           => $r['DimProdi.jenjang']          ?? '',
+            'tahun_lulus'       => $r['DimAlumni.tahun_lulus']     ?? '',
+            'kesesuaian_bidang' => $r['DimKesesuaianBidang.label'] ?? '',
+            'status'            => $r['DimStatusAlumni.label']     ?? '',
         ])->toArray();
 
         return [
@@ -213,8 +225,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  DRILL-DOWN ALASAN — alumni per alasan kerja tidak sesuai
-    //  Source: FactMultiSelect (bukan FactTracerStudy)
+    //  5. DRILL-DOWN ALASAN — alumni per alasan kerja tidak sesuai
     // ──────────────────────────────────────────────────────────────
 
     /**
@@ -280,12 +291,12 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         ]);
 
         $data = $result->map(fn($r) => [
-            'nama'              => $r['DimAlumni.nama']                        ?? '',
-            'nim'               => $r['DimAlumni.nim']                         ?? '',
-            'nama_prodi'        => $r['DimProdi.nama_prodi']                   ?? '',
-            'jenjang'           => $r['DimProdi.jenjang']                      ?? '',
-            'tahun_lulus'       => $r['DimAlumni.tahun_lulus']                 ?? '',
-            'alasan'            => $r['DimIndikatorEvaluasi.label_pertanyaan'] ?? '',
+            'nama'        => $r['DimAlumni.nama']                        ?? '',
+            'nim'         => $r['DimAlumni.nim']                         ?? '',
+            'nama_prodi'  => $r['DimProdi.nama_prodi']                   ?? '',
+            'jenjang'     => $r['DimProdi.jenjang']                      ?? '',
+            'tahun_lulus' => $r['DimAlumni.tahun_lulus']                 ?? '',
+            'alasan'      => $r['DimIndikatorEvaluasi.label_pertanyaan'] ?? '',
         ])->toArray();
 
         return [
