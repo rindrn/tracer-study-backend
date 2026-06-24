@@ -15,21 +15,18 @@ use Illuminate\Support\Facades\DB;
  *   - alumni_profiles    (id, program_id, name, nim, graduation_year)
  *   - responses          (id, alumni_id, status, started_at, submitted_at)
  *
+ * Definisi status (murni dari kolom r.status, tidak ada hubungan submitted_at):
+ *   submitted = Sudah Mengisi
+ *   started   = Belum Mengisi (termasuk alumni tanpa row responses / NULL)
+ *   ongoing   = Sedang Mengisi
  */
 class SummaryRepository
 {
     // ──────────────────────────────────────────────────────────────
-    //  1. AGREGAT UTAMA — total, sudah mengisi, belum mengisi, avg waktu
+    //  1. AGREGAT UTAMA
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Hitung agregat utama untuk filter yang diberikan (TANPA breakdown
-     * per tahun — dipakai untuk angka "saat ini").
-     *
-     * Rata-rata waktu pengisian = AVG(submitted_at - started_at) dalam JAM,
-     * HANYA dari row yang started_at IS NOT NULL (sesuai instruksi: skip
-     * row yang started_at null karena dianggap data tidak lengkap).
-     *
      * @return array{
      *   total: int,
      *   count_submitted: int,
@@ -48,8 +45,10 @@ class SummaryRepository
             ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
             ->select([
                 DB::raw('COUNT(ap.id) as total'),
-                DB::raw('SUM(CASE WHEN r.submitted_at IS NOT NULL THEN 1 ELSE 0 END) as count_submitted'),
-                // AVG durasi dalam jam, hanya baris dengan started_at terisi
+                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_submitted"),
+                DB::raw("SUM(CASE WHEN r.status = 'started' OR r.status IS NULL THEN 1 ELSE 0 END) as count_not_submitted"),
+                // Rata-rata durasi pengisian dalam jam — tetap pakai started_at & submitted_at
+                // karena ini kolom timestamp, bukan status
                 DB::raw("AVG(CASE WHEN r.started_at IS NOT NULL AND r.submitted_at IS NOT NULL
                             THEN EXTRACT(EPOCH FROM (submitted_at - started_at)) / 3600.0
                             ELSE NULL END) as avg_fill_hours"),
@@ -61,27 +60,22 @@ class SummaryRepository
 
         $r = $query->first();
 
-        $total           = (int) ($r->total           ?? 0);
-        $countSubmitted  = (int) ($r->count_submitted  ?? 0);
-
         return [
-            'total'                => $total,
-            'count_submitted'      => $countSubmitted,
-            'count_not_submitted'  => $total - $countSubmitted,
-            'avg_fill_hours'       => $r->avg_fill_hours !== null ? (float) $r->avg_fill_hours : null,
-            'count_with_duration'  => (int) ($r->count_with_duration ?? 0),
+            'total'               => (int) ($r->total                ?? 0),
+            'count_submitted'     => (int) ($r->count_submitted      ?? 0),
+            'count_not_submitted' => (int) ($r->count_not_submitted  ?? 0),
+            'avg_fill_hours'      => $r->avg_fill_hours !== null ? (float) $r->avg_fill_hours : null,
+            'count_with_duration' => (int) ($r->count_with_duration  ?? 0),
         ];
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  2. RESPONSE RATE PER TAHUN — untuk badge trend di card Response Rate
+    //  2. RESPONSE RATE PER TAHUN — untuk badge trend
     // ──────────────────────────────────────────────────────────────
 
     /**
      * Response rate per graduation_year, diurutkan ascending.
-     * "Responded" di sini = submitted_at IS NOT NULL (selesai), KONSISTEN
-     * dengan definisi "Sudah Mengisi" pada card (bukan on_going+selesai
-     * seperti di KPI Response Rate /bar).
+     * "Responded" = r.status = 'submitted' (murni dari status, bukan submitted_at).
      *
      * @return array<int, array{graduation_year: string, total: int, count_submitted: int, rate: float}>
      */
@@ -96,7 +90,7 @@ class SummaryRepository
             ->select([
                 'ap.graduation_year as graduation_year',
                 DB::raw('COUNT(ap.id) as total'),
-                DB::raw('SUM(CASE WHEN r.submitted_at IS NOT NULL THEN 1 ELSE 0 END) as count_submitted'),
+                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_submitted"),
             ])
             ->groupBy('ap.graduation_year');
 

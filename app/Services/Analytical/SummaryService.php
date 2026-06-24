@@ -9,30 +9,19 @@ use App\Repositories\Analytical\SummaryRepository;
  * SummaryService
  *
  * Orkestrasi data dari SummaryRepository untuk 5 Summary Card di Overview Page:
- *   1. Total Kuesioner   — total alumni (= total kuesioner yang "dikirim")
- *   2. Sudah Mengisi     — count submitted_at IS NOT NULL
+ *   1. Total Kuesioner   — total alumni
+ *   2. Sudah Mengisi     — count r.status = 'submitted'
  *   3. Response Rate     — (sudah mengisi / total) × 100%, + badge trend
  *   4. Rata-rata Waktu   — AVG(submitted_at - started_at), skip started_at null
- *   5. Belum Mengisi     — total - sudah mengisi
+ *   5. Belum Mengisi     — count r.status = 'started' OR r.status IS NULL
  *
- * Catatan: card "Tren 5 Thn" yang sebelumnya ada DIHAPUS — labelnya ambigu
- * (cuma bandingkan 2 tahun terakhir, bukan tren 5 tahun beneran) dan FE
- * juga menghapus card ini. Badge trend di card "Response Rate" TETAP ADA,
- * masih pakai logic year-over-year yang sama.
- *
- * Definisi penting (hasil klarifikasi):
- *   - "Sudah Mengisi" / response rate di card ini = submitted_at IS NOT NULL SAJA
- *     (BERBEDA dari KPI Response Rate /bar yang menghitung on_going+selesai
- *      sebagai "responded". Di card ini, "Sudah Mengisi" = SELESAI submit).
- *   - Rata-rata waktu pengisian HANYA dari row yang started_at terisi (skip null).
- *   - Badge trend "+5,2%" di card Response Rate dihitung dari selisih response
- *     rate antara graduation_year terbesar vs terbesar-1 (tidak ada tabel
- *     snapshot, jadi pakai perbandingan antar tahun lulus).
- *
+ * Definisi status (murni dari kolom r.status):
+ *   submitted = Sudah Mengisi
+ *   started   = Belum Mengisi (termasuk alumni tanpa row responses)
+ *   ongoing   = Sedang Mengisi (tidak ditampilkan di card, tapi masuk total)
  */
 class SummaryService
 {
-    /** Ambang batas (persentase poin) untuk label "Stabil" vs "Naik"/"Menurun". */
     private const STABLE_THRESHOLD_PP = 1.0;
 
     public function __construct(
@@ -68,9 +57,9 @@ class SummaryService
      */
     public function getSummary(array $params): SummaryDTO
     {
-        $jenjang    = $params['jenjang']         ?? null;
-        $namaProdi  = $params['nama_prodi']      ?? null;
-        $gradYear   = $params['graduation_year'] ?? null;
+        $jenjang   = $params['jenjang']         ?? null;
+        $namaProdi = $params['nama_prodi']      ?? null;
+        $gradYear  = $params['graduation_year'] ?? null;
 
         $agg = $this->repo->getAggregate(
             jenjang:        $jenjang,
@@ -115,7 +104,7 @@ class SummaryService
                 'count_with_duration' => $agg['count_with_duration'],
             ],
             'belum_mengisi' => [
-                'value' => $agg['count_not_submitted'],
+                'value' => $agg['count_not_submitted'],  // r.status = 'started' OR NULL
                 'hint'  => 'Follow-up',
             ],
         ];
@@ -131,19 +120,14 @@ class SummaryService
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Hitung selisih response rate (persentase poin) antara graduation_year
-     * terbesar vs terbesar-1 dari array ratePerYear (hasil getRatePerYear,
-     * sudah terurut ascending by tahun).
-     *
      * @param  array<int, array{graduation_year:string,total:int,count_submitted:int,rate:float}>  $ratePerYear
-     * @return array{0: float|null, 1: string} [trend_pp, direction] — direction: up|down|flat
+     * @return array{0: float|null, 1: string}
      */
     private function computeYearOverYearTrend(array $ratePerYear): array
     {
         $n = count($ratePerYear);
 
         if ($n < 2) {
-            // Tidak cukup data 2 tahun untuk dibandingkan
             return [null, 'flat'];
         }
 
@@ -167,7 +151,7 @@ class SummaryService
             return '-';
         }
 
-        $rounded = round($hours, 1);
+        $rounded   = round($hours, 1);
         $formatted = number_format($rounded, 1, ',', '.');
 
         return "{$formatted} jam";
