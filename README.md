@@ -69,6 +69,7 @@ Cube.js tetap berada di **belakang** Laravel agar:
 | Database Transaksional | PostgreSQL (koneksi `oltp`) |
 | Database Analitik | PostgreSQL (koneksi `olap`) via Cube.js |
 | Analytic Layer | Cube.js (JWT-secured, diakses dari backend) |
+| Cache & Pre-aggregation Store | Redis (via `predis/predis`) |
 | Auth | Laravel Sanctum (token-based) |
 | Excel Import/Export | `maatwebsite/excel` |
 | Data Eksternal | BPS Web API (untuk data UMP provinsi) |
@@ -162,6 +163,7 @@ tests/
 - PHP 8.2+ & Composer
 - PostgreSQL 14+
 - Node.js (untuk menjalankan Cube.js secara terpisah)
+- Redis (untuk cache Laravel dan pre-aggregation store Cube.js)
 - Cube.js instance yang sudah berjalan (lihat repo Cube.js terpisah)
 - Akun BPS Web API ([https://webapi.bps.go.id](https://webapi.bps.go.id)) — diperlukan untuk sinkronisasi data UMP
 
@@ -235,7 +237,34 @@ php artisan vendor:publish --provider="Maatwebsite\Excel\ExcelServiceProvider" -
 
 ---
 
-### Langkah 6 — Konfigurasi Cube.js
+### Langkah 6 — Install Redis Client (Predis)
+
+Laravel membutuhkan PHP client untuk berkomunikasi dengan Redis. SmartTracer menggunakan `predis/predis`:
+
+```bash
+composer require predis/predis
+```
+
+Pastikan Redis sudah berjalan secara lokal (default port `6379`). Untuk instalasi Redis:
+
+- **macOS:** `brew install redis && brew services start redis`
+- **Ubuntu/Debian:** `sudo apt install redis-server && sudo systemctl start redis`
+- **Windows:** Gunakan [Redis for Windows](https://github.com/microsoftarchive/redis/releases) atau WSL
+
+Verifikasi Redis berjalan:
+
+```bash
+redis-cli ping
+# Output: PONG
+```
+
+Redis digunakan untuk dua keperluan:
+- **Laravel Cache** — cache response API agar tidak query berulang ke Cube.js
+- **Cube.js Pre-aggregation Store** — menyimpan hasil pre-aggregation agar query dashboard lebih cepat (set `CUBEJS_REDIS_URL` di `.env` Cube.js)
+
+---
+
+### Langkah 7 — Konfigurasi Cube.js
 
 Pastikan Cube.js sudah berjalan (repo terpisah). Isi di `.env`:
 
@@ -254,7 +283,7 @@ Artinya satu instance client digunakan selama satu request lifecycle — tidak a
 
 ---
 
-### Langkah 7 — Jalankan Server
+### Langkah 8 — Jalankan Server
 
 ```bash
 php artisan serve
@@ -313,6 +342,17 @@ CUBEJS_BASE_URL=http://localhost:4000
 # Secret untuk generate JWT — salin dari .env Cube.js
 CUBEJS_API_SECRET=
 
+# ── Redis ──────────────────────────────────────────────────────
+# Digunakan untuk Laravel Cache dan Cube.js pre-aggregation store
+# Pastikan sudah install: composer require predis/predis
+REDIS_CLIENT=predis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=null
+
+# ── Cache ──────────────────────────────────────────────────────
+CACHE_STORE=redis
+
 # ── Sanctum (CORS untuk frontend) ─────────────────────────────
 SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000
 
@@ -323,7 +363,6 @@ BPS_API_KEY=
 # ── Laravel Defaults (boleh dibiarkan) ────────────────────────
 DB_CONNECTION=oltp
 SESSION_DRIVER=array
-CACHE_STORE=array
 QUEUE_CONNECTION=sync
 LOG_CHANNEL=stack
 LOG_LEVEL=debug
@@ -412,7 +451,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
             'measures'   => ['FactTracerStudy.count_alumni'],
             'dimensions' => [
                 'DimProdi.nama_prodi',
-                'DimMasaTunggu.label',          // ← dimension baru
+                'DimMasaTunggu.label',
                 'DimAlumni.tahun_lulus',
             ],
             'filters' => $filters,
@@ -465,7 +504,6 @@ class MasaTungguService
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
         );
 
-        // Kalkulasi bisnis (pct, dll.) dilakukan di sini, bukan di Repository
         $total = $raw->sum('count_alumni');
 
         $data = $raw->map(fn($r) => [
