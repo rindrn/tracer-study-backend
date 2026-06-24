@@ -61,7 +61,7 @@ class WirausahaController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'tingkat'         => 'nullable|string|in:Lokal,Nasional,Internasional',
+            'jabatan'         => 'nullable|string|in:Staff,Co-Founder,Owner,Founder,CEO,Manager,Direktur',
             'jenjang'         => 'nullable|string|in:D3,D4',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -71,10 +71,9 @@ class WirausahaController extends Controller
             'per_page'        => 'nullable|integer|min:5|max:100',
         ]);
 
-        // scopedParams() hanya meneruskan global filters — params spesifik
-        // endpoint diambil langsung dari request dan di-merge
+        // scopedParams() hanya meneruskan global filters — params spesifik diambil langsung
         $p = array_merge($this->scopedParams($request), [
-            'tingkat'  => $request->input('tingkat'),
+            'jabatan'  => $request->input('jabatan'),
             'search'   => $request->input('search'),
             'page'     => $request->input('page'),
             'per_page' => $request->input('per_page'),

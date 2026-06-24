@@ -6,7 +6,7 @@ class WirausahaDrillDownDTO
 {
     public function __construct(
         private readonly array   $data,
-        private readonly ?string $tingkat,  // null = semua tingkat (tidak difilter)
+        private readonly ?string $jabatan,  
         private readonly int     $page,
         private readonly int     $perPage,
         private readonly int     $totalOnPage,
@@ -16,7 +16,7 @@ class WirausahaDrillDownDTO
     public function toArray(): array
     {
         return [
-            'tingkat'    => $this->tingkat, 
+            'jabatan'    => $this->jabatan, 
             'filters'    => $this->filters,
             'pagination' => [
                 'page'          => $this->page,
