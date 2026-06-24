@@ -5,16 +5,28 @@ namespace App\Services\ETL;
 use App\Repositories\ETL\OlapLoadRepository;
 
 /**
- * ETL untuk dim_wirausaha. SCD Type 2 (terkonfirmasi: valid_from,
- * valid_to, flag_wirausaha ada di schema).
+ * Sinkronisasi dim_wirausaha (SCD Type 2).
  *
- * Sama seperti dim_perusahaan, OLTP TIDAK punya tabel wirausaha
- * tersendiri -- jabatan, lokasi usaha, dst adalah JAWABAN alumni yang
- * memilih f8='3' (Wiraswasta). Business key di-derive dari kombinasi
- * jawaban relevan milik satu alumni.
+ * Business key: id_alumni (surrogate key dari dim_alumni).
  *
- * Dipanggil inline dari AlumniFactBuilderService setelah jawaban
- * alumni di-pivot, sama seperti PerusahaanDimService.
+ * Alasan perubahan dari business key lama ("jabatan|kota"):
+ *   Wirausaha adalah usaha MILIK SATU ALUMNI — tidak ada dua alumni yang
+ *   berbagi satu entitas wirausaha yang sama. Business key "jabatan|kota"
+ *   menyebabkan collision: dua alumni dengan jabatan dan kota yang sama
+ *   akan dianggap satu entitas, dan ETL alumni kedua akan menutup versi
+ *   aktif alumni pertama (flag_wirausaha → false) karena SCD Type 2
+ *   mendeteksi "perubahan atribut" padahal itu entitas berbeda.
+ *
+ *   Dengan business key = id_alumni (SK dari dim_alumni), setiap alumni
+ *   memiliki entitas wirausaha-nya sendiri. SCD Type 2 tetap bermakna:
+ *   jika pada snapshot berikutnya alumni melaporkan jabatan atau kota
+ *   yang berbeda, versi lama ditutup dan versi baru dibuat — riwayat
+ *   perkembangan usaha alumni ter-track dengan benar.
+ *
+ *   id_alumni dipilih daripada NIM karena:
+ *   - Konsisten dengan pola dimensi lain yang menggunakan surrogate key
+ *   - dim_alumni sudah pasti tersinkronisasi sebelum loop fact dijalankan
+ *   - $alumniSk sudah tersedia di AlumniFactBuilderService tanpa query tambahan
  */
 class WirausahaDimService
 {
@@ -23,19 +35,26 @@ class WirausahaDimService
     ) {}
 
     /**
-     * @param array $resolvedAnswers harus berisi 'jabatan', 'kota', 'provinsi',
-     *              'tingkat_instansi' (sesuaikan question_code asli saat wiring)
-     * @return int|null wirausaha_sk, null jika alumni bukan wiraswasta
+     * @param array $resolvedAnswers  hasil pivot EAV alumni ini
+     * @param int   $alumniSk         surrogate key dari dim_alumni (id_alumni)
+     * @param \DateTimeInterface $snapshotDate
+     * @return int|null wirausaha_sk, atau null jika alumni tidak wirausaha (f5c kosong)
      */
-    public function syncAndResolveSk(array $resolvedAnswers, \DateTimeInterface $snapshotDate): ?int
-    {
+    public function syncAndResolveSk(
+        array $resolvedAnswers,
+        int $alumniSk,
+        \DateTimeInterface $snapshotDate
+    ): ?int {
         $jabatan = $resolvedAnswers['jabatan'] ?? null;
 
+        // Jika tidak ada jawaban f5c (jabatan wirausaha), alumni ini bukan wirausaha
         if ($jabatan === null) {
-            return null; // alumni bukan wiraswasta / tidak mengisi data ini
+            return null;
         }
 
-        $idWirausaha = $this->deriveBusinessKey($jabatan, $resolvedAnswers['kota'] ?? '');
+        // Business key = id_alumni (surrogate key dim_alumni)
+        // Setiap alumni punya entitas wirausaha sendiri -- tidak ada sharing antar alumni
+        $idWirausaha = $alumniSk;
 
         $newAttributes = [
             'id_wirausaha'           => $idWirausaha,
@@ -51,9 +70,11 @@ class WirausahaDimService
             return $this->olapRepo->insertNewWirausahaVersion($newAttributes, $snapshotDate);
         }
 
-        $hasChanged = $active->label_tingkat_instansi !== $newAttributes['label_tingkat_instansi']
-            || $active->nama_provinsi !== $newAttributes['nama_provinsi']
-            || $active->nama_kota !== $newAttributes['nama_kota'];
+        // Deteksi perubahan atribut wirausaha antar snapshot
+        $hasChanged = $active->jabatan                !== $newAttributes['jabatan']
+            || $active->label_tingkat_instansi !== $newAttributes['label_tingkat_instansi']
+            || $active->nama_provinsi          !== $newAttributes['nama_provinsi']
+            || $active->nama_kota              !== $newAttributes['nama_kota'];
 
         if ($hasChanged) {
             $this->olapRepo->closeWirausahaVersion($active->wirausaha_sk, $snapshotDate);
@@ -61,12 +82,5 @@ class WirausahaDimService
         }
 
         return $active->wirausaha_sk;
-    }
-
-    private function deriveBusinessKey(string $jabatan, string $kota): string
-    {
-        return mb_strtolower(trim($jabatan))
-            . '|'
-            . mb_strtolower(trim($kota));
     }
 }
