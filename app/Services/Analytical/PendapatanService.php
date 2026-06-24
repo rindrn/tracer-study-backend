@@ -7,22 +7,14 @@ use App\DTOs\Analytical\Pendapatan\PendapatanDistribusiDTO;
 use App\DTOs\Analytical\Pendapatan\PendapatanDrillDownDTO;
 use App\DTOs\Analytical\Pendapatan\PendapatanBarDTO;
 use App\Repositories\Analytical\PendapatanRepository;
+use App\Traits\WithCache;
 
-/**
- * PendapatanService
- *
- * Orkestrasi logika bisnis untuk segmen Pendapatan Lulusan.
- * - Semua logika kalkulasi (pct, target) ada di sini, bukan di Repository/Controller.
- * - TARGET_PCT = standar LAM BAN-PT 3.0 Level Baik (60% ≥ 1,2× UMP).
- *   Kalau standar berubah, edit konstanta ini saja.
- */
 class PendapatanService
 {
-    /**
-     * Standar LAM BAN-PT 3.0 Level Baik: 60% alumni ≥ 1,2× UMP.
-     * Ditampilkan sebagai garis merah putus-putus di dual-axis chart.
-     */
+    use WithCache;
+
     private const TARGET_PCT = 60.0;
+    private const TTL        = 3600; // 1 jam
 
     public function __construct(
         private readonly PendapatanRepository $repo,
@@ -32,19 +24,25 @@ class PendapatanService
 
     public function getBar(array $params): PendapatanBarDTO
     {
-        $rows = $this->repo->getGajiPerTahun(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $key = $this->key('pendapatan:bar', $params);
 
-        $availableTahun = $rows->pluck('tahun_lulus')
-            ->unique()->sort()->values()->toArray();
+        $cached = $this->remember($key, function () use ($params) {
+            $rows = $this->repo->getGajiPerTahun(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
+
+            return [
+                'rows'           => $rows->values()->toArray(),
+                'availableTahun' => $rows->pluck('tahun_lulus')->unique()->sort()->values()->toArray(),
+            ];
+        }, self::TTL);
 
         return new PendapatanBarDTO(
-            rows:           $rows->values()->toArray(),
-            availableTahun: $availableTahun,
+            rows:           $cached['rows'],
+            availableTahun: $cached['availableTahun'],
             filters:        array_filter($params),
         );
     }
@@ -53,22 +51,31 @@ class PendapatanService
 
     public function getDistribusi(array $params): PendapatanDistribusiDTO
     {
-        $rows = $this->repo->getProporsiUmpPerTahun(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $key = $this->key('pendapatan:distribusi', $params);
 
-        $availableTahun = $rows->pluck('tahun_lulus')->unique()->sort()->values()->toArray();
+        $cached = $this->remember($key, function () use ($params) {
+            $rows = $this->repo->getProporsiUmpPerTahun(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
+
+            return [
+                'rows'           => $rows->values()->toArray(),
+                'availableTahun' => $rows->pluck('tahun_lulus')->unique()->sort()->values()->toArray(),
+            ];
+        }, self::TTL);
 
         return new PendapatanDistribusiDTO(
-            rows:           $rows->values()->toArray(),
-            availableTahun: $availableTahun,
+            rows:           $cached['rows'],
+            availableTahun: $cached['availableTahun'],
             filters:        array_filter($params),
         );
     }
 
+    // ──────────────────────────────────────────────────────────────
+    // DrillDown tidak di-cache
     // ──────────────────────────────────────────────────────────────
 
     public function getDrillDown(array $params): PendapatanDrillDownDTO
@@ -88,7 +95,6 @@ class PendapatanService
             perPage:        $perPage,
         );
 
-        // Label segmen untuk response — human-readable
         $segmenLabel = match ($params['segmen_ump'] ?? null) {
             'above_ump' => '≥ 1,2× UMP',
             'below_ump' => '< 1,2× UMP',
@@ -111,19 +117,32 @@ class PendapatanService
 
     public function getBandingkan(array $params): PendapatanBandingkanDTO
     {
-        $result = $this->repo->getUmpPerProdi(
-            prodiFilter:    $params['prodi']           ?? [],
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $key = $this->key('pendapatan:bandingkan', $params);
+
+        $cached = $this->remember($key, function () use ($params) {
+            return $this->repo->getUmpPerProdi(
+                prodiFilter:    $params['prodi']           ?? [],
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
+        }, self::TTL);
 
         return new PendapatanBandingkanDTO(
-            chart:     $result['chart'],
-            table:     $result['table'],
-            prodiList: $result['prodi_list'],
+            chart:     $cached['chart'],
+            table:     $cached['table'],
+            prodiList: $cached['prodi_list'],
             filters:   array_filter($params, fn($v, $k) => $k !== 'prodi', ARRAY_FILTER_USE_BOTH),
         );
+    }
+
+    // ──────────────────────────────────────────────────────────────
+
+    private function key(string $prefix, array $params): string
+    {
+        $relevant = array_diff_key($params, array_flip(['page', 'per_page', 'search']));
+        ksort($relevant);
+        return $prefix . ':' . md5(json_encode($relevant));
     }
 }

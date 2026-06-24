@@ -7,52 +7,61 @@ use App\DTOs\Analytical\Wirausaha\WirausahaPieDTO;
 use App\DTOs\Analytical\Wirausaha\WirausahaDrillDownDTO;
 use App\DTOs\Analytical\Wirausaha\WirausahaBandingkanDTO;
 use App\Repositories\Analytical\WirausahaRepository;
+use App\Traits\WithCache;
 
 class WirausahaService
 {
+    use WithCache;
+
+    private const TTL = 3600; // 1 jam — sesuaikan dengan interval ETL
+
     public function __construct(
         private readonly WirausahaRepository $repo,
     ) {}
 
+    // ──────────────────────────────────────────────────────────────
+
     public function getBar(array $params): WirausahaBarDTO
     {
-        // Ambil dua query paralel
-        $wirausaha = $this->repo->getBarData(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $key = $this->key('wirausaha:bar', $params);
 
-        $totals = $this->repo->getBarDataTotal(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $data = $this->remember($key, function () use ($params) {
+            $wirausaha = $this->repo->getBarData(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        // Index total by "nama_prodi|tahun_lulus"
-        $totalMap = $totals->keyBy(fn($r) => $r['nama_prodi'] . '|' . $r['tahun_lulus']);
+            $totals = $this->repo->getBarDataTotal(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        $data = $wirausaha->map(function ($r) use ($totalMap) {
-            $key         = $r['nama_prodi'] . '|' . $r['tahun_lulus'];
-            $totalAlumni = $totalMap->get($key)['count_alumni'] ?? 0;
-            $pct         = $totalAlumni > 0
-                ? round($r['count_wirausaha'] / $totalAlumni * 100, 1)
-                : 0.0;
+            $totalMap = $totals->keyBy(fn($r) => $r['nama_prodi'] . '|' . $r['tahun_lulus']);
 
-            return [
-                'nama_prodi'               => $r['nama_prodi'],
-                'jenjang'                  => $r['jenjang'],
-                'tahun_lulus'              => $r['tahun_lulus'],
-                'count_alumni'             => $totalAlumni,
-                'count_wirausaha'          => $r['count_wirausaha'],
-                'pct_wirausaha'            => $pct,
-                'avg_masa_tunggu_wirausaha'=> round($r['avg_masa_tunggu_wirausaha'], 1),
-            ];
-        })->values()->toArray();
+            return $wirausaha->map(function ($r) use ($totalMap) {
+                $key         = $r['nama_prodi'] . '|' . $r['tahun_lulus'];
+                $totalAlumni = $totalMap->get($key)['count_alumni'] ?? 0;
+                $pct         = $totalAlumni > 0
+                    ? round($r['count_wirausaha'] / $totalAlumni * 100, 1)
+                    : 0.0;
+
+                return [
+                    'nama_prodi'                => $r['nama_prodi'],
+                    'jenjang'                   => $r['jenjang'],
+                    'tahun_lulus'               => $r['tahun_lulus'],
+                    'count_alumni'              => $totalAlumni,
+                    'count_wirausaha'           => $r['count_wirausaha'],
+                    'pct_wirausaha'             => $pct,
+                    'avg_masa_tunggu_wirausaha' => round($r['avg_masa_tunggu_wirausaha'], 1),
+                ];
+            })->values()->toArray();
+        }, self::TTL);
 
         return new WirausahaBarDTO(
             data:    $data,
@@ -60,59 +69,72 @@ class WirausahaService
         );
     }
 
+    // ──────────────────────────────────────────────────────────────
+
     public function getPie(array $params): WirausahaPieDTO
     {
-        $posisiRaw = $this->repo->getPiePosisi(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $key = $this->key('wirausaha:pie', $params);
 
-        $kotaRaw = $this->repo->getKotaData(
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $cached = $this->remember($key, function () use ($params) {
+            $posisiRaw = $this->repo->getPiePosisi(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        $total = $posisiRaw->sum('count');
+            $kotaRaw = $this->repo->getKotaData(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        // Pisahkan top-3 dan sisanya
-        $top3      = $posisiRaw->take(3);
-        $lainnya   = $posisiRaw->skip(3);
-        $countLain = $lainnya->sum('count');
+            $total     = $posisiRaw->sum('count');
+            $top3      = $posisiRaw->take(3);
+            $lainnya   = $posisiRaw->skip(3);
+            $countLain = $lainnya->sum('count');
 
-        $posisi = $top3->map(fn($r) => [
-            'label' => $r['label'],
-            'count' => $r['count'],
-            'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
-        ])->values()->toArray();
+            $posisi = $top3->map(fn($r) => [
+                'label' => $r['label'],
+                'count' => $r['count'],
+                'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
+            ])->values()->toArray();
 
-        // Tambahkan "Lainnya" hanya kalau ada data di rank 4+
-        if ($countLain > 0) {
-            $posisi[] = [
-                'label' => 'Lainnya',
-                'count' => $countLain,
-                'pct'   => $total > 0 ? round($countLain / $total * 100, 1) : 0.0,
+            if ($countLain > 0) {
+                $posisi[] = [
+                    'label' => 'Lainnya',
+                    'count' => $countLain,
+                    'pct'   => $total > 0 ? round($countLain / $total * 100, 1) : 0.0,
+                ];
+            }
+
+            return [
+                'posisi'      => $posisi,
+                'sebaranKota' => $kotaRaw->values()->toArray(),
+                'total'       => $total,
             ];
-        }
+        }, self::TTL);
 
         return new WirausahaPieDTO(
-            posisi:      $posisi,
-            sebaranKota: $kotaRaw->values()->toArray(),
-            total:       $total,
+            posisi:      $cached['posisi'],
+            sebaranKota: $cached['sebaranKota'],
+            total:       $cached['total'],
             filters:     $this->activeFilters($params),
         );
     }
+
+    // ──────────────────────────────────────────────────────────────
+    // DrillDown tidak di-cache
+    // ──────────────────────────────────────────────────────────────
 
     public function getDrillDown(array $params): WirausahaDrillDownDTO
     {
         $page    = max(1, (int) ($params['page']     ?? 1));
         $perPage = min(100, max(5, (int) ($params['per_page'] ?? 15)));
-        $jabatan = $params['jabatan'] ?? null; // opsional — null = semua jabatan
+        $jabatan = $params['jabatan'] ?? null;
 
         $result = $this->repo->getDetailAlumni(
             jabatan:        $jabatan,
@@ -137,76 +159,84 @@ class WirausahaService
         );
     }
 
+    // ──────────────────────────────────────────────────────────────
+
     public function getBandingkan(array $params): WirausahaBandingkanDTO
     {
-        $prodiFilter = $params['prodi'] ?? [];
-        if (is_string($prodiFilter)) {
-            $prodiFilter = [$prodiFilter];
-        }
+        $key = $this->key('wirausaha:bandingkan', $params);
 
-        $raw = $this->repo->getBandingkanData(
-            prodiFilter:    $prodiFilter,
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+        $cached = $this->remember($key, function () use ($params) {
+            $prodiFilter = is_string($params['prodi'] ?? null)
+                ? [$params['prodi']]
+                : ($params['prodi'] ?? []);
 
-        $totals = $this->repo->getBandingkanTotal(
-            prodiFilter:    $prodiFilter,
-            jenjang:        $params['jenjang']         ?? null,
-            jurusan:        $params['jurusan']         ?? null,
-            tahunLulus:     $params['tahun_lulus']     ?? null,
-            mingguSnapshot: $params['minggu_snapshot'] ?? null,
-        );
+            $raw = $this->repo->getBandingkanData(
+                prodiFilter:    $prodiFilter,
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        // Index total by nama_prodi
-        $totalMap = $totals->keyBy('nama_prodi');
+            $totals = $this->repo->getBandingkanTotal(
+                prodiFilter:    $prodiFilter,
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            );
 
-        // Group raw by nama_prodi
-        $grouped = $raw->groupBy('nama_prodi');
+            $totalMap  = $totals->keyBy('nama_prodi');
+            $chart     = [];
+            $prodiList = [];
 
-        $chart     = [];
-        $prodiList = [];
+            foreach ($raw->groupBy('nama_prodi') as $namaProdi => $rows) {
+                $first       = $rows->first();
+                $totalAlumni = $totalMap->get($namaProdi)['count_alumni'] ?? 0;
+                $countWir    = $rows->sum('count_wirausaha');
+                $pctWir      = $totalAlumni > 0 ? round($countWir / $totalAlumni * 100, 1) : 0.0;
 
-        foreach ($grouped as $namaProdi => $rows) {
-            $first        = $rows->first();
-            $totalAlumni  = $totalMap->get($namaProdi)['count_alumni'] ?? 0;
-            $countWir     = $rows->sum('count_wirausaha');
-            $pctWir       = $totalAlumni > 0 ? round($countWir / $totalAlumni * 100, 1) : 0.0;
+                $weightedSum  = $rows->sum(fn($r) => $r['avg_masa_tunggu'] * $r['count_wirausaha']);
+                $avgMasTunggu = $countWir > 0 ? round($weightedSum / $countWir, 1) : 0.0;
 
-            // Weighted avg masa tunggu
-            $weightedSum = $rows->sum(fn($r) => $r['avg_masa_tunggu'] * $r['count_wirausaha']);
-            $avgMasTunggu = $countWir > 0 ? round($weightedSum / $countWir, 1) : 0.0;
+                $jabatanBreakdown = $rows->groupBy('jabatan')->map(function ($tRows, $label) use ($countWir) {
+                    $tCount = $tRows->sum('count_wirausaha');
+                    return [
+                        'label' => $label,
+                        'count' => $tCount,
+                        'pct'   => $countWir > 0 ? round($tCount / $countWir * 100, 1) : 0.0,
+                    ];
+                })->values()->toArray();
 
-            // Breakdown per jabatan
-            $jabatanBreakdown = $rows->groupBy('jabatan')->map(function ($tRows, $label) use ($countWir) {
-                $tCount = $tRows->sum('count_wirausaha');
-                return [
-                    'label' => $label,
-                    'count' => $tCount,
-                    'pct'   => $countWir > 0 ? round($tCount / $countWir * 100, 1) : 0.0,
+                $chart[]     = [
+                    'nama_prodi'                => $namaProdi,
+                    'jenjang'                   => $first['jenjang'],
+                    'total_alumni'              => $totalAlumni,
+                    'count_wirausaha'           => $countWir,
+                    'pct_wirausaha'             => $pctWir,
+                    'avg_masa_tunggu_wirausaha' => $avgMasTunggu,
+                    'jabatan'                   => $jabatanBreakdown,
                 ];
-            })->values()->toArray();
+                $prodiList[] = $namaProdi;
+            }
 
-            $chart[]     = [
-                'nama_prodi'               => $namaProdi,
-                'jenjang'                  => $first['jenjang'],
-                'total_alumni'             => $totalAlumni,
-                'count_wirausaha'          => $countWir,
-                'pct_wirausaha'            => $pctWir,
-                'avg_masa_tunggu_wirausaha'=> $avgMasTunggu,
-                'jabatan'                  => $jabatanBreakdown,
-            ];
-
-            $prodiList[] = $namaProdi;
-        }
+            return ['chart' => $chart, 'prodiList' => array_values(array_unique($prodiList))];
+        }, self::TTL);
 
         return new WirausahaBandingkanDTO(
-            chart:     $chart,
-            prodiList: array_values(array_unique($prodiList)),
+            chart:     $cached['chart'],
+            prodiList: $cached['prodiList'],
             filters:   $this->activeFilters($params),
         );
+    }
+
+    // ──────────────────────────────────────────────────────────────
+
+    private function key(string $prefix, array $params): string
+    {
+        $relevant = array_diff_key($params, array_flip(['page', 'per_page', 'search']));
+        ksort($relevant);
+        return $prefix . ':' . md5(json_encode($relevant));
     }
 
     private function activeFilters(array $params, array $keys = []): array
