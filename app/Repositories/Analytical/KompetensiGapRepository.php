@@ -145,7 +145,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
      * @return array{data: array, page: int, per_page: int, total_on_page: int}
      */
     public function getDetailAlumni(
-        string  $kodeField,
+        string  $grupGap,
         ?string $jenjang        = null,
         ?string $jurusan        = null,
         ?string $namaProdi      = null,
@@ -155,23 +155,20 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
         int     $page           = 1,
         int     $perPage        = 15,
     ): array {
-        $filters = array_merge(
-            $this->buildGlobalFilters(
-                jenjang:        $jenjang,
-                jurusan:        $jurusan,
-                namaProdi:      $namaProdi,
-                tahunLulus:     $tahunLulus,
-                mingguSnapshot: $mingguSnapshot,
-            ),
-            [
-                [
-                    'member'   => 'DimIndikatorEvaluasi.kode_field',
-                    'operator' => 'equals',
-                    'values'   => [$kodeField],
-                ],
-                self::FILTER_KATEGORI,
-            ],
+        $filters = $this->buildGlobalFilters(
+            jenjang:        $jenjang,
+            jurusan:        $jurusan,
+            namaProdi:      $namaProdi,
+            tahunLulus:     $tahunLulus,
+            mingguSnapshot: $mingguSnapshot,
         );
+
+        // Filter grup_gap
+        $filters[] = [
+            'member'   => 'DimIndikatorEvaluasi.grup_gap',
+            'operator' => 'equals',
+            'values'   => [$grupGap],
+        ];
 
         if ($search !== null && $search !== '') {
             $filters[] = [
@@ -181,7 +178,11 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
             ];
         }
 
-        $result = $this->cube->load([
+        // Tidak include FILTER_KATEGORI di sini — split per query A dan B di bawah
+
+        // 2 query terpisah karena Cube pre-agg hanya return 1 kategori per alumni
+        // ketika kategori_pertanyaan ada di dimensions (deduplication issue)
+        $baseQuery = [
             'measures'   => ['FactRangeEvaluasi.avg_skor'],
             'dimensions' => [
                 'DimAlumni.nama',
@@ -189,37 +190,51 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
                 'DimProdi.nama_prodi',
                 'DimProdi.jenjang',
                 'DimAlumni.tahun_lulus',
-                'DimIndikatorEvaluasi.kategori_pertanyaan',
-                'DimIndikatorEvaluasi.kode_field',
             ],
-            'filters' => $filters,
-            'order'   => [['DimAlumni.nama', 'asc']],
-            'limit'   => $perPage * 2, // ×2 karena setiap alumni ada 2 baris (A+B)
-            'offset'  => ($page - 1) * $perPage * 2,
-        ]);
+            'order'  => [['DimAlumni.nama', 'asc']],
+            'limit'  => $perPage,
+            'offset' => ($page - 1) * $perPage,
+        ];
 
-        // Join baris A+B per alumni → 1 row dengan skor_lulus + skor_dibutuhkan
-        $byAlumni = $result->groupBy(
-            fn($r) => ($r['DimAlumni.nim'] ?? '') . '||' . ($r['DimAlumni.nama'] ?? '')
-        );
+        $filtersA = array_merge($filters, [[
+            'member'   => 'DimIndikatorEvaluasi.kategori_pertanyaan',
+            'operator' => 'equals',
+            'values'   => ['Kompetensi_A'],
+        ]]);
 
-        $data = $byAlumni->map(function ($rows) {
-            $rowA  = $rows->firstWhere('DimIndikatorEvaluasi.kategori_pertanyaan', 'Kompetensi_A');
-            $rowB  = $rows->firstWhere('DimIndikatorEvaluasi.kategori_pertanyaan', 'Kompetensi_B');
-            $first = $rows->first();
+        $filtersB = array_merge($filters, [[
+            'member'   => 'DimIndikatorEvaluasi.kategori_pertanyaan',
+            'operator' => 'equals',
+            'values'   => ['Kompetensi_B'],
+        ]]);
+
+        // Hapus FILTER_KATEGORI dari $filters karena sudah di-split per query
+        // (filters sudah tidak punya FILTER_KATEGORI karena kita replace di atas)
+        $resultA = $this->cube->load(array_merge($baseQuery, ['filters' => $filtersA]));
+        $resultB = $this->cube->load(array_merge($baseQuery, ['filters' => $filtersB]));
+
+        // Index B by nim untuk lookup cepat
+        $mapB = $resultB->keyBy(fn($r) => $r['DimAlumni.nim'] ?? '');
+
+        $data = $resultA->map(function ($r) use ($mapB) {
+            $nim  = $r['DimAlumni.nim'] ?? '';
+            $rowB = $mapB->get($nim);
+
+            $skorLulus      = round((float) ($r['FactRangeEvaluasi.avg_skor'] ?? 0), 2);
+            $skorDibutuhkan = $rowB ? round((float) ($rowB['FactRangeEvaluasi.avg_skor'] ?? 0), 2) : null;
+            $gap = $skorDibutuhkan !== null
+                ? round($skorDibutuhkan - $skorLulus, 2)
+                : null;
 
             return [
-                'nama'            => $first['DimAlumni.nama']        ?? '',
-                'nim'             => $first['DimAlumni.nim']         ?? '',
-                'nama_prodi'      => $first['DimProdi.nama_prodi']   ?? '',
-                'jenjang'         => $first['DimProdi.jenjang']      ?? '',
-                'tahun_lulus'     => $first['DimAlumni.tahun_lulus'] ?? '',
-                'skor_lulus'      => isset($rowA)
-                    ? round((float) ($rowA['FactRangeEvaluasi.avg_skor'] ?? 0), 2)
-                    : null,
-                'skor_dibutuhkan' => isset($rowB)
-                    ? round((float) ($rowB['FactRangeEvaluasi.avg_skor'] ?? 0), 2)
-                    : null,
+                'nama'            => $r['DimAlumni.nama']      ?? '',
+                'nim'             => $nim,
+                'nama_prodi'      => $r['DimProdi.nama_prodi'] ?? '',
+                'jenjang'         => $r['DimProdi.jenjang']    ?? '',
+                'tahun_lulus'     => $r['DimAlumni.tahun_lulus'] ?? '',
+                'skor_lulus'      => $skorLulus,
+                'skor_dibutuhkan' => $skorDibutuhkan,
+                'gap'             => $gap,
             ];
         })->values()->toArray();
 
