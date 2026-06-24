@@ -7,125 +7,121 @@ use App\DTOs\Analytical\ResponseRate\ResponseRatePieDTO;
 use App\DTOs\Analytical\ResponseRate\ResponseRateTrendDTO;
 use App\DTOs\Analytical\ResponseRate\ResponseRateDrillDownDTO;
 use App\Repositories\Analytical\ResponseRateRepository;
+use App\Traits\WithCache;
 
 class ResponseRateService
 {
+    use WithCache;
+
+    private const TTL = 3600;
+
     public function __construct(
         private readonly ResponseRateRepository $repo,
     ) {}
 
-    // ──────────────────────────────────────────────────────────────
-    //  BAR
-    // ──────────────────────────────────────────────────────────────
+    // ── BAR ───────────────────────────────────────────────────────
 
     public function getBar(array $params): ResponseRateBarDTO
     {
         $sort = $params['sort'] ?? 'valueDesc';
+        $key  = $this->key('response_rate:bar', $params);
 
-        $raw = $this->repo->getBarData(
-            jenjang:        $params['jenjang']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            graduationYear: $params['graduation_year'] ?? null,
-        );
+        $data = $this->remember($key, function () use ($params, $sort) {
+            $raw = $this->repo->getBarData(
+                jenjang:        $params['jenjang']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                graduationYear: $params['graduation_year'] ?? null,
+            );
 
-        $data = $raw->map(function ($r) {
-            $total = $r['total'];
+            $data = $raw->map(function ($r) {
+                $total           = $r['total'];
+                $pctResponded    = $total > 0 ? round($r['count_submitted'] / $total * 100, 1) : 0.0;
+                $pctNotResponded = $total > 0 ? round(($r['count_ongoing'] + $r['count_started']) / $total * 100, 1) : 0.0;
 
-            $pctResponded    = $total > 0 ? round($r['count_submitted'] / $total * 100, 1) : 0.0;
-            $pctNotResponded = $total > 0 ? round(($r['count_ongoing'] + $r['count_started']) / $total * 100, 1) : 0.0;
+                return [
+                    'prodi'        => $r['nama_prodi'],
+                    'jenjang'      => $r['jenjang'],
+                    'responded'    => $pctResponded,
+                    'notResponded' => $pctNotResponded,
+                    'total'        => $total,
+                    'breakdown'    => [
+                        'submitted' => $r['count_submitted'],
+                        'ongoing'   => $r['count_ongoing'],
+                        'started'   => $r['count_started'],
+                    ],
+                ];
+            });
 
-            return [
-                'prodi'        => $r['nama_prodi'],
-                'jenjang'      => $r['jenjang'],
-                'responded'    => $pctResponded,
-                'notResponded' => $pctNotResponded,
-                'total'        => $total,
-                'breakdown'    => [
-                    'submitted' => $r['count_submitted'],  // Selesai
-                    'ongoing'   => $r['count_ongoing'],    // Sedang Mengisi
-                    'started'   => $r['count_started'],    // Belum Mengisi
-                ],
-            ];
-        });
-
-        $sorted = $this->applySort($data, $sort);
+            return $this->applySort($data, $sort)->values()->toArray();
+        }, self::TTL);
 
         return new ResponseRateBarDTO(
-            data:    $sorted->values()->toArray(),
+            data:    $data,
             sort:    $sort,
             filters: $this->activeFilters($params),
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  PIE
-    // ──────────────────────────────────────────────────────────────
+    // ── PIE ───────────────────────────────────────────────────────
 
     public function getPie(array $params): ResponseRatePieDTO
     {
-        $raw = $this->repo->getPieData(
-            jenjang:        $params['jenjang']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            graduationYear: $params['graduation_year'] ?? null,
-        );
+        $key = $this->key('response_rate:pie', $params);
 
-        $total = $raw['total'];
+        $cached = $this->remember($key, function () use ($params) {
+            $raw   = $this->repo->getPieData(
+                jenjang:        $params['jenjang']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                graduationYear: $params['graduation_year'] ?? null,
+            );
+            $total = $raw['total'];
 
-        $data = [
-            [
-                'name'   => 'Selesai',
-                'status' => 'submitted',   // ← langsung bisa dipakai sebagai params drilldown
-                'value'  => $raw['count_submitted'],
-                'pct'    => $total > 0 ? round($raw['count_submitted'] / $total * 100, 1) : 0.0,
-            ],
-            [
-                'name'   => 'Sedang Mengisi',
-                'status' => 'ongoing',     // ← langsung bisa dipakai sebagai params drilldown
-                'value'  => $raw['count_ongoing'],
-                'pct'    => $total > 0 ? round($raw['count_ongoing'] / $total * 100, 1) : 0.0,
-            ],
-            [
-                'name'   => 'Belum Mengisi',
-                'status' => 'started',     // ← langsung bisa dipakai sebagai params drilldown
-                'value'  => $raw['count_started'],
-                'pct'    => $total > 0 ? round($raw['count_started'] / $total * 100, 1) : 0.0,
-            ],
-        ];
+            return [
+                'data'  => [
+                    ['name' => 'Selesai',         'status' => 'submitted', 'value' => $raw['count_submitted'], 'pct' => $total > 0 ? round($raw['count_submitted'] / $total * 100, 1) : 0.0],
+                    ['name' => 'Sedang Mengisi',  'status' => 'ongoing',   'value' => $raw['count_ongoing'],   'pct' => $total > 0 ? round($raw['count_ongoing']   / $total * 100, 1) : 0.0],
+                    ['name' => 'Belum Mengisi',   'status' => 'started',   'value' => $raw['count_started'],   'pct' => $total > 0 ? round($raw['count_started']   / $total * 100, 1) : 0.0],
+                ],
+                'total' => $total,
+            ];
+        }, self::TTL);
 
         return new ResponseRatePieDTO(
-            data:    $data,
-            total:   $total,
+            data:    $cached['data'],
+            total:   $cached['total'],
             filters: $this->activeFilters($params),
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  TREND
-    // ──────────────────────────────────────────────────────────────
+    // ── TREND ─────────────────────────────────────────────────────
 
     public function getTrend(array $params): ResponseRateTrendDTO
     {
-        $raw = $this->repo->getTrendData(
-            jenjang:        $params['jenjang']         ?? null,
-            namaProdi:      $params['nama_prodi']      ?? null,
-            graduationYear: $params['graduation_year'] ?? null,
-        );
+        $key = $this->key('response_rate:trend', $params);
 
-        $data = $raw->map(function ($r) {
-            $total = $r['total'];
-            $rate  = $total > 0 ? round($r['count_submitted'] / $total * 100, 1) : 0.0;
+        $data = $this->remember($key, function () use ($params) {
+            $raw = $this->repo->getTrendData(
+                jenjang:        $params['jenjang']         ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                graduationYear: $params['graduation_year'] ?? null,
+            );
 
-            return [
-                'year'      => $r['graduation_year'],
-                'rate'      => $rate,
-                'total'     => $total,
-                'breakdown' => [
-                    'submitted' => $r['count_submitted'],
-                    'ongoing'   => $r['count_ongoing'],
-                    'started'   => $r['count_started'],
-                ],
-            ];
-        })->values()->toArray();
+            return $raw->map(function ($r) {
+                $total = $r['total'];
+                $rate  = $total > 0 ? round($r['count_submitted'] / $total * 100, 1) : 0.0;
+
+                return [
+                    'year'      => $r['graduation_year'],
+                    'rate'      => $rate,
+                    'total'     => $total,
+                    'breakdown' => [
+                        'submitted' => $r['count_submitted'],
+                        'ongoing'   => $r['count_ongoing'],
+                        'started'   => $r['count_started'],
+                    ],
+                ];
+            })->values()->toArray();
+        }, self::TTL);
 
         return new ResponseRateTrendDTO(
             data:    $data,
@@ -133,9 +129,7 @@ class ResponseRateService
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  DRILL-DOWN
-    // ──────────────────────────────────────────────────────────────
+    // ── DRILL-DOWN (tidak di-cache) ───────────────────────────────
 
     public function getDrillDown(array $params): ResponseRateDrillDownDTO
     {
@@ -164,9 +158,7 @@ class ResponseRateService
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  PRIVATE HELPERS
-    // ──────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────
 
     private function applySort(\Illuminate\Support\Collection $data, string $sort): \Illuminate\Support\Collection
     {
@@ -177,11 +169,17 @@ class ResponseRateService
         };
     }
 
+    private function key(string $prefix, array $params): string
+    {
+        $relevant = array_diff_key($params, array_flip(['page', 'per_page', 'search']));
+        ksort($relevant);
+        return $prefix . ':' . md5(json_encode($relevant));
+    }
+
     private function activeFilters(array $params, array $keys = []): array
     {
         $allKeys = ['jenjang', 'nama_prodi', 'graduation_year'];
         $keys    = empty($keys) ? $allKeys : $keys;
-
         return array_filter(
             array_intersect_key($params, array_flip($keys)),
             fn($v) => $v !== null && $v !== '' && $v !== [],
