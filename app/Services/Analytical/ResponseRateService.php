@@ -15,28 +15,9 @@ class ResponseRateService
     ) {}
 
     // ──────────────────────────────────────────────────────────────
-    //  BAR — stacked bar per prodi (Kpi1ParticipationChart)
+    //  BAR
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * {
-     *   "filters": {},
-     *   "sort": "valueDesc",
-     *   "data": [
-     *     {
-     *       "prodi": "Teknik Informatika",
-     *       "jenjang": "D4",
-     *       "responded": 76.5,
-     *       "notResponded": 23.5,
-     *       "total": 95,
-     *       "breakdown": { "selesai": 62, "on_going": 10, "belum_mengisi": 23 }
-     *     }
-     *   ]
-     * }
-     *
-     * responded    = % submitted / total
-     * notResponded = % (ongoing + belum_mengisi) / total
-     */
     public function getBar(array $params): ResponseRateBarDTO
     {
         $sort = $params['sort'] ?? 'valueDesc';
@@ -50,8 +31,8 @@ class ResponseRateService
         $data = $raw->map(function ($r) {
             $total = $r['total'];
 
-            $pctResponded    = $total > 0 ? round($r['count_selesai'] / $total * 100, 1) : 0.0;
-            $pctNotResponded = $total > 0 ? round(($r['count_on_going'] + $r['count_belum_mengisi']) / $total * 100, 1) : 0.0;
+            $pctResponded    = $total > 0 ? round($r['count_submitted'] / $total * 100, 1) : 0.0;
+            $pctNotResponded = $total > 0 ? round(($r['count_ongoing'] + $r['count_started']) / $total * 100, 1) : 0.0;
 
             return [
                 'prodi'        => $r['nama_prodi'],
@@ -60,9 +41,9 @@ class ResponseRateService
                 'notResponded' => $pctNotResponded,
                 'total'        => $total,
                 'breakdown'    => [
-                    'selesai'       => $r['count_selesai'],
-                    'on_going'      => $r['count_on_going'],
-                    'belum_mengisi' => $r['count_belum_mengisi'],
+                    'submitted' => $r['count_submitted'],  // Selesai
+                    'ongoing'   => $r['count_ongoing'],    // Sedang Mengisi
+                    'started'   => $r['count_started'],    // Belum Mengisi
                 ],
             ];
         });
@@ -77,20 +58,9 @@ class ResponseRateService
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  PIE — 3 status aggregate (Kpi2CompletionStatusChart)
+    //  PIE
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * {
-     *   "filters": {},
-     *   "total": 1093,
-     *   "data": [
-     *     { "name": "Selesai",         "value": 612, "pct": 56.0 },
-     *     { "name": "Sedang Mengisi",  "value": 184, "pct": 16.8 },
-     *     { "name": "Belum Mengisi",   "value": 297, "pct": 27.2 }
-     *   ]
-     * }
-     */
     public function getPie(array $params): ResponseRatePieDTO
     {
         $raw = $this->repo->getPieData(
@@ -103,19 +73,22 @@ class ResponseRateService
 
         $data = [
             [
-                'name'  => 'Selesai',
-                'value' => $raw['count_selesai'],
-                'pct'   => $total > 0 ? round($raw['count_selesai'] / $total * 100, 1) : 0.0,
+                'name'   => 'Selesai',
+                'status' => 'submitted',   // ← langsung bisa dipakai sebagai params drilldown
+                'value'  => $raw['count_submitted'],
+                'pct'    => $total > 0 ? round($raw['count_submitted'] / $total * 100, 1) : 0.0,
             ],
             [
-                'name'  => 'Sedang Mengisi',
-                'value' => $raw['count_on_going'],
-                'pct'   => $total > 0 ? round($raw['count_on_going'] / $total * 100, 1) : 0.0,
+                'name'   => 'Sedang Mengisi',
+                'status' => 'ongoing',     // ← langsung bisa dipakai sebagai params drilldown
+                'value'  => $raw['count_ongoing'],
+                'pct'    => $total > 0 ? round($raw['count_ongoing'] / $total * 100, 1) : 0.0,
             ],
             [
-                'name'  => 'Belum Mengisi',
-                'value' => $raw['count_belum_mengisi'],
-                'pct'   => $total > 0 ? round($raw['count_belum_mengisi'] / $total * 100, 1) : 0.0,
+                'name'   => 'Belum Mengisi',
+                'status' => 'started',     // ← langsung bisa dipakai sebagai params drilldown
+                'value'  => $raw['count_started'],
+                'pct'    => $total > 0 ? round($raw['count_started'] / $total * 100, 1) : 0.0,
             ],
         ];
 
@@ -127,24 +100,9 @@ class ResponseRateService
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  TREND — response rate per graduation_year (Kpi3ParticipationTrendChart)
+    //  TREND
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * {
-     *   "filters": {},
-     *   "data": [
-     *     {
-     *       "year": "2020",
-     *       "rate": 42.0,
-     *       "total": 1320,
-     *       "breakdown": { "selesai": 480, "on_going": 74, "belum_mengisi": 766 }
-     *     }
-     *   ]
-     * }
-     *
-     * "rate" = % submitted / total
-     */
     public function getTrend(array $params): ResponseRateTrendDTO
     {
         $raw = $this->repo->getTrendData(
@@ -155,16 +113,16 @@ class ResponseRateService
 
         $data = $raw->map(function ($r) {
             $total = $r['total'];
-            $rate  = $total > 0 ? round($r['count_selesai'] / $total * 100, 1) : 0.0;
+            $rate  = $total > 0 ? round($r['count_submitted'] / $total * 100, 1) : 0.0;
 
             return [
                 'year'      => $r['graduation_year'],
                 'rate'      => $rate,
                 'total'     => $total,
                 'breakdown' => [
-                    'selesai'       => $r['count_selesai'],
-                    'on_going'      => $r['count_on_going'],
-                    'belum_mengisi' => $r['count_belum_mengisi'],
+                    'submitted' => $r['count_submitted'],
+                    'ongoing'   => $r['count_ongoing'],
+                    'started'   => $r['count_started'],
                 ],
             ];
         })->values()->toArray();
@@ -215,7 +173,7 @@ class ResponseRateService
         return match ($sort) {
             'valueAsc' => $data->sortBy('responded'),
             'name'     => $data->sortBy(fn($r) => $r['prodi']),
-            default    => $data->sortByDesc('responded'), // valueDesc
+            default    => $data->sortByDesc('responded'),
         };
     }
 

@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Schema;
  *     (company_name, jabatan, perguruan_tinggi, program_studi, dst).
  *   - label_pertanyaan di dim_indikator_evaluasi diperbesar ke 255.
  *   - skor di fact_range_evaluasi: CHECK constraint 1-5.
+ *   - dim_wirausaha: id_alumni::text (surrogate key dari dim_alumni).
  *
  * Koneksi: 'olap' (database terpisah dari OLTP).
  * Semua tabel masuk ke schema 'public' (default PostgreSQL).
@@ -169,13 +170,25 @@ return new class extends Migration
         });
 
         // dim_wirausaha — SCD Type 2.
-        // Business key: id_wirausaha = "{jabatan}|{kota}" lowercase-trimmed (varchar),
-        // derived dari f5c (jabatan, label single_choice: Staff/Founder/Freelancer/Co-Founder)
-        // + f5a2 (nama kota, resolved dari cities.id).
+        // Business key: id_wirausaha = id_alumni::text (surrogate key dari dim_alumni).
+        //
+        // Alasan perubahan dari business key lama "{jabatan}|{kota}":
+        //   Wirausaha adalah usaha MILIK SATU ALUMNI — tidak ada dua alumni yang
+        //   berbagi satu entitas wirausaha yang sama. Business key "{jabatan}|{kota}"
+        //   menyebabkan collision: dua alumni dengan jabatan dan kota yang sama akan
+        //   saling menutup versi aktif satu sama lain (flag_wirausaha → false) karena
+        //   ETL alumni kedua mendeteksi "perubahan atribut" pada entitas yang sama.
+        //   Dengan business key = id_alumni, setiap alumni memiliki entitas wirausaha
+        //   sendiri. SCD Type 2 tetap bermakna: jika alumni melaporkan jabatan atau
+        //   kota yang berbeda pada snapshot berikutnya, versi lama ditutup dan versi
+        //   baru dibuat — riwayat perkembangan usaha alumni ter-track dengan benar.
+        //   id_alumni dipilih daripada NIM karena konsisten dengan pola surrogate key
+        //   dan sudah tersedia sebagai $alumniSk di AlumniFactBuilderService tanpa
+        //   query tambahan.
         // NULL jika alumni bukan wiraswasta (wirausaha_sk di fact bisa NULL).
         Schema::connection('olap')->create('dim_wirausaha', function (Blueprint $table) {
             $table->increments('wirausaha_sk');
-            $table->string('id_wirausaha', 255)->index();        // "{jabatan}|{kota}" lowercase
+            $table->integer('id_wirausaha')->index();        // id_alumni::text (surrogate key dari dim_alumni)
             $table->string('jabatan', 150)->nullable();          // diperbesar dari 20 (label f5c)
             $table->string('label_tingkat_instansi', 100)->nullable(); // diperbesar dari 15 (label f5d)
             $table->string('nama_provinsi', 100)->nullable();

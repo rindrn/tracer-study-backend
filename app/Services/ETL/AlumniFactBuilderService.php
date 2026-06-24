@@ -121,6 +121,8 @@ class AlumniFactBuilderService
                 $this->olapRepo->upsertAlumni([
                     'nim'                          => $alumniRow->nim,
                     'nama'                         => $alumniRow->name,
+                    'jenis_kelamin'                => null,
+                    'angkatan'                     => (string) $alumniRow->entry_year,
                     'tahun_lulus'                  => (string) $alumniRow->graduation_year,
                     'label_sumber_biaya_dipolban'  => $resolved['f1201'],
                 ]);
@@ -168,12 +170,15 @@ class AlumniFactBuilderService
             ], $snapshotDate);
 
             // ── dim_wirausaha (alumni wiraswasta, f5c terisi) ──
+            // Business key = $alumniSk (id_alumni dari dim_alumni).
+            // Lihat WirausahaDimService untuk penjelasan lengkap perubahan
+            // dari business key lama "jabatan|kota" ke id_alumni.
             $wirausahaSk = $this->wirausahaDim->syncAndResolveSk([
                 'jabatan'          => $resolved['f5c'] ?? null,
                 'kota'             => $resolved['f5a2'] ?? null,
                 'provinsi'         => $resolved['f5a1'] ?? null,
                 'tingkat_instansi' => $resolved['f5d'] ?? null,
-            ], $snapshotDate);
+            ], $alumniSk, $snapshotDate);
 
             // ── dim_kesesuaian_bidang dari f14 (kesesuaian BIDANG studi) ──
             // Dynamic sync (pola SAMA dengan f8/dim_status_alumni).
@@ -239,7 +244,7 @@ class AlumniFactBuilderService
             $umpSk = null;
             $flagAboveUmp = null;
             $rawThp = isset($resolved['f505']) ? (int) $resolved['f505'] : null;
-            $takeHomePay = ($rawThp !== null && $rawThp >= 100000) ? $rawThp : null; // jika nilai 0 atau <100rb, dianggap tidak valid (bukan THP sebenarnya)
+            $takeHomePay = ($rawThp !== null && $rawThp >= 100000) ? $rawThp : null;
 
             if ($alumniRow !== null && $perusahaanSk !== null) {
                 $tahunLulus = (string) $alumniRow->graduation_year;
