@@ -34,6 +34,8 @@ class KeterserapanService
         'Bekerja (full time / part time)',
         'Wiraswasta',
         'Melanjutkan Pendidikan',
+        'Melanjutkan pendidikan sambil bekerja',
+        'Melanjutkan pendidikan sambil wiraswasta',
     ];
 
     public function __construct(
