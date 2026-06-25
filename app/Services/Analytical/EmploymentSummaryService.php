@@ -16,14 +16,13 @@ use App\Traits\WithCache;
  *
  * Inject langsung ke 6 Repository KPI yang sudah established —
  * TIDAK melalui EmploymentSummaryRepository wrapper.
- * Tujuan: hindari inkonsistensi logic (misal filter terserap, erat keyword, dll)
- * dengan cara reuse persis source of truth yang sama dengan masing-masing KPI page.
  *
  * Mapping card → Repository + method:
  *   keterserapan      → KeterserapanRepository::getDistribusiStatusSnapshot()
  *   masa_tunggu_cepat → MasaTungguRepository::getBarData()
- *   kesesuaian        → KesesuaianRepository::getPieData()   ← bukan BarData
+ *   kesesuaian        → KesesuaianRepository::getPieData()
  *   wirausaha         → WirausahaRepository::getBarData() + getBarDataTotal()
+ *                       + WirausahaRepository::getPiePosisi()   ← untuk hint jabatan
  *   avg_pendapatan    → PendapatanRepository::getGajiPerTahun()
  *   level_nasional    → SebaranInstansiRepository::getTingkatData()
  */
@@ -34,9 +33,8 @@ class EmploymentSummaryService
     private const TTL = 3600;
 
     /**
-     * Keyword "terserap" sesuai definisi IKU 2 Kemendikbud:
-     * Bekerja + Wirausaha/Wiraswasta + Studi Lanjut (termasuk sambil bekerja/wirausaha).
-     * Harus konsisten dengan KeterserapanRepository.
+     * Keyword "terserap" sesuai definisi IKU 2 Kemendikbud.
+     * Konsisten dengan KeterserapanRepository::buildRentangFilters().
      */
     private const TERSERAP_KEYWORDS = [
         'bekerja',
@@ -45,13 +43,6 @@ class EmploymentSummaryService
         'studi lanjut',
         'melanjutkan pendidikan',
     ];
-
-    /**
-     * Keyword "erat" untuk kesesuaian bidang.
-     * Harus konsisten dengan KesesuaianService::getPie.
-     * Label dari DimKesesuaianBidang: "Sangat Erat", "Erat", "Kurang Erat", "Tidak Erat".
-     */
-    private const ERAT_KEYWORDS = ['sangat erat', 'erat'];
 
     public function __construct(
         private readonly KeterserapanRepository    $keterserapanRepo,
@@ -74,7 +65,12 @@ class EmploymentSummaryService
      *     "keterserapan":      { "value": 84.0, "hint": "Bekerja / usaha / lanjut studi" },
      *     "masa_tunggu_cepat": { "value": 85.0, "hint": "Terserap ≤ 6 bulan" },
      *     "kesesuaian":        { "value": 79.0, "hint": "Sangat erat + erat" },
-     *     "wirausaha":         { "value": 11.0, "hint": "Dari total alumni" },
+     *     "wirausaha": {
+     *       "value": 11.0,               ← % wirausaha dari total alumni
+     *       "hint": "75,0% Owner",        ← jabatan terbesar sebagai % dari total wirausaha
+     *       "top_jabatan": "Owner",
+     *       "pct_top_jabatan": 75.0
+     *     },
      *     "avg_pendapatan": {
      *       "value": 9100000,
      *       "label": "Rp 9,1 jt",
@@ -97,90 +93,71 @@ class EmploymentSummaryService
             $ms = $params['minggu_snapshot'] ?? null;
 
             // ── 1. Keterserapan ──────────────────────────────────
-            // Ambil dari repo yang sama dengan KPI Keterserapan (pie chart snapshot).
-            // Method ini sudah filter by minggu_snapshot dan semua global filter.
             $keterserapanRaw = $this->keterserapanRepo->getDistribusiStatusSnapshot(
-                jenjang:        $j,
-                jurusan:        $ju,
-                namaProdi:      $np,
-                tahunLulus:     $tl,
-                mingguSnapshot: $ms,
+                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                tahunLulus: $tl, mingguSnapshot: $ms,
             );
 
             // ── 2. Masa Tunggu ───────────────────────────────────
-            // Ambil dari MasaTungguRepository::getBarData() — sumber yang sama
-            // dengan MasaTungguService::getBar(). Measure count_masa_tunggu_cepat
-            // di Cube.js sudah pre-computed (alumni bekerja ≤ 6 bulan).
+            // Sumber sama dengan MasaTungguService::getBar().
+            // Measure count_masa_tunggu_cepat dan count_terserap sudah
+            // pre-computed di Cube.js (tanpa filter status manual di PHP).
             $masaTungguRaw = $this->masaTungguRepo->getBarData(
-                jenjang:        $j,
-                jurusan:        $ju,
-                namaProdi:      $np,
-                tahunLulus:     $tl,
-                mingguSnapshot: $ms,
+                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                tahunLulus: $tl, mingguSnapshot: $ms,
             );
 
             // ── 3. Kesesuaian ────────────────────────────────────
-            // Ambil dari KesesuaianRepository::getPieData() — BUKAN getBarData().
-            // getPieData() sudah filter status_alumni_sk = 1 (Bekerja) dan
-            // menghasilkan distribusi per label DimKesesuaianBidang.
-            // Sumber yang sama dengan KesesuaianService::getPie().
+            // getPieData() sudah filter status_alumni_sk = 1 (Bekerja)
+            // dan menghasilkan distribusi per DimKesesuaianBidang.label.
             $kesesuaianRaw = $this->kesesuaianRepo->getPieData(
-                jenjang:        $j,
-                jurusan:        $ju,
-                namaProdi:      $np,
-                tahunLulus:     $tl,
-                mingguSnapshot: $ms,
+                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                tahunLulus: $tl, mingguSnapshot: $ms,
             );
 
             // ── 4. Wirausaha ─────────────────────────────────────
-            // Ambil dari WirausahaRepository — sumber yang sama dengan
-            // WirausahaService::getBar().
-            // wirausaha = count alumni status=3, total = semua status (denominator).
+            // getBarData()      → count_wirausaha (status=3), untuk value card
+            // getBarDataTotal() → count_alumni semua status, untuk denominator pct
+            // getPiePosisi()    → distribusi jabatan di kalangan wirausaha,
+            //                     untuk hint jabatan terbesar
             $wirausahaRaw = $this->wirausahaRepo->getBarData(
-                jenjang:        $j,
-                jurusan:        $ju,
-                namaProdi:      $np,
-                tahunLulus:     $tl,
-                mingguSnapshot: $ms,
+                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                tahunLulus: $tl, mingguSnapshot: $ms,
             );
             $wirausahaTotalRaw = $this->wirausahaRepo->getBarDataTotal(
-                jenjang:        $j,
-                jurusan:        $ju,
-                namaProdi:      $np,
-                tahunLulus:     $tl,
-                mingguSnapshot: $ms,
+                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                tahunLulus: $tl, mingguSnapshot: $ms,
+            );
+            // getPiePosisi sudah filter status=3 di repo → total = total wirausaha
+            $wirausahaPosisiRaw = $this->wirausahaRepo->getPiePosisi(
+                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                tahunLulus: $tl, mingguSnapshot: $ms,
             );
 
             // ── 5. Pendapatan ────────────────────────────────────
-            // Ambil dari PendapatanRepository::getGajiPerTahun() — sumber yang sama
-            // dengan PendapatanService::getBar().
-            // Hasil per tahun_lulus; card menghitung weighted average lintas tahun
-            // (atau nilai tunggal bila tahun_lulus difilter).
+            // getGajiPerTahun() menghasilkan rows per tahun_lulus.
+            // tahun_lulus filter diselesaikan di buildPendapatanCard().
             $pendapatanRaw = $this->pendapatanRepo->getGajiPerTahun(
-                jenjang:        $j,
-                jurusan:        $ju,
-                namaProdi:      $np,
+                jenjang: $j, jurusan: $ju, namaProdi: $np,
                 mingguSnapshot: $ms,
-                // tahun_lulus TIDAK diteruskan — axis X adalah tahun_lulus,
-                // filtering dilakukan di level card builder bila $tl tidak null.
             );
 
             // ── 6. Sebaran Instansi ──────────────────────────────
-            // Ambil dari SebaranInstansiRepository::getTingkatData() — sumber
-            // yang sama dengan SebaranInstansiService (halaman Sebaran Instansi).
+            // getTingkatData() sudah filter FILTER_BEKERJA (status_alumni_sk=1).
             $tingkatRaw = $this->sebaranInstansiRepo->getTingkatData(
-                jenjang:        $j,
-                jurusan:        $ju,
-                namaProdi:      $np,
-                tahunLulus:     $tl,
-                mingguSnapshot: $ms,
+                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                tahunLulus: $tl, mingguSnapshot: $ms,
             );
 
             return [
                 'keterserapan'      => $this->buildKeterserapanCard($keterserapanRaw),
                 'masa_tunggu_cepat' => $this->buildMasaTungguCard($masaTungguRaw),
                 'kesesuaian'        => $this->buildKesesuaianCard($kesesuaianRaw),
-                'wirausaha'         => $this->buildWirausahaCard($wirausahaRaw, $wirausahaTotalRaw),
+                'wirausaha'         => $this->buildWirausahaCard(
+                                           $wirausahaRaw,
+                                           $wirausahaTotalRaw,
+                                           $wirausahaPosisiRaw,
+                                       ),
                 'avg_pendapatan'    => $this->buildPendapatanCard($pendapatanRaw, $tl),
                 'level_nasional'    => $this->buildLevelNasionalCard($tingkatRaw),
             ];
@@ -199,12 +176,12 @@ class EmploymentSummaryService
     /**
      * Card Keterserapan
      *
-     * Denominator : total semua alumni pada snapshot tersebut.
+     * Denominator : semua alumni pada snapshot (sum seluruh status).
      * Numerator   : alumni dengan status "terserap" = Bekerja + Wiraswasta/Wirausaha
-     *               + Melanjutkan pendidikan (semua varian).
+     *               + semua varian Melanjutkan Pendidikan sambil bekerja/wirausaha.
      *
-     * Keyword matching case-insensitive menggunakan TERSERAP_KEYWORDS —
-     * sama persis dengan filter yang dipakai di KeterserapanService.
+     * Matching case-insensitive contains → TERSERAP_KEYWORDS.
+     * Konsisten dengan filter di KeterserapanRepository::buildRentangFilters().
      */
     private function buildKeterserapanCard(\Illuminate\Support\Collection $rows): array
     {
@@ -222,13 +199,17 @@ class EmploymentSummaryService
     /**
      * Card Masa Tunggu Cepat
      *
-     * Sumber: MasaTungguRepository::getBarData()
-     * Measure count_masa_tunggu_cepat = alumni Bekerja/Wirausaha yang
-     * masa tunggu ≤ 6 bulan (pre-computed di Cube.js).
-     * Measure count_terserap = total alumni Bekerja/Wirausaha (denominator).
-     *
-     * Logika persis sama dengan MasaTungguService::getBar() yang menghitung pct_cepat:
+     * Ikut logic MasaTungguService::getBar() persis:
      *   pct_cepat = count_masa_tunggu_cepat / count_terserap × 100
+     *
+     * Measure count_masa_tunggu_cepat = alumni Bekerja/Wirausaha masa tunggu ≤ 6 bln
+     *                                   (pre-computed di Cube.js, bukan filter PHP).
+     * Measure count_terserap          = total alumni yang sudah bekerja/wirausaha
+     *                                   (denominator — bukan total semua alumni).
+     *
+     * Sum di PHP karena getBarData() mengembalikan baris per prodi × tahun_lulus.
+     * Dengan menjumlahkan seluruh baris, kita dapat agregat keseluruhan
+     * yang sesuai dengan filter global yang sudah diteruskan ke Cube.js.
      */
     private function buildMasaTungguCard(\Illuminate\Support\Collection $rows): array
     {
@@ -245,27 +226,20 @@ class EmploymentSummaryService
      * Card Kesesuaian
      *
      * Sumber: KesesuaianRepository::getPieData()
-     * Data sudah difilter status_alumni_sk = 1 (Bekerja) di level repo.
+     * Repo sudah filter status_alumni_sk = 1 (Bekerja).
      * Label dari DimKesesuaianBidang: "Sangat Erat", "Erat", "Kurang Erat", "Tidak Erat".
      *
-     * Numerator : label yang mengandung "sangat erat" ATAU "erat" (case-insensitive).
-     * Catatan   : "sangat erat" mengandung "erat" — order matching tidak penting
-     *             karena keduanya masuk numerator. Namun untuk kejelasan, kita
-     *             cek contains saja (str_contains "erat" sudah cukup karena
-     *             "Kurang Erat" dan "Tidak Erat" juga mengandung "erat").
-     *             Oleh karena itu kita gunakan keyword eksplisit "sangat erat" dan
-     *             exact "erat" dengan trim.
+     * Numerator  : label "Sangat Erat" + "Erat" (exact match setelah lowercase).
+     * Denominator: semua alumni Bekerja yang punya data kesesuaian.
      *
-     * Logika sama dengan KesesuaianService::buildKesesuaianCard di versi lama,
-     * tapi sekarang sumbernya getPieData bukan getDistribusiStatusSnapshot.
+     * KENAPA exact match, bukan str_contains("erat")?
+     * Karena "Kurang Erat" dan "Tidak Erat" juga mengandung substring "erat" —
+     * jika pakai contains maka semua label ikut terhitung.
      */
     private function buildKesesuaianCard(\Illuminate\Support\Collection $rows): array
     {
         $total = $rows->sum('count');
 
-        // Filter: label == "Sangat Erat" atau label == "Erat" (case-insensitive)
-        // Tidak pakai contains karena "Kurang Erat" dan "Tidak Erat" juga mengandung "erat".
-        // Pakai exact match setelah lowercase untuk keamanan.
         $erat = $rows->filter(function ($r) {
             $lower = mb_strtolower(trim($r['label']));
             return $lower === 'sangat erat' || $lower === 'erat';
@@ -280,81 +254,99 @@ class EmploymentSummaryService
     /**
      * Card Wirausaha
      *
-     * Sumber: WirausahaRepository::getBarData() + getBarDataTotal()
-     * Logika sama persis dengan WirausahaService::getBar():
-     *   pct = count_wirausaha / count_alumni_total × 100
-     * Denominator = SEMUA alumni (bukan hanya yang bekerja).
+     * VALUE (pct wirausaha dari total alumni):
+     *   Denominator = semua alumni (getBarDataTotal, semua status).
+     *   Numerator   = alumni wirausaha saja (getBarData, filter status=3).
+     *   → Konsisten dengan WirausahaService::getBar()::pct_wirausaha.
      *
-     * Hint: "Dari total alumni" — karena card ini menunjukkan
-     * seberapa banyak alumni yang berwirausaha dari keseluruhan.
+     * HINT (jabatan terbesar sebagai % dari total WIRAUSAHA):
+     *   Sumber: getPiePosisi() → sudah filter status=3, sehingga
+     *   total dari koleksi ini = total alumni WIRAUSAHA (bukan semua alumni).
+     *
+     *   Contoh:
+     *     Total wirausaha = 100 orang
+     *     Owner     = 75 → 75 / 100 = 75%
+     *     Co-founder = 25 → 25 / 100 = 25%
+     *     → hint: "75,0% Owner"
+     *     → BUKAN "75% dari total alumni" (yang hanya 7,5% jika total alumni=1000)
+     *
+     *   Ini konsisten dengan WirausahaService::getPie() di mana
+     *   $total = $posisiRaw->sum('count') = total wirausaha (karena repo sudah filter status=3).
      */
     private function buildWirausahaCard(
         \Illuminate\Support\Collection $wirausahaRows,
         \Illuminate\Support\Collection $totalRows,
+        \Illuminate\Support\Collection $posisiRows,
     ): array {
+        // Value: % wirausaha dari total alumni
         $totalAlumni    = $totalRows->sum('count_alumni');
         $totalWirausaha = $wirausahaRows->sum('count_wirausaha');
+        $pctWirausaha   = $totalAlumni > 0
+            ? round($totalWirausaha / $totalAlumni * 100, 1)
+            : 0.0;
+
+        // Hint: jabatan terbesar sebagai % dari total WIRAUSAHA
+        // posisiRows sudah difilter status=3 di repo, jadi sum = total wirausaha
+        $totalPosisi = $posisiRows->sum('count'); // = total wirausaha berdasarkan jabatan data
+        $topJabatan  = $posisiRows->sortByDesc('count')->first();
+
+        $hintParts    = null;
+        $topLabel     = null;
+        $pctTopJabatan = null;
+
+        if ($topJabatan && $totalPosisi > 0) {
+            $topLabel      = $topJabatan['label'];
+            $pctTopJabatan = round($topJabatan['count'] / $totalPosisi * 100, 1);
+            // Format: "75,0% Owner" — pct dari 100% wirausaha
+            $hintParts = number_format($pctTopJabatan, 1, ',', '.') . '% ' . $topLabel;
+        }
 
         return [
-            'value' => $totalAlumni > 0 ? round($totalWirausaha / $totalAlumni * 100, 1) : 0.0,
-            'hint'  => 'Dari total alumni',
+            'value'           => $pctWirausaha,
+            'hint'            => $hintParts ?? 'Dari total alumni',
+            'top_jabatan'     => $topLabel,
+            'pct_top_jabatan' => $pctTopJabatan,
         ];
     }
 
     /**
      * Card Avg Pendapatan
      *
-     * Sumber: PendapatanRepository::getGajiPerTahun()
-     * Data berupa rows per tahun_lulus.
+     * Sumber: PendapatanRepository::getGajiPerTahun() → rows per tahun_lulus.
      *
-     * Kasus A — filter tahun_lulus diisi (misal "2022"):
-     *   getGajiPerTahun tidak punya param tahun_lulus (axis X adalah tahun),
-     *   jadi kita filter koleksi di PHP untuk ambil baris tahun ybs.
-     *   avg_gaji = nilai tahun tersebut (sudah dihitung Cube.js).
+     * Kasus A — ada filter tahun_lulus:
+     *   Filter baris di PHP untuk tahun ybs, ambil weighted avg tahun tersebut.
+     *   (getGajiPerTahun tidak punya param tahun_lulus karena axis X = tahun_lulus.)
      *
-     * Kasus B — tahun_lulus null (semua tahun):
-     *   avg_gaji = weighted average lintas tahun,
-     *   bobot = total_alumni_ump per tahun (bukan count_alumni —
-     *   karena hanya alumni yang punya data UMP yang bisa dibandingkan).
+     * Kasus B — tanpa filter (semua tahun):
+     *   Weighted average lintas tahun, bobot = total_alumni_ump
+     *   (alumni yang punya data gaji + ref UMP — bukan count_alumni semua alumni).
      *
-     * Logika ini konsisten dengan PendapatanService::getBar() yang juga
-     * pakai getGajiPerTahun() dan menampilkan per-tahun.
+     * Konsisten dengan PendapatanService::getBar() yang pakai sumber yang sama.
      */
     private function buildPendapatanCard(
         \Illuminate\Support\Collection $rows,
         ?string $tahunLulusFilter,
     ): array {
         if ($rows->isEmpty()) {
-            return [
-                'value'         => 0,
-                'label'         => '-',
-                'pct_above_ump' => null,
-                'hint'          => null,
-            ];
+            return ['value' => 0, 'label' => '-', 'pct_above_ump' => null, 'hint' => null];
         }
 
-        // Kasus A: ada filter tahun_lulus → ambil baris spesifik
+        // Kasus A: filter tahun_lulus spesifik
         if ($tahunLulusFilter !== null && $tahunLulusFilter !== '') {
             $filtered = $rows->filter(
                 fn($r) => (string) $r['tahun_lulus'] === (string) $tahunLulusFilter
             );
 
             if ($filtered->isEmpty()) {
-                return [
-                    'value'         => 0,
-                    'label'         => '-',
-                    'pct_above_ump' => null,
-                    'hint'          => null,
-                ];
+                return ['value' => 0, 'label' => '-', 'pct_above_ump' => null, 'hint' => null];
             }
 
-            // Seharusnya hanya 1 baris (1 tahun), tapi sum untuk keamanan
             $totalBobot      = $filtered->sum('total_alumni_ump');
             $weightedSumGaji = $filtered->sum(fn($r) => $r['avg_gaji'] * $r['total_alumni_ump']);
             $avgGaji         = $totalBobot > 0 ? (int) round($weightedSumGaji / $totalBobot) : 0;
-
-            $aboveUmp    = $filtered->sum('count_above_ump');
-            $pctAboveUmp = $totalBobot > 0 ? round($aboveUmp / $totalBobot * 100, 1) : null;
+            $aboveUmp        = $filtered->sum('count_above_ump');
+            $pctAboveUmp     = $totalBobot > 0 ? round($aboveUmp / $totalBobot * 100, 1) : null;
 
             return $this->formatPendapatanCard($avgGaji, $pctAboveUmp);
         }
@@ -363,9 +355,8 @@ class EmploymentSummaryService
         $totalBobot      = $rows->sum('total_alumni_ump');
         $weightedSumGaji = $rows->sum(fn($r) => $r['avg_gaji'] * $r['total_alumni_ump']);
         $avgGaji         = $totalBobot > 0 ? (int) round($weightedSumGaji / $totalBobot) : 0;
-
-        $aboveUmp    = $rows->sum('count_above_ump');
-        $pctAboveUmp = $totalBobot > 0 ? round($aboveUmp / $totalBobot * 100, 1) : null;
+        $aboveUmp        = $rows->sum('count_above_ump');
+        $pctAboveUmp     = $totalBobot > 0 ? round($aboveUmp / $totalBobot * 100, 1) : null;
 
         return $this->formatPendapatanCard($avgGaji, $pctAboveUmp);
     }
@@ -374,8 +365,8 @@ class EmploymentSummaryService
      * Card Level Nasional
      *
      * Sumber: SebaranInstansiRepository::getTingkatData()
-     * Repo sudah filter FILTER_BEKERJA (status_alumni_sk = 1).
-     * Pct alumni yang bekerja di instansi tingkat "nasional".
+     * Repo sudah filter FILTER_BEKERJA (status_alumni_sk=1).
+     * % alumni Bekerja yang bekerja di instansi tingkat "nasional".
      */
     private function buildLevelNasionalCard(\Illuminate\Support\Collection $rows): array
     {
@@ -406,10 +397,6 @@ class EmploymentSummaryService
         ];
     }
 
-    /**
-     * Case-insensitive contains matching terhadap salah satu keyword.
-     * Dipakai untuk status label (keterserapan) dan tingkat instansi.
-     */
     private function labelMatchesAny(string $label, array $keywords): bool
     {
         $lower = mb_strtolower($label);
