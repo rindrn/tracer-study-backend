@@ -338,11 +338,12 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             [self::FILTER_BEKERJA],
         );
 
-        if ($jenisInstansi !== null && $jenisInstansi !== '') {
+        if (!empty($jenisInstansi)) {
+            $values = is_array($jenisInstansi) ? $jenisInstansi : [$jenisInstansi];
             $filters[] = [
                 'member'   => 'DimPerusahaan.label_jenis_perusahaan',
-                'operator' => 'equals',
-                'values'   => [$jenisInstansi],
+                'operator' => 'equals',   // Cube.js "equals" dengan multi-values = IN
+                'values'   => $values,
             ];
         }
 
