@@ -318,7 +318,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
      * @return array{data: array, page: int, per_page: int, total_on_page: int}
      */
     public function getDetailAlumni(
-        ?string $jenisInstansi   = null,
+        array|string|null $jenisInstansi   = null,
         ?string $tingkatInstansi = null,
         ?string $jenjang         = null,
         ?string $namaProdi       = null,
