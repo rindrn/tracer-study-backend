@@ -66,8 +66,8 @@ class EmploymentSummaryService
      *     "masa_tunggu_cepat": { "value": 85.0, "hint": "Terserap ≤ 6 bulan" },
      *     "kesesuaian":        { "value": 79.0, "hint": "Sangat erat + erat" },
      *     "wirausaha": {
-     *       "value": 11.0,               ← % wirausaha dari total alumni
-     *       "hint": "75,0% Owner",        ← jabatan terbesar sebagai % dari total wirausaha
+     *       "value": 75.0,          ← % jabatan terbesar dari 100% wirausaha
+     *       "hint": "Owner",        ← label jabatan terbesar
      *       "top_jabatan": "Owner",
      *       "pct_top_jabatan": 75.0
      *     },
@@ -116,19 +116,9 @@ class EmploymentSummaryService
             );
 
             // ── 4. Wirausaha ─────────────────────────────────────
-            // getBarData()      → count_wirausaha (status=3), untuk value card
-            // getBarDataTotal() → count_alumni semua status, untuk denominator pct
-            // getPiePosisi()    → distribusi jabatan di kalangan wirausaha,
-            //                     untuk hint jabatan terbesar
-            $wirausahaRaw = $this->wirausahaRepo->getBarData(
-                jenjang: $j, jurusan: $ju, namaProdi: $np,
-                tahunLulus: $tl, mingguSnapshot: $ms,
-            );
-            $wirausahaTotalRaw = $this->wirausahaRepo->getBarDataTotal(
-                jenjang: $j, jurusan: $ju, namaProdi: $np,
-                tahunLulus: $tl, mingguSnapshot: $ms,
-            );
-            // getPiePosisi sudah filter status=3 di repo → total = total wirausaha
+            // Hanya butuh getPiePosisi() untuk card summary.
+            // Sudah filter status=3 di repo → sum count = total wirausaha.
+            // Value card = jabatan terbesar sebagai % dari total wirausaha.
             $wirausahaPosisiRaw = $this->wirausahaRepo->getPiePosisi(
                 jenjang: $j, jurusan: $ju, namaProdi: $np,
                 tahunLulus: $tl, mingguSnapshot: $ms,
@@ -153,11 +143,7 @@ class EmploymentSummaryService
                 'keterserapan'      => $this->buildKeterserapanCard($keterserapanRaw),
                 'masa_tunggu_cepat' => $this->buildMasaTungguCard($masaTungguRaw),
                 'kesesuaian'        => $this->buildKesesuaianCard($kesesuaianRaw),
-                'wirausaha'         => $this->buildWirausahaCard(
-                                           $wirausahaRaw,
-                                           $wirausahaTotalRaw,
-                                           $wirausahaPosisiRaw,
-                                       ),
+                'wirausaha'         => $this->buildWirausahaCard($wirausahaPosisiRaw),
                 'avg_pendapatan'    => $this->buildPendapatanCard($pendapatanRaw, $tl),
                 'level_nasional'    => $this->buildLevelNasionalCard($tingkatRaw),
             ];
@@ -254,56 +240,42 @@ class EmploymentSummaryService
     /**
      * Card Wirausaha
      *
-     * VALUE (pct wirausaha dari total alumni):
-     *   Denominator = semua alumni (getBarDataTotal, semua status).
-     *   Numerator   = alumni wirausaha saja (getBarData, filter status=3).
-     *   → Konsisten dengan WirausahaService::getBar()::pct_wirausaha.
+     * Denominator seluruh card ini = total alumni WIRAUSAHA (bukan total semua alumni).
+     * posisiRows sudah difilter status=3 di getPiePosisi() → sum = total wirausaha.
      *
-     * HINT (jabatan terbesar sebagai % dari total WIRAUSAHA):
-     *   Sumber: getPiePosisi() → sudah filter status=3, sehingga
-     *   total dari koleksi ini = total alumni WIRAUSAHA (bukan semua alumni).
+     * VALUE = jabatan terbesar sebagai % dari total wirausaha.
+     *   Contoh: total wirausaha 100 orang, Owner 75 → value = 75.0
      *
-     *   Contoh:
-     *     Total wirausaha = 100 orang
-     *     Owner     = 75 → 75 / 100 = 75%
-     *     Co-founder = 25 → 25 / 100 = 25%
-     *     → hint: "75,0% Owner"
-     *     → BUKAN "75% dari total alumni" (yang hanya 7,5% jika total alumni=1000)
+     * HINT = label jabatan terbesar tersebut.
+     *   Contoh: "dari total wirausaha" atau "Owner"
      *
-     *   Ini konsisten dengan WirausahaService::getPie() di mana
-     *   $total = $posisiRaw->sum('count') = total wirausaha (karena repo sudah filter status=3).
+     * Konsisten dengan WirausahaService::getPie() di mana pct per jabatan
+     * dihitung sebagai count / $total, dan $total = $posisiRaw->sum('count')
+     * = total wirausaha (bukan total semua alumni).
      */
     private function buildWirausahaCard(
-        \Illuminate\Support\Collection $wirausahaRows,
-        \Illuminate\Support\Collection $totalRows,
         \Illuminate\Support\Collection $posisiRows,
     ): array {
-        // Value: % wirausaha dari total alumni
-        $totalAlumni    = $totalRows->sum('count_alumni');
-        $totalWirausaha = $wirausahaRows->sum('count_wirausaha');
-        $pctWirausaha   = $totalAlumni > 0
-            ? round($totalWirausaha / $totalAlumni * 100, 1)
-            : 0.0;
+        // Total wirausaha = sum count dari getPiePosisi() yang sudah filter status=3
+        $totalWirausaha = $posisiRows->sum('count');
+        $topJabatan     = $posisiRows->sortByDesc('count')->first();
 
-        // Hint: jabatan terbesar sebagai % dari total WIRAUSAHA
-        // posisiRows sudah difilter status=3 di repo, jadi sum = total wirausaha
-        $totalPosisi = $posisiRows->sum('count'); // = total wirausaha berdasarkan jabatan data
-        $topJabatan  = $posisiRows->sortByDesc('count')->first();
-
-        $hintParts    = null;
-        $topLabel     = null;
-        $pctTopJabatan = null;
-
-        if ($topJabatan && $totalPosisi > 0) {
-            $topLabel      = $topJabatan['label'];
-            $pctTopJabatan = round($topJabatan['count'] / $totalPosisi * 100, 1);
-            // Format: "75,0% Owner" — pct dari 100% wirausaha
-            $hintParts = number_format($pctTopJabatan, 1, ',', '.') . '% ' . $topLabel;
+        if (!$topJabatan || $totalWirausaha === 0) {
+            return [
+                'value'           => 0.0,
+                'hint'            => '-',
+                'top_jabatan'     => null,
+                'pct_top_jabatan' => null,
+            ];
         }
 
+        $topLabel      = $topJabatan['label'];
+        // value = % jabatan terbesar dari 100% wirausaha
+        $pctTopJabatan = round($topJabatan['count'] / $totalWirausaha * 100, 1);
+
         return [
-            'value'           => $pctWirausaha,
-            'hint'            => $hintParts ?? 'Dari total alumni',
+            'value'           => $pctTopJabatan,
+            'hint'            => $topLabel,
             'top_jabatan'     => $topLabel,
             'pct_top_jabatan' => $pctTopJabatan,
         ];
