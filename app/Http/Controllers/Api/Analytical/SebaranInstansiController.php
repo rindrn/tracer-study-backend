@@ -99,7 +99,8 @@ class SebaranInstansiController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'jenis_instansi'   => 'nullable|string|max:100',
+            'jenis_instansi'   => 'nullable|array',
+            'jenis_instansi.*' => 'string|max:100',
             'tingkat_instansi' => 'nullable|string|in:Lokal,Nasional,Internasional',
             'jenjang'          => 'nullable|string|in:D3,D4',
             'nama_prodi'       => 'nullable|string|max:100',
