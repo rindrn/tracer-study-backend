@@ -20,7 +20,7 @@ class KesesuaianController extends Controller
     public function bar(Request $request): JsonResponse
     {
         $params = $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -38,7 +38,7 @@ class KesesuaianController extends Controller
     public function pie(Request $request): JsonResponse
     {
         $params = $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -56,7 +56,7 @@ class KesesuaianController extends Controller
     public function alasan(Request $request): JsonResponse
     {
         $params = $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -77,7 +77,7 @@ class KesesuaianController extends Controller
         $request->validate([
             'prodi'           => 'nullable|array',
             'prodi.*'         => 'string|max:100',
-            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
@@ -97,7 +97,7 @@ class KesesuaianController extends Controller
         $request->validate([
             'kesesuaian_label'    => 'nullable|string',
             'label_pertanyaan' => 'nullable|string|max:500',
-            'jenjang'          => 'nullable|string|in:D3,D4',
+            'jenjang'          => 'nullable|string|in:D3,D4,S2,S1',
             'nama_prodi'       => 'nullable|string|max:100',
             'tahun_lulus'      => 'nullable|string|max:5',
             'minggu_snapshot'  => 'nullable|string|max:10',
