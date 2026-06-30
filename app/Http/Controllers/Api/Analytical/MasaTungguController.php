@@ -20,7 +20,7 @@ class MasaTungguController extends Controller
     public function bar(Request $request): JsonResponse
     {
         $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -40,7 +40,7 @@ class MasaTungguController extends Controller
     public function distribusi(Request $request): JsonResponse
     {
         $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -61,7 +61,7 @@ class MasaTungguController extends Controller
     {
         $request->validate([
             'rentang'         => 'required|string|in:0-3,3-6,>6',
-            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -86,7 +86,7 @@ class MasaTungguController extends Controller
         $request->validate([
             'prodi'           => 'nullable|array',
             'prodi.*'         => 'string|max:100',
-            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',

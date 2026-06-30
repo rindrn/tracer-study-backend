@@ -23,14 +23,14 @@ class SummaryController extends Controller
      * GET /api/dashboard/overview/summary
      *
      * Query params (semua opsional):
-     *   jenjang          string   D3 | D4
+     *   jenjang          string   D3 | D4 | S2 | S1
      *   nama_prodi       string   Nama program studi (exact match)
      *   graduation_year  string   Filter tahun lulus alumni
      */
     public function summary(Request $request): JsonResponse
     {
         $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4',
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'nama_prodi'      => 'nullable|string|max:100',
             'graduation_year' => 'nullable|string|max:5',
         ]);
