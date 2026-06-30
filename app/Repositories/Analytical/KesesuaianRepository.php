@@ -11,12 +11,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     //  1. BAR — sesuai vs tidak sesuai per prodi × tahun
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * Pre-agg: FactTracerStudy.distribusi_kesesuaian ✅
-     *
-     * @return Collection<array{nama_prodi, jenjang, tahun_lulus,
-     *                          count_alumni, count_sesuai_bidang, count_tidak_sesuai_bidang}>
-     */
     public function getBarData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
@@ -60,12 +54,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     //  2. PIE — distribusi tingkat kesesuaian
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * Hanya alumni Bekerja (status_alumni_sk = 1).
-     * Pre-agg: FactTracerStudy.distribusi_kesesuaian ✅
-     *
-     * @return Collection<array{label, count}>
-     */
     public function getPieData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
@@ -96,15 +84,9 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  3. ALASAN — frekuensi alasan kerja tidak sesuai (FactMultiSelect)
+    //  3. ALASAN — frekuensi alasan kerja tidak sesuai
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * Pre-agg: FactMultiSelect.per_indikator ✅
-     * Filter kategori_pertanyaan = 'AlasanKerjaTdkSesuai'.
-     *
-     * @return Collection<array{kode_field, label, count}>
-     */
     public function getAlasanData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
@@ -144,12 +126,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     //  4. DETAIL ALUMNI — per kesesuaian bidang
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * TIDAK pakai pre-agg — data individual alumni.
-     * $labelKesesuaian bisa string tunggal atau array (multi-select dari FE).
-     *
-     * @return array{data: array, page: int, per_page: int, total_on_page: int}
-     */
     public function getDetailAlumni(
         array|string|null $labelKesesuaian,
         ?string           $jenjang        = null,
@@ -160,7 +136,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         int               $page           = 1,
         int               $perPage        = 15,
     ): array {
-        // normalisasi ke array
         $labels = match(true) {
             is_array($labelKesesuaian)  => $labelKesesuaian,
             is_string($labelKesesuaian) => [$labelKesesuaian],
@@ -176,7 +151,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
             ),
             !empty($labels) ? [[
                 'member'   => 'DimKesesuaianBidang.label',
-                'operator' => 'equals',   // Cube.js: equals + multiple values = IN (...)
+                'operator' => 'equals',
                 'values'   => $labels,
             ]] : [],
         );
@@ -228,13 +203,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     //  5. DRILL-DOWN ALASAN — alumni per alasan kerja tidak sesuai
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * List alumni yang memilih alasan tertentu dari chart alasan kerja tidak sesuai.
-     * Source: FactMultiSelect, filter by DimIndikatorEvaluasi.label_pertanyaan.
-     * TIDAK pakai pre-agg — data individual alumni.
-     *
-     * @return array{data: array, page: int, per_page: int, total_on_page: int}
-     */
     public function getDetailAlumniByAlasan(
         string  $labelPertanyaan,
         ?string $jenjang        = null,
@@ -305,5 +273,55 @@ class KesesuaianRepository extends BaseAnalyticalRepository
             'per_page'      => $perPage,
             'total_on_page' => count($data),
         ];
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  6. BANDINGKAN — sesuai vs tidak sesuai per prodi terpilih
+    // ──────────────────────────────────────────────────────────────
+
+    public function getBandingkanData(
+        array   $prodiFilter    = [],
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $tahunLulus     = null,
+        ?string $mingguSnapshot = null,
+    ): Collection {
+        $extra = [];
+        if (!empty($prodiFilter)) {
+            $extra[] = [
+                'member'   => 'DimProdi.nama_prodi',
+                'operator' => 'equals',
+                'values'   => $prodiFilter,
+            ];
+        }
+
+        $filters = $this->buildGlobalFilters(
+            jenjang:        $jenjang,
+            jurusan:        $jurusan,
+            tahunLulus:     $tahunLulus,
+            mingguSnapshot: $mingguSnapshot,
+            extra:          $extra,
+        );
+
+        return $this->cube->load([
+            'measures' => [
+                'FactTracerStudy.count_alumni',
+                'FactTracerStudy.count_sesuai_bidang',
+                'FactTracerStudy.count_tidak_sesuai_bidang',
+            ],
+            'dimensions' => [
+                'DimProdi.jenjang',
+                'DimProdi.jurusan',
+                'DimProdi.nama_prodi',
+            ],
+            'filters' => $filters,
+            'order'   => [['DimProdi.nama_prodi', 'asc']],
+        ])->map(fn($r) => [
+            'nama_prodi'                => $r['DimProdi.nama_prodi']                              ?? '',
+            'jenjang'                   => $r['DimProdi.jenjang']                                 ?? '',
+            'count_alumni'              => (int) ($r['FactTracerStudy.count_alumni']               ?? 0),
+            'count_sesuai_bidang'       => (int) ($r['FactTracerStudy.count_sesuai_bidang']        ?? 0),
+            'count_tidak_sesuai_bidang' => (int) ($r['FactTracerStudy.count_tidak_sesuai_bidang']  ?? 0),
+        ]);
     }
 }

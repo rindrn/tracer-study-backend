@@ -6,6 +6,7 @@ use App\DTOs\Analytical\Kesesuaian\KesesuaianBarDTO;
 use App\DTOs\Analytical\Kesesuaian\KesesuaianPieDTO;
 use App\DTOs\Analytical\Kesesuaian\KesesuaianAlasanDTO;
 use App\DTOs\Analytical\Kesesuaian\KesesuaianDrillDownDTO;
+use App\DTOs\Analytical\Kesesuaian\KesesuaianBandingkanDTO;
 use App\Repositories\Analytical\KesesuaianRepository;
 use App\Traits\WithCache;
 
@@ -102,6 +103,49 @@ class KesesuaianService
         return new KesesuaianAlasanDTO(
             data:    $data,
             filters: $this->activeFilters($params),
+        );
+    }
+
+    public function getBandingkan(array $params): KesesuaianBandingkanDTO
+    {
+        $prodiFilter = $params['prodi'] ?? [];
+        if (is_string($prodiFilter)) {
+            $prodiFilter = [$prodiFilter];
+        }
+
+        $raw = $this->repo->getBandingkanData(
+            prodiFilter:    $prodiFilter,
+            jenjang:        $params['jenjang']         ?? null,
+            jurusan:        $params['jurusan']         ?? null,
+            tahunLulus:     $params['tahun_lulus']     ?? null,
+            mingguSnapshot: $params['minggu_snapshot'] ?? null,
+        );
+
+        $data      = [];
+        $prodiList = [];
+
+        foreach ($raw as $r) {
+            $total    = $r['count_alumni'];
+            $sesuai   = $r['count_sesuai_bidang'];
+            $tidakSesuai = $r['count_tidak_sesuai_bidang'];
+
+            $data[] = [
+                'nama_prodi'               => $r['nama_prodi'],
+                'jenjang'                  => $r['jenjang'],
+                'total'                    => $total,
+                'count_sesuai_bidang'      => $sesuai,
+                'count_tidak_sesuai_bidang'=> $tidakSesuai,
+                'pct_sesuai'               => $total > 0 ? round($sesuai      / $total * 100, 1) : 0.0,
+                'pct_tidak_sesuai'         => $total > 0 ? round($tidakSesuai / $total * 100, 1) : 0.0,
+            ];
+
+            $prodiList[] = $r['nama_prodi'];
+        }
+
+        return new KesesuaianBandingkanDTO(
+            data:      $data,
+            prodiList: array_values(array_unique($prodiList)),
+            filters:   $this->activeFilters($params),
         );
     }
 

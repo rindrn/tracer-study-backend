@@ -172,9 +172,9 @@ class EmploymentSummaryService
     private function buildKeterserapanCard(\Illuminate\Support\Collection $rows): array
     {
         $total    = $rows->sum('count');
-        $terserap = $rows
-            ->filter(fn($r) => $this->labelMatchesAny($r['status'], self::TERSERAP_KEYWORDS))
-            ->sum('count');
+        $terserap = $rows->filter(fn($r) =>
+            $this->labelMatches($r['status'], ['bekerja', 'wirausaha', 'wiraswasta', 'melanjutkan'])
+             )->sum('count');
 
         return [
             'value' => $total > 0 ? round($terserap / $total * 100, 1) : 0.0,
@@ -199,12 +199,14 @@ class EmploymentSummaryService
      */
     private function buildMasaTungguCard(\Illuminate\Support\Collection $rows): array
     {
-        $totalTerserap = $rows->sum('count_terserap');
-        $totalCepat    = $rows->sum('count_masa_tunggu_cepat');
-
+        $totalAlumni = $rows->sum('count_alumni');
+        $totalCepat  = $rows->sum('count_masa_tunggu_cepat');
+ 
+        $pct = $totalAlumni > 0 ? round($totalCepat / $totalAlumni * 100, 1) : 0.0;
+ 
         return [
-            'value' => $totalTerserap > 0 ? round($totalCepat / $totalTerserap * 100, 1) : 0.0,
-            'hint'  => 'Terserap ≤ 6 bulan',
+            'value' => $pct,
+            'hint'  => 'Cepat terserap',
         ];
     }
 
