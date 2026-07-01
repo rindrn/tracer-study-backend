@@ -53,7 +53,6 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     // ──────────────────────────────────────────────────────────────
     //  2. PIE — distribusi tingkat kesesuaian
     // ──────────────────────────────────────────────────────────────
-
     public function getPieData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
@@ -61,15 +60,12 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
-        $filters = array_merge(
-            $this->buildGlobalFilters(
-                jenjang:        $jenjang,
-                jurusan:        $jurusan,
-                namaProdi:      $namaProdi,
-                tahunLulus:     $tahunLulus,
-                mingguSnapshot: $mingguSnapshot,
-            ),
-            [['member' => 'FactTracerStudy.status_alumni_sk', 'operator' => 'equals', 'values' => ['1']]],
+        $filters = $this->buildGlobalFilters(
+            jenjang:        $jenjang,
+            jurusan:        $jurusan,
+            namaProdi:      $namaProdi,
+            tahunLulus:     $tahunLulus,
+            mingguSnapshot: $mingguSnapshot,
         );
 
         return $this->cube->load([
