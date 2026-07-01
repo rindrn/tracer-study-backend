@@ -173,7 +173,7 @@ class EmploymentSummaryService
     {
         $total    = $rows->sum('count');
         $terserap = $rows->filter(fn($r) =>
-            $this->labelMatches($r['status'], ['bekerja', 'wirausaha', 'wiraswasta', 'melanjutkan'])
+            $this->labelMatchesAny($r['status'], ['bekerja', 'wirausaha', 'wiraswasta', 'melanjutkan'])
              )->sum('count');
 
         return [

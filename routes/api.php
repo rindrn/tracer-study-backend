@@ -91,7 +91,7 @@ Route::middleware("auth:sanctum")->group(function () {
     Route::get('lam-versions/{id}/thresholds', [ThresholdController::class, 'byVersion']);
 
     // ── Admin only ───────────────────────────────────────────
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware('role:kotc')->group(function () {
 
         // Programs
         Route::post('programs',        [ProgramController::class, 'store']);
@@ -124,7 +124,7 @@ Route::middleware("auth:sanctum")->group(function () {
 
     });
 
-    Route::middleware('role:admin')->prefix('ump')->group(function () {
+    Route::middleware('role:kotc')->prefix('ump')->group(function () {
         Route::get('years',                              [RefUmpController::class, 'years']);
         Route::get('template',                           [RefUmpController::class, 'template']);
         Route::get('{tahun}',                            [RefUmpController::class, 'show']);

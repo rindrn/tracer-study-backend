@@ -18,10 +18,10 @@ class User extends Authenticatable
     protected $casts      = ['password' => 'hashed'];
 
     // ── Role constants (sinkron dengan CHECK constraint di migration users) ─
-    public const ROLE_ADMIN        = 'admin';
+    public const ROLE_ADMIN        = 'kotc';
     public const ROLE_P2MPP        = 'p2mpp';
     public const ROLE_KAPRODI      = 'kaprodi';
-    public const ROLE_HEAD_TRACER  = 'head_tracer';
+    public const ROLE_HEAD_TRACER  = 'kotc';
     public const ROLE_TRACER_TEAM  = 'tracer_team';
     public const ROLE_WADIR        = 'wadir';
 

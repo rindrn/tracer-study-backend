@@ -246,12 +246,22 @@ class SebaranInstansiService
         $page    = max(1, (int) ($params['page']     ?? 1));
         $perPage = min(100, max(5, (int) ($params['per_page'] ?? 15)));
 
-        $jenisInstansi   = $params['jenis_instansi']   ?? null;
+        // Parse jenis_instansi: bisa string CSV atau array
+        $jenisInstansi = $params['jenis_instansi'] ?? null;
+        if (is_string($jenisInstansi) && $jenisInstansi !== '') {
+            $jenisInstansi = array_map('trim', explode(',', $jenisInstansi));
+            $jenisInstansi = array_values(array_filter($jenisInstansi));
+        }
+        if (empty($jenisInstansi)) {
+            $jenisInstansi = null;
+        }
+
         $tingkatInstansi = $params['tingkat_instansi'] ?? null;
+        if ($tingkatInstansi === '') $tingkatInstansi = null;
 
         $result = $this->repo->getDetailAlumni(
-            jenisInstansi:   $jenisInstansi !== '' ? $jenisInstansi : null,
-            tingkatInstansi: $tingkatInstansi !== '' ? $tingkatInstansi : null,
+            jenisInstansi:   $jenisInstansi,
+            tingkatInstansi: $tingkatInstansi,
             jenjang:         $params['jenjang']         ?? null,
             namaProdi:       $params['nama_prodi']      ?? null,
             tahunLulus:      $params['tahun_lulus']     ?? null,
@@ -263,7 +273,7 @@ class SebaranInstansiService
 
         return new SebaranInstansiDrillDownDTO(
             data:            $result['data'],
-            jenisInstansi:   $jenisInstansi ?: null,
+            jenisInstansi: is_array($jenisInstansi) ? implode(', ', $jenisInstansi) : $jenisInstansi,
             tingkatInstansi: $tingkatInstansi ?: null,
             page:            $page,
             perPage:         $perPage,
