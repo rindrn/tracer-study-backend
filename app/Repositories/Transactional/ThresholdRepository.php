@@ -130,11 +130,9 @@ class ThresholdRepository
 
     public function byProdiAndIndicator(int $prodiId, string $indicatorKey): ?object
     {
-        // Return object berisi lam info + collection of versions+thresholds
-        // Pakai 1 query dengan join berantai
         $lamRow = DB::connection('oltp')
             ->table('lam_programs as lp')
-            ->join('lams as l',          'l.id',  '=', 'lp.lam_id')
+            ->join('lams as l', 'l.id', '=', 'lp.lam_id')
             ->where('lp.program_id', $prodiId)
             ->select('l.id as lam_id', 'l.name as lam_name', 'l.code as lam_code')
             ->first();
@@ -143,10 +141,14 @@ class ThresholdRepository
 
         $rows = DB::connection('oltp')
             ->table('lam_versions as lv')
-            ->join('thresholds as t',           't.lam_version_id',  '=', 'lv.id')
-            ->join('threshold_indicators as ti', 'ti.id',             '=', 't.indicator_id')
-            ->where('lv.lam_id',  $lamRow->lam_id)
-            ->where('ti.key',     $indicatorKey)
+            ->join('thresholds as t', 't.lam_version_id', '=', 'lv.id')
+            ->join('threshold_indicators as ti', 'ti.id', '=', 't.indicator_id')
+            ->leftJoin('threshold_configs as tc', function ($join) {
+                $join->on('tc.lam_version_id', '=', 't.lam_version_id')
+                    ->on('tc.indicator_id', '=', 't.indicator_id');
+            })
+            ->where('lv.lam_id', $lamRow->lam_id)
+            ->where('ti.key', $indicatorKey)
             ->select(
                 'lv.id as version_id',
                 'lv.year',
@@ -156,6 +158,9 @@ class ThresholdRepository
                 'ti.name as indicator_name',
                 'ti.unit as indicator_unit',
                 'ti.operator as indicator_operator',
+                'ti.dynamic_param_unit',
+                'ti.is_system_calculated',
+                'tc.param_value',
                 't.id as threshold_id',
                 't.level as threshold_level',
                 't.value as threshold_value',
@@ -164,9 +169,24 @@ class ThresholdRepository
             ->orderBy('t.level')
             ->get();
 
-        return (object) [
-            'lam'  => $lamRow,
-            'rows' => $rows,
-        ];
+        return (object) ['lam' => $lamRow, 'rows' => $rows];
+    }
+
+    public function upsertConfig(int $lamVersionId, int $indicatorId, float $paramValue): void
+    {
+        DB::connection('oltp')->table('threshold_configs')->updateOrInsert(
+            ['lam_version_id' => $lamVersionId, 'indicator_id' => $indicatorId],
+            ['param_value' => $paramValue, 'updated_at' => now(), 'created_at' => now()]
+        );
+    }
+
+    public function getConfig(int $lamVersionId, int $indicatorId): ?float
+    {
+        $row = DB::connection('oltp')->table('threshold_configs')
+            ->where('lam_version_id', $lamVersionId)
+            ->where('indicator_id', $indicatorId)
+            ->first();
+
+        return $row ? (float) $row->param_value : null;
     }
 }

@@ -54,9 +54,8 @@ class LamVersionService
 
         $result = LamVersionResponseDTO::fromModel($this->repo->create($data));
 
-        // Bust cache list versi milik LAM ini + cache LAM
         $this->forget("lam_versions:by_lam:{$data['lam_id']}");
-        $this->forgetTag('lams');
+        $this->forgetTag('lams', 'thresholds');
 
         return $result;
     }

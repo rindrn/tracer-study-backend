@@ -114,6 +114,7 @@ Route::middleware("auth:sanctum")->group(function () {
 
         // Threshold Indicators
         Route::get('threshold-indicators', [ThresholdIndicatorController::class, 'index']);
+        Route::put('threshold-indicators/{id}', [ThresholdIndicatorController::class, 'update']);
 
         // Thresholds
         Route::post('thresholds',        [ThresholdController::class, 'store']);
