@@ -21,4 +21,10 @@ class ThresholdIndicatorRepository
             ->where('id', $id)
             ->first();
     }
+
+    public function update(int $id, array $data): object
+    {
+        DB::connection('oltp')->table('threshold_indicators')->where('id', $id)->update($data);
+        return $this->findById($id);
+    }
 }

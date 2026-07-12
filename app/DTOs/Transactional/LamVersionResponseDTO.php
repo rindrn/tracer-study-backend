@@ -1,16 +1,16 @@
 <?php
-// app/DTOs/Transactional/LamVersionResponseDTO.php
 namespace App\DTOs\Transactional;
 
 class LamVersionResponseDTO
 {
     public function __construct(
-        public readonly int    $id,
-        public readonly int    $lamId,
-        public readonly string $lamName,
-        public readonly int    $year,
+        public readonly int     $id,
+        public readonly int     $lamId,
+        public readonly string  $lamName,
+        public readonly int     $year,
+        public readonly ?int    $yearEnd,
         public readonly ?string $versionName,
-        public readonly bool   $isActive,
+        public readonly bool    $isActive,
     ) {}
 
     public static function fromModel(object $row): self
@@ -20,6 +20,7 @@ class LamVersionResponseDTO
             lamId:       $row->lam_id,
             lamName:     $row->lam_name ?? '',
             year:        $row->year,
+            yearEnd:     $row->year_end ?? null,
             versionName: $row->version_name,
             isActive:    (bool) $row->is_active,
         );
@@ -32,6 +33,7 @@ class LamVersionResponseDTO
             'lam_id'       => $this->lamId,
             'lam_name'     => $this->lamName,
             'year'         => $this->year,
+            'year_end'     => $this->yearEnd,
             'version_name' => $this->versionName,
             'is_active'    => $this->isActive,
         ];

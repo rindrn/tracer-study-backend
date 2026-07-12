@@ -8,10 +8,16 @@ trait WithCache
 {
     /**
      * Ambil dari cache; kalau miss, jalankan $callback lalu simpan.
+     * $tags harus diisi kalau key ini juga mau bisa dihapus lewat forgetTag() —
+     * tanpa tag di sini, forgetTag() tidak akan pernah menyentuh key ini.
      */
-    protected function remember(string $key, \Closure $callback, int $ttlSeconds = 300): mixed
+    protected function remember(string $key, \Closure $callback, int $ttlSeconds = 300, array $tags = []): mixed
     {
-        return Cache::store('redis')->remember($key, $ttlSeconds, $callback);
+        $store = Cache::store('redis');
+
+        return $tags
+            ? $store->tags($tags)->remember($key, $ttlSeconds, $callback)
+            : $store->remember($key, $ttlSeconds, $callback);
     }
 
     /**

@@ -40,6 +40,8 @@ Schedule::command('etl:run')
     })
     ->onFailure(fn () => Log::error('ETL snapshot gagal'));
 
+Schedule::command('tracer:recalc-response-threshold')->dailyAt('01:00');
+
 /*
 |--------------------------------------------------------------------------
 | MODE PRODUCTION (uncomment setelah testing selesai, comment yang di atas)

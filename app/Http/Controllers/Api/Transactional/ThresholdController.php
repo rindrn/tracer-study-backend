@@ -108,4 +108,13 @@ class ThresholdController extends Controller
         ]);
     }
 
+    // GET /api/lams/{lamId}/thresholds/tracer-response — breakdown per prodi di bawah LAM ini
+    public function tracerResponseByLam(int $lamId): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->tracerResponseByLam($lamId),
+        ]);
+    }
+
 }

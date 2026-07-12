@@ -89,6 +89,7 @@ Route::middleware("auth:sanctum")->group(function () {
     // LAM Versions — semua role bisa GET
     Route::get('lam-versions/{id}',            [LamVersionController::class, 'show']);
     Route::get('lam-versions/{id}/thresholds', [ThresholdController::class, 'byVersion']);
+    Route::get('lams/{lamId}/thresholds/tracer-response', [ThresholdController::class, 'tracerResponseByLam']);
 
     // ── Admin only ───────────────────────────────────────────
     Route::middleware('role:kotc')->group(function () {
@@ -114,6 +115,7 @@ Route::middleware("auth:sanctum")->group(function () {
 
         // Threshold Indicators
         Route::get('threshold-indicators', [ThresholdIndicatorController::class, 'index']);
+        Route::put('threshold-indicators/{id}', [ThresholdIndicatorController::class, 'update']);
 
         // Thresholds
         Route::post('thresholds',        [ThresholdController::class, 'store']);
