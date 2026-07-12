@@ -139,8 +139,15 @@ class ThresholdRepository
 
         if (! $lamRow) return null;
 
+        // year_end dihitung dulu di level lam_versions mentah (LEAD partition per lam_id)
+        // sebelum di-join ke thresholds — kalau dihitung setelah join, hasilnya salah
+        // karena tiap versi muncul 2x (baik/unggul) dan partition-nya jadi rusak.
+        $lamVersionsWithYearEnd = DB::connection('oltp')->table('lam_versions')
+            ->selectRaw('lam_versions.*, (LEAD(year) OVER (PARTITION BY lam_id ORDER BY year) - 1) as year_end');
+
         $rows = DB::connection('oltp')
-            ->table('lam_versions as lv')
+            ->query()
+            ->fromSub($lamVersionsWithYearEnd, 'lv')
             ->join('thresholds as t', 't.lam_version_id', '=', 'lv.id')
             ->join('threshold_indicators as ti', 'ti.id', '=', 't.indicator_id')
             ->leftJoin('threshold_configs as tc', function ($join) {
@@ -152,6 +159,7 @@ class ThresholdRepository
             ->select(
                 'lv.id as version_id',
                 'lv.year',
+                'lv.year_end',
                 'lv.version_name',
                 'lv.is_active',
                 'ti.key as indicator_key',
@@ -188,5 +196,41 @@ class ThresholdRepository
             ->first();
 
         return $row ? (float) $row->param_value : null;
+    }
+
+    public function getTracerResponseThreshold(int $programId, int $graduatedYear): ?object
+    {
+        return DB::connection('oltp')
+            ->table('tracer_response_thresholds')
+            ->where('program_id', $programId)
+            ->where('graduated_year', $graduatedYear)
+            ->first();
+    }
+
+    public function latestTracerResponseThreshold(int $programId): ?object
+    {
+        return DB::connection('oltp')
+            ->table('tracer_response_thresholds')
+            ->where('program_id', $programId)
+            ->orderByDesc('graduated_year')
+            ->first();
+    }
+
+    public function tracerResponseHistoryByLam(int $lamId): \Illuminate\Support\Collection
+    {
+        // Join lam_programs → dapat semua prodi di bawah LAM ini, lalu histori tiap prodi
+        return DB::connection('oltp')
+            ->table('lam_programs as lp')
+            ->join('programs as p', 'p.id', '=', 'lp.program_id')
+            ->join('tracer_response_thresholds as t', 't.program_id', '=', 'lp.program_id')
+            ->where('lp.lam_id', $lamId)
+            ->select(
+                'p.id as program_id', 'p.name as program_name', 'p.code as program_code',
+                't.graduated_year', 't.threshold_value', 't.total_lulusan',
+                't.min_responden', 't.margin_error', 't.calculated_at',
+            )
+            ->orderBy('p.name')
+            ->orderByDesc('t.graduated_year')
+            ->get();
     }
 }

@@ -24,7 +24,7 @@ class ThresholdIndicatorService
             return $this->repo->all()
                 ->map(fn($row) => ThresholdIndicatorDTO::fromRow($row)->toArray())
                 ->toArray();
-        }, self::TTL);
+        }, self::TTL, ['thresholds']);
     }
 
     public function update(int $id, array $data): array

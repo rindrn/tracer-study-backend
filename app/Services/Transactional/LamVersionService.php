@@ -13,7 +13,7 @@ class LamVersionService
 {
     use WithCache;
 
-    private const TTL = 1800; // 10 menit
+    private const TTL = 300; // 5 menit — sama dengan LamService, data ini erat kaitannya dgn threshold
 
     public function __construct(
         private readonly LamVersionRepository $repo,
@@ -25,7 +25,7 @@ class LamVersionService
     {
         $row = $this->remember("lam_versions:show:{$id}", function () use ($id) {
             return $this->repo->findById($id);
-        }, self::TTL);
+        }, self::TTL, ['lams', 'thresholds']);
 
         if (! $row) throw new BusinessException("LAM Version ID {$id} tidak ditemukan.", 404);
         return LamVersionResponseDTO::fromModel($row);
@@ -38,9 +38,14 @@ class LamVersionService
 
         $versions = $this->remember("lam_versions:by_lam:{$lamId}", function () use ($lamId) {
             return $this->repo->byLam($lamId)
-                ->map(fn($v) => ['id' => $v->id, 'year' => $v->year])
-                ->toArray();
-        }, self::TTL);
+                ->map(fn($v) => [
+                    'id'           => $v->id,
+                    'year'         => $v->year,
+                    'year_end'     => $v->year_end ?? null,
+                    'version_name' => $v->version_name,
+                    'is_active'    => (bool) $v->is_active,
+                ])->toArray();
+        }, self::TTL, ['lams', 'thresholds']);
 
         return [
             'lam'      => ['id' => $lam->id, 'name' => $lam->name],

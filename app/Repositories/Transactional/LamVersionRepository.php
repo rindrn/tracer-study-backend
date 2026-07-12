@@ -1,15 +1,26 @@
 <?php
-// app/Repositories/Transactional/LamVersionRepository.php
 namespace App\Repositories\Transactional;
 
 use Illuminate\Support\Facades\DB;
 
 class LamVersionRepository
 {
+    /**
+     * Base query dengan year_end dihitung via window function LEAD(),
+     * di-partition per lam_id, di-order per year.
+     * year_end = null berarti versi ini masih berlaku sampai sekarang.
+     */
+    private function withYearEnd()
+    {
+        return DB::connection('oltp')->table('lam_versions')
+            ->selectRaw('lam_versions.*, (LEAD(year) OVER (PARTITION BY lam_id ORDER BY year) - 1) as year_end');
+    }
+
     public function findById(int $id): ?object
     {
         return DB::connection('oltp')
-            ->table('lam_versions as lv')
+            ->query()
+            ->fromSub($this->withYearEnd(), 'lv')
             ->join('lams as l', 'l.id', '=', 'lv.lam_id')
             ->select('lv.*', 'l.name as lam_name', 'l.code as lam_code')
             ->where('lv.id', $id)
@@ -19,9 +30,10 @@ class LamVersionRepository
     public function byLam(int $lamId): \Illuminate\Support\Collection
     {
         return DB::connection('oltp')
-            ->table('lam_versions')
-            ->where('lam_id', $lamId)
-            ->orderBy('year')
+            ->query()
+            ->fromSub($this->withYearEnd(), 'lv')
+            ->where('lv.lam_id', $lamId)
+            ->orderBy('lv.year')
             ->get();
     }
 
@@ -35,7 +47,7 @@ class LamVersionRepository
             'created_at'   => now(),
             'updated_at'   => now(),
         ]);
-        return $this->findById($id);
+        return $this->findById($id); // ← sudah termasuk year_end
     }
 
     public function update(int $id, array $data): object
@@ -45,7 +57,7 @@ class LamVersionRepository
             'is_active'    => $data['is_active'] ?? true,
             'updated_at'   => now(),
         ]);
-        return $this->findById($id);
+        return $this->findById($id); // ← sudah termasuk year_end
     }
 
     public function delete(int $id): void

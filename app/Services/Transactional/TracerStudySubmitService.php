@@ -2,6 +2,7 @@
 // app/Services/Transactional/TracerStudySubmitService.php
 namespace App\Services\Transactional;
 
+use App\Events\AlumniDataChanged;  
 use App\Exceptions\BusinessException;
 use App\Repositories\Transactional\AlumniProfileRepository;
 use App\Repositories\Transactional\EducationRecordRepository;
@@ -100,6 +101,14 @@ class TracerStudySubmitService
             // 4. Normalisasi data ke employment / education records
             $this->persistNormalizedRecords($validated, $alumniId, $globalQnr->id);
         });
+        // Transaction sudah commit (DB::transaction() commit otomatis sebelum
+        // closure-nya return tanpa exception). Dispatch di sini — bukan di
+        // dalam closure — supaya event cuma nembak kalau seluruh submission
+        // beneran tersimpan, dan tidak ikut ke-rollback kalau ada error.
+        event(new AlumniDataChanged(
+            programId:     $program->id,
+            graduatedYear: (int) $validated['tahun_lulus'],
+        ));
     }
 
     // ═══════════════════════════════════════════════════════════
