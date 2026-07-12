@@ -216,6 +216,26 @@ class ThresholdRepository
             ->first();
     }
 
+    public function historyByProgram(int $programId): \Illuminate\Support\Collection
+    {
+        return DB::connection('oltp')
+            ->table('tracer_response_thresholds')
+            ->where('program_id', $programId)
+            ->orderBy('graduated_year')
+            ->get();
+    }
+
+    /** Total lulusan per tahun, digabung dari semua prodi — dasar hitung threshold agregat "Semua Prodi". */
+    public function totalLulusanPerYearAllPrograms(): \Illuminate\Support\Collection
+    {
+        return DB::connection('oltp')
+            ->table('tracer_response_thresholds')
+            ->selectRaw('graduated_year, SUM(total_lulusan) as total_lulusan')
+            ->groupBy('graduated_year')
+            ->orderBy('graduated_year')
+            ->get();
+    }
+
     public function tracerResponseHistoryByLam(int $lamId): \Illuminate\Support\Collection
     {
         // Join lam_programs → dapat semua prodi di bawah LAM ini, lalu histori tiap prodi

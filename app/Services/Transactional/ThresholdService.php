@@ -156,6 +156,17 @@ class ThresholdService
         ];
     }
 
+    // GET /api/dashboard/thresholds?prodi_id=&indicator= — dipakai semua chart KPI
+    // yang menampilkan garis/nilai threshold (via useLamFilter di FE).
+    public function forChart(?int $prodiId, string $indicatorKey): array
+    {
+        $key = 'thresholds:chart:' . ($prodiId ?? 'all') . ':' . $indicatorKey;
+
+        return $this->remember($key, function () use ($prodiId, $indicatorKey) {
+            return $this->doForChart($prodiId, $indicatorKey);
+        }, self::TTL, ['thresholds', 'lams']);
+    }
+
     private function doForChart(?int $prodiId, string $indicatorKey): array
     {
         if ($indicatorKey === 'tracer_response') {
@@ -286,7 +297,7 @@ class ThresholdService
         $indicatorMeta = $this->resolveIndicatorMeta('tracer_response');
 
         if (! $prodiId) {
-            return ['context' => 'all_prodi', 'lam' => null, 'indicator' => $indicatorMeta, 'versions' => []];
+            return $this->aggregateTracerResponseAllPrograms($indicatorMeta);
         }
 
         $lamRow = DB::connection('oltp')
@@ -296,9 +307,12 @@ class ThresholdService
             ->select('l.id as lam_id', 'l.name as lam_name', 'l.code as lam_code')
             ->first();
 
-        $latest = $this->repo->latestTracerResponseThreshold($prodiId);
+        // Seluruh histori per angkatan — beda dari indikator lain, threshold tracer_response
+        // memang berubah tiap tahun (mengikuti jumlah lulusan angkatan tsb), jadi konsumen
+        // (mis. grafik tren) butuh nilai tiap tahun, bukan cuma versi "aktif" terakhir.
+        $history = $this->repo->historyByProgram($prodiId);
 
-        if (! $latest) {
+        if ($history->isEmpty()) {
             return [
                 'context'   => 'prodi',
                 'lam'       => $lamRow ? ['id' => $lamRow->lam_id, 'name' => $lamRow->lam_name, 'code' => $lamRow->lam_code] : null,
@@ -307,30 +321,81 @@ class ThresholdService
             ];
         }
 
+        $maxYear = $history->max('graduated_year');
+
+        $versions = $history->map(fn($row) => [
+            'id'             => $row->graduated_year, // dipakai sbg id unik pengganti lam_version_id
+            'year'           => $row->graduated_year,
+            'version_name'   => "Angkatan {$row->graduated_year}",
+            'label'          => ($lamRow->lam_name ?? 'Prodi') . " — Angkatan {$row->graduated_year}",
+            'is_active'      => $row->graduated_year === $maxYear,
+            'indicator_name' => $indicatorMeta['name'],
+            'thresholds'     => [
+                'baik'   => ['threshold_id' => null, 'value' => (float) $row->threshold_value],
+                'unggul' => ['threshold_id' => null, 'value' => (float) $row->threshold_value],
+            ],
+            'dynamic_param'  => null,
+            'calculation_meta' => [
+                'graduated_year' => $row->graduated_year,
+                'total_lulusan'  => $row->total_lulusan,
+                'margin_error'   => (float) $row->margin_error,
+                'min_responden'  => $row->min_responden,
+                'formula'        => 'Slovin',
+            ],
+        ])->values()->toArray();
+
         return [
             'context'   => 'prodi',
             'lam'       => $lamRow ? ['id' => $lamRow->lam_id, 'name' => $lamRow->lam_name, 'code' => $lamRow->lam_code] : null,
             'indicator' => $indicatorMeta,
-            'versions'  => [[
-                'id'             => null, // tidak terikat lam_version
-                'year'           => $latest->graduated_year,
-                'version_name'   => "Angkatan {$latest->graduated_year}",
-                'label'          => ($lamRow->lam_name ?? 'Prodi') . " — Angkatan {$latest->graduated_year}",
-                'is_active'      => true,
-                'indicator_name' => $indicatorMeta['name'],
+            'versions'  => $versions,
+        ];
+    }
+
+    /**
+     * Mode "Semua Prodi" — tidak ada satu program_id spesifik, jadi threshold dihitung
+     * ulang dari total lulusan gabungan semua prodi per tahun, pakai formula Slovin yang
+     * sama (bukan menjumlah min_responden per-prodi yang sudah dibulatkan — non-linear,
+     * hasilnya beda kalau dihitung ulang dari agregat total_lulusan langsung).
+     */
+    private function aggregateTracerResponseAllPrograms(array $indicatorMeta): array
+    {
+        $history = $this->repo->totalLulusanPerYearAllPrograms();
+
+        if ($history->isEmpty()) {
+            return ['context' => 'all_prodi', 'lam' => null, 'indicator' => $indicatorMeta, 'versions' => []];
+        }
+
+        $maxYear = $history->max('graduated_year');
+        $d       = self::SLOVIN_MARGIN_ERROR;
+
+        $versions = $history->map(function ($row) use ($maxYear, $d) {
+            $totalLulusan = (int) $row->total_lulusan;
+            $minResponden = $totalLulusan > 0 ? $totalLulusan / ($totalLulusan * ($d ** 2) + 1) : 0;
+            $thresholdValue = $totalLulusan > 0 ? round(($minResponden / $totalLulusan) * 100, 2) : 0;
+
+            return [
+                'id'             => $row->graduated_year,
+                'year'           => $row->graduated_year,
+                'version_name'   => "Angkatan {$row->graduated_year}",
+                'label'          => "Semua Prodi — Angkatan {$row->graduated_year}",
+                'is_active'      => $row->graduated_year === $maxYear,
+                'indicator_name' => 'Respon Tracer Study Alumni',
                 'thresholds'     => [
-                    'baik'   => ['threshold_id' => null, 'value' => (float) $latest->threshold_value],
-                    'unggul' => ['threshold_id' => null, 'value' => (float) $latest->threshold_value],
+                    'baik'   => ['threshold_id' => null, 'value' => $thresholdValue],
+                    'unggul' => ['threshold_id' => null, 'value' => $thresholdValue],
                 ],
                 'dynamic_param'  => null,
                 'calculation_meta' => [
-                    'graduated_year' => $latest->graduated_year,
-                    'total_lulusan'  => $latest->total_lulusan,
-                    'margin_error'   => (float) $latest->margin_error,
-                    'min_responden'  => $latest->min_responden,
-                    'formula'        => 'Slovin',
+                    'graduated_year' => $row->graduated_year,
+                    'total_lulusan'  => $totalLulusan,
+                    'margin_error'   => $d,
+                    'min_responden'  => (int) round($minResponden),
+                    'formula'        => 'Slovin (agregat semua prodi)',
                 ],
-            ]],
-        ];
+            ];
+        })->values()->toArray();
+
+        return ['context' => 'all_prodi', 'lam' => null, 'indicator' => $indicatorMeta, 'versions' => $versions];
     }
 }
