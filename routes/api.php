@@ -11,6 +11,10 @@ use App\Http\Controllers\Api\Transactional\LamVersionController;
 use App\Http\Controllers\Api\Transactional\LamProgramController; 
 use App\Http\Controllers\Api\Transactional\ProgramController; 
 use App\Http\Controllers\Api\Transactional\RefUmpController;
+use App\Http\Controllers\Api\Transactional\SemanticRoleController;
+use App\Http\Controllers\Api\Transactional\QuestionSemanticMappingController;
+use App\Http\Controllers\Api\Analytical\KpiCategoryMappingController;
+use App\Http\Controllers\Api\Analytical\EtlAnomalyLogController;
 
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireController;
@@ -124,6 +128,35 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::post('lam-versions/{id}/thresholds/bulk', [ThresholdController::class, 'bulkStore']);
         Route::put('lam-versions/{id}/thresholds/bulk',  [ThresholdController::class, 'bulkUpdate']);
 
+    });
+
+    // ── Semantic Role Mapping (ETL admin config) ──────────────────────
+    // Read: semua role login (auth:sanctum). Write: hanya kotc, sama gate
+    // dengan Threshold/LamVersion (lihat blok role:kotc di bawah).
+    Route::get('semantic-roles', [SemanticRoleController::class, 'index']);
+
+    Route::prefix('question-semantic-mappings')->group(function () {
+        Route::get('/',        [QuestionSemanticMappingController::class, 'index']);
+        Route::get('unmapped', [QuestionSemanticMappingController::class, 'unmapped']);
+        Route::get('similar',  [QuestionSemanticMappingController::class, 'similar']);
+        Route::get('option-candidates', [QuestionSemanticMappingController::class, 'optionCandidates']);
+        Route::get('questionnaires', [QuestionSemanticMappingController::class, 'questionnaires']);
+    });
+
+    Route::prefix('kpi-category-mappings')->group(function () {
+        Route::get('/',         [KpiCategoryMappingController::class, 'index']);
+        Route::get('formula',   [KpiCategoryMappingController::class, 'formula']);
+        Route::get('taxonomy',  [KpiCategoryMappingController::class, 'taxonomy']);
+    });
+
+    Route::get('etl-anomaly-log', [EtlAnomalyLogController::class, 'index']);
+
+    Route::middleware('role:kotc')->group(function () {
+        Route::post('question-semantic-mappings',              [QuestionSemanticMappingController::class, 'store']);
+        Route::post('question-semantic-mappings/{id}/deactivate', [QuestionSemanticMappingController::class, 'deactivate']);
+
+        Route::post('kpi-category-mappings',                   [KpiCategoryMappingController::class, 'store']);
+        Route::post('kpi-category-mappings/{id}/deactivate',   [KpiCategoryMappingController::class, 'deactivate']);
     });
 
     Route::middleware('role:kotc')->prefix('ump')->group(function () {

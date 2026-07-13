@@ -36,10 +36,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Dipakai di Service layer untuk error business-level (not found, forbidden, conflict).
         $exceptions->render(function (BusinessException $e, $request) {
             $code = $e->getCode() ?: 400;
-            return response()->json([
+            return response()->json(array_merge([
                 'success' => false,
                 'message' => $e->getMessage(),
-            ], $code);
+            ], $e->getPayload()), $code);
         });
 
     })->create();

@@ -8,27 +8,68 @@ use Illuminate\Support\Collection;
  * PendapatanRepository
  *
  * Query ke Cube.js untuk segmen "Pendapatan Lulusan":
- *   1. Avg gaji + % ≥ 1,2× UMP per tahun_lulus  → dual-axis chart
+ *   1. Avg gaji + % ≥ ambang UMP per tahun_lulus  → dual-axis chart
  *   2. Proporsi above/below UMP per tahun_lulus               → grouped bar
  *   3. Detail alumni per segmen UMP atau per tahun_lulus      → drill-down
  *   4. Perbandingan above/below UMP per prodi                 → halaman Bandingkan
  *
- * Pre-agg Cube.js yang dipakai: FactTracerStudy.distribusi_gaji
- * (cover measures: avg/min/max_take_home_pay, count_above_ump,
- *  count_below_ump, count_dengan_data_ump, count_alumni
- *  dimensions: DimProdi.*, DimStatusAlumni.label,
- *  DimAlumni.tahun_lulus, DimWaktu.minggu_snapshot)
+ * AMBANG UMP DINAMIS: setiap method di sini menerima $ambangMultiplier
+ * (default 1.2 -- nilai lama yang dulu hardcode di AlumniFactBuilderService).
+ * Sumbernya sekarang threshold_configs.param_value milik indikator
+ * 'salary_above_ump' per LAM version, di-resolve FE lewat useLamFilter lalu
+ * dikirim sebagai query param ambang_ump_multiplier (lihat
+ * PendapatanController). "Above/below" TIDAK LAGI dihitung dari
+ * fact_tracer_study.flag_above_ump (kolom itu tetap ada, dipakai measure
+ * count_above_ump/count_below_ump versi lama yang masih hardcode 1.2x) --
+ * dihitung ULANG di query time via dimension FactTracerStudy.salary_ump_multiplier
+ * (take_home_pay / nilai_ump, lihat model/cubes/FactTracerStudy.js), supaya
+ * ambang bisa berapa pun tanpa perlu ETL ulang atau redeploy Cube.js.
+ *
+ * Pre-agg Cube.js yang dipakai: FactTracerStudy.distribusi_gaji (untuk
+ * total/avg/min/max -- tidak bergantung ambang). Query "above" ambang
+ * dinamis TIDAK match pre-agg manapun (measure count_alumni + filter ad hoc
+ * pada dimension baru), jadi query langsung ke fact table -- dampak performa
+ * dapat diabaikan pada volume data SmartTracer saat ini.
  */
 class PendapatanRepository extends BaseAnalyticalRepository
 {
+    private const AMBANG_DEFAULT = 1.2;
+
     // ──────────────────────────────────────────────────────────────
-    //  1. DUAL-AXIS — avg gaji + % ≥ 1,2× UMP per tahun
+    //  Helper: hitung "above ambang" per grup dimensi, ad hoc filter
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Agregat gaji dan flag UMP per tahun_lulus.
-     *
-     * Pre-agg: FactTracerStudy.distribusi_gaji
+     * @param  array<string>  $dimensions  Dimension Cube.js untuk group by (mis. DimAlumni.tahun_lulus)
+     * @param  array          $baseFilters Filter global (buildGlobalFilters) TANPA filter ambang
+     * @return Collection  Baris {..dimensions.., count_above: int} keyed by gabungan nilai dimension (pipe-separated)
+     */
+    private function countAboveAmbang(array $dimensions, array $baseFilters, float $ambangMultiplier): Collection
+    {
+        $filters = array_merge($baseFilters, [
+            ['member' => 'FactTracerStudy.salary_ump_multiplier', 'operator' => 'set'],
+            ['member' => 'FactTracerStudy.salary_ump_multiplier', 'operator' => 'gte', 'values' => [(string) $ambangMultiplier]],
+        ]);
+
+        return $this->cube->load([
+            'measures'   => ['FactTracerStudy.count_alumni'],
+            'dimensions' => $dimensions,
+            'filters'    => $filters,
+        ])->keyBy(fn ($r) => implode('|', array_map(fn ($d) => $r[$d] ?? '', $dimensions)))
+          ->map(fn ($r) => (int) ($r['FactTracerStudy.count_alumni'] ?? 0));
+    }
+
+    private static function rowKey(array $values): string
+    {
+        return implode('|', $values);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  1. DUAL-AXIS — avg gaji + % ≥ ambang UMP per tahun
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Agregat gaji dan proporsi di atas ambang UMP per tahun_lulus.
      *
      * @return Collection<array{
      *   tahun_lulus: string,
@@ -45,6 +86,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
         ?string $jurusan        = null,
         ?string $namaProdi      = null,
         ?string $mingguSnapshot = null,
+        float   $ambangMultiplier = self::AMBANG_DEFAULT,
     ): Collection {
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
@@ -56,7 +98,6 @@ class PendapatanRepository extends BaseAnalyticalRepository
         $raw = $this->cube->load([
             'measures' => [
                 'FactTracerStudy.avg_take_home_pay',
-                'FactTracerStudy.count_above_ump',
                 'FactTracerStudy.count_dengan_data_ump',
             ],
             'dimensions' => [
@@ -66,12 +107,15 @@ class PendapatanRepository extends BaseAnalyticalRepository
             'order'   => [['DimAlumni.tahun_lulus', 'asc']],
         ]);
 
-        return $raw->map(function ($r) {
+        $aboveByTahun = $this->countAboveAmbang(['DimAlumni.tahun_lulus'], $filters, $ambangMultiplier);
+
+        return $raw->map(function ($r) use ($aboveByTahun) {
+            $tahun = $r['DimAlumni.tahun_lulus'] ?? '';
             $total = (int) ($r['FactTracerStudy.count_dengan_data_ump'] ?? 0);
-            $above = (int) ($r['FactTracerStudy.count_above_ump']       ?? 0);
+            $above = $aboveByTahun->get(self::rowKey([$tahun]), 0);
 
             return [
-                'tahun_lulus'     => $r['DimAlumni.tahun_lulus']                  ?? '',
+                'tahun_lulus'     => $tahun,
                 'avg_gaji' => (int) round($r['FactTracerStudy.avg_take_home_pay'] ?? 0),
                 'total_alumni_ump'=> $total,
                 'count_above_ump' => $above,
@@ -85,9 +129,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Proporsi < 1,2× UMP vs ≥ 1,2× UMP per tahun lulus (tanpa split jenjang).
-     *
-     * Pre-agg: FactTracerStudy.distribusi_gaji ✅
+     * Proporsi < ambang UMP vs ≥ ambang UMP per tahun lulus (tanpa split jenjang).
      *
      * @return Collection<array{
      *   tahun_lulus: string,
@@ -103,6 +145,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
         ?string $jurusan        = null,
         ?string $namaProdi      = null,
         ?string $mingguSnapshot = null,
+        float   $ambangMultiplier = self::AMBANG_DEFAULT,
     ): Collection {
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
@@ -112,23 +155,22 @@ class PendapatanRepository extends BaseAnalyticalRepository
         );
 
         $raw = $this->cube->load([
-            'measures' => [
-                'FactTracerStudy.count_above_ump',
-                'FactTracerStudy.count_below_ump',
-                'FactTracerStudy.count_dengan_data_ump',
-            ],
+            'measures'   => ['FactTracerStudy.count_dengan_data_ump'],
             'dimensions' => ['DimAlumni.tahun_lulus'],
             'filters'    => $filters,
             'order'      => [['DimAlumni.tahun_lulus', 'asc']],
         ]);
 
-        return $raw->map(function ($r) {
+        $aboveByTahun = $this->countAboveAmbang(['DimAlumni.tahun_lulus'], $filters, $ambangMultiplier);
+
+        return $raw->map(function ($r) use ($aboveByTahun) {
+            $tahun = $r['DimAlumni.tahun_lulus'] ?? '';
             $total = (int) ($r['FactTracerStudy.count_dengan_data_ump'] ?? 0);
-            $above = (int) ($r['FactTracerStudy.count_above_ump']       ?? 0);
-            $below = (int) ($r['FactTracerStudy.count_below_ump']       ?? 0);
+            $above = $aboveByTahun->get(self::rowKey([$tahun]), 0);
+            $below = max(0, $total - $above);
 
             return [
-                'tahun_lulus'     => $r['DimAlumni.tahun_lulus'] ?? '',
+                'tahun_lulus'     => $tahun,
                 'total_alumni_ump'=> $total,
                 'count_above_ump' => $above,
                 'count_below_ump' => $below,
@@ -160,29 +202,21 @@ class PendapatanRepository extends BaseAnalyticalRepository
         ?string $search         = null,
         int     $page           = 1,
         int     $perPage        = 15,
+        float   $ambangMultiplier = self::AMBANG_DEFAULT,
     ): array {
         $extra = [];
 
-        // Filter flag_above_ump dari fact table langsung
+        // Filter FactTracerStudy.salary_ump_multiplier (dinamis) -- BUKAN
+        // flag_above_ump lagi (itu 1.2x hardcode dari ETL).
         if ($segmenUmp === 'above_ump') {
-            $extra[] = [
-                'member'   => 'FactTracerStudy.flag_above_ump',
-                'operator' => 'equals',
-                'values'   => ['1'],
-            ];
+            $extra[] = ['member' => 'FactTracerStudy.salary_ump_multiplier', 'operator' => 'gte', 'values' => [(string) $ambangMultiplier]];
         } elseif ($segmenUmp === 'below_ump') {
-            $extra[] = [
-                'member'   => 'FactTracerStudy.flag_above_ump',
-                'operator' => 'equals',
-                'values'   => ['0'],
-            ];
+            $extra[] = ['member' => 'FactTracerStudy.salary_ump_multiplier', 'operator' => 'lt', 'values' => [(string) $ambangMultiplier]];
         }
 
-        // Hanya alumni yang punya data gaji + UMP ref (flag_above_ump NOT NULL)
-        // Cube.js tidak punya operator 'set', pakai notEquals null workaround
-        // via filter member pada dimension langsung:
+        // Hanya alumni yang punya data gaji + UMP ref
         $extra[] = [
-            'member'   => 'FactTracerStudy.flag_above_ump',
+            'member'   => 'FactTracerStudy.salary_ump_multiplier',
             'operator' => 'set',
         ];
 
@@ -248,8 +282,6 @@ class PendapatanRepository extends BaseAnalyticalRepository
     /**
      * Above/below UMP per prodi untuk halaman Bandingkan.
      *
-     * Pre-agg: FactTracerStudy.distribusi_gaji
-     *
      * @param  array<string> $prodiFilter  Kosong = semua prodi
      * @return array{chart: array, table: array, prodi_list: array<string>}
      */
@@ -259,6 +291,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
         ?string $jurusan        = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
+        float   $ambangMultiplier = self::AMBANG_DEFAULT,
     ): array {
         $extra = [];
 
@@ -280,8 +313,6 @@ class PendapatanRepository extends BaseAnalyticalRepository
 
         $raw = $this->cube->load([
             'measures' => [
-                'FactTracerStudy.count_above_ump',
-                'FactTracerStudy.count_below_ump',
                 'FactTracerStudy.count_dengan_data_ump',
                 'FactTracerStudy.avg_take_home_pay',
             ],
@@ -297,25 +328,42 @@ class PendapatanRepository extends BaseAnalyticalRepository
             ],
         ]);
 
-        $normalized = $raw->map(fn($r) => [
-            'nama_prodi'          => $r['DimProdi.nama_prodi']                    ?? '',
-            'jenjang'             => $r['DimProdi.jenjang']                       ?? '',
-            'jurusan'             => $r['DimProdi.jurusan']                       ?? '',
-            'count_above_ump'     => (int) ($r['FactTracerStudy.count_above_ump']     ?? 0),
-            'count_below_ump'     => (int) ($r['FactTracerStudy.count_below_ump']     ?? 0),
-            'total'               => (int) ($r['FactTracerStudy.count_dengan_data_ump'] ?? 0),
-            'avg_gaji'            => (int) round($r['FactTracerStudy.avg_take_home_pay'] ?? 0),
-        ]);
+        $aboveByProdi = $this->countAboveAmbang(
+            ['DimProdi.nama_prodi', 'DimProdi.jenjang', 'DimProdi.jurusan'],
+            $filters,
+            $ambangMultiplier,
+        );
 
-        return $this->reshapeUmpPerProdi($normalized, $prodiFilter);
+        $normalized = $raw->map(function ($r) use ($aboveByProdi) {
+            $namaProdi = $r['DimProdi.nama_prodi'] ?? '';
+            $jenjang   = $r['DimProdi.jenjang']    ?? '';
+            $jurusan   = $r['DimProdi.jurusan']    ?? '';
+            $total     = (int) ($r['FactTracerStudy.count_dengan_data_ump'] ?? 0);
+            $above     = $aboveByProdi->get(self::rowKey([$namaProdi, $jenjang, $jurusan]), 0);
+
+            return [
+                'nama_prodi'          => $namaProdi,
+                'jenjang'             => $jenjang,
+                'jurusan'             => $jurusan,
+                'count_above_ump'     => $above,
+                'count_below_ump'     => max(0, $total - $above),
+                'total'               => $total,
+                'avg_gaji'            => (int) round($r['FactTracerStudy.avg_take_home_pay'] ?? 0),
+            ];
+        });
+
+        return $this->reshapeUmpPerProdi($normalized, $prodiFilter, $ambangMultiplier);
     }
 
     private function reshapeUmpPerProdi(
         \Illuminate\Support\Collection $raw,
         array $prodiFilter = [],
+        float $ambangMultiplier = self::AMBANG_DEFAULT,
     ): array {
         $chart     = [];
         $prodiList = [];
+        $labelAbove = '≥ ' . rtrim(rtrim(number_format($ambangMultiplier, 1, ',', '.'), '0'), ',') . '× UMP';
+        $labelBelow = '< ' . rtrim(rtrim(number_format($ambangMultiplier, 1, ',', '.'), '0'), ',') . '× UMP';
 
         foreach ($raw as $r) {
             $namaProdi = $r['nama_prodi'];
@@ -333,12 +381,12 @@ class PendapatanRepository extends BaseAnalyticalRepository
 
             $statuses = [
                 [
-                    'label' => '≥ 1,2× UMP',
+                    'label' => $labelAbove,
                     'count' => $above,
                     'pct'   => $total > 0 ? round($above / $total * 100, 1) : 0.0,
                 ],
                 [
-                    'label' => '< 1,2× UMP',
+                    'label' => $labelBelow,
                     'count' => $below,
                     'pct'   => $total > 0 ? round($below / $total * 100, 1) : 0.0,
                 ],

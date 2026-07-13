@@ -25,6 +25,9 @@ class MasaTungguController extends Controller
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
+            // Ambang dinamis (dulu hardcode 6 bulan) -- dikirim FE dari useLamFilter's
+            // dynamicParam.value (indikator employment_time), default 6 kalau kosong.
+            'batas_cepat_bulan' => 'nullable|numeric|min:0.1|max:60',
         ]);
         $p = $this->scopedParams($request);
  
@@ -90,6 +93,7 @@ class MasaTungguController extends Controller
             'jurusan'         => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
+            'batas_cepat_bulan' => 'nullable|numeric|min:0.1|max:60',
         ]);
         $p = $this->scopedParams($request);
  

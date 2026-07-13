@@ -57,6 +57,13 @@ class EtlOrchestratorService
             $summary->idWaktu = $idWaktu;
             $summary->addStage('dim_waktu', 1, 1, 0);
 
+            // ── Identitas run ETL ini, dipakai etl_anomaly_log (kolom
+            // etl_run_id) -- REUSE id_waktu snapshot yang baru saja
+            // dibuat di atas alih-alih mint UUID baru, karena id_waktu
+            // SUDAH jadi identitas per-run yang unik & sudah tercatat
+            // di dim_waktu; tidak perlu konsep run-id kedua yang terpisah. ──
+            $etlRunId = 'snapshot-' . $idWaktu;
+
             // ── Extract: responses + answers relevan untuk batch ini ──
             $responses = $this->oltpRepo->getSubmittedResponsesSince($lastSnapshot);
 
@@ -88,26 +95,27 @@ class EtlOrchestratorService
 
             // ── Tahap 6: dim_status_alumni (Type 1+append) ──
             $questionnaireIds = $responses->pluck('questionnaire_id')->unique()->all();
-            $statusResult = $this->statusAlumniDim->sync($questionnaireIds);
+            $statusResult = $this->statusAlumniDim->sync($questionnaireIds, $etlRunId);
             $summary->addStage('dim_status_alumni (Type1)', $statusResult['processed'], $statusResult['inserted'], $statusResult['updated']);
 
             // ── Tahap 6b: dim_kesesuaian_level (Type1+append, dynamic) ──
             // Sama pola dim_status_alumni -- dijalankan sebelum fact,
-            // supaya semua opsi f14 yang relevan di batch ini sudah
-            // ter-sync sebelum AlumniFactBuilderService butuh resolve SK.
-            $kesesuaianResult = $this->kesesuaianLevelDim->sync($questionnaireIds);
+            // supaya semua opsi yang relevan di batch ini sudah ter-sync
+            // sebelum AlumniFactBuilderService butuh resolve SK.
+            $kesesuaianResult = $this->kesesuaianLevelDim->sync($questionnaireIds, $etlRunId);
             $summary->addStage('dim_kesesuaian_level (Type1)', $kesesuaianResult['processed'], $kesesuaianResult['inserted'], $kesesuaianResult['updated']);
 
             // ── Tahap 6c: dim_kesesuaian_bidang (Type1+append, dynamic) ──
-            // Independen dari dim_kesesuaian_level (sumber f14, bukan f15).
-            $kesesuaianBidangResult = $this->kesesuaianBidangDim->sync($questionnaireIds);
+            // Independen dari dim_kesesuaian_level (role relevansi_bidang,
+            // bukan kesesuaian_level).
+            $kesesuaianBidangResult = $this->kesesuaianBidangDim->sync($questionnaireIds, $etlRunId);
             $summary->addStage('dim_kesesuaian_bidang (Type1)', $kesesuaianBidangResult['processed'], $kesesuaianBidangResult['inserted'], $kesesuaianBidangResult['updated']);
 
             // ── Tahap 7: 3 fact table sekaligus, per alumni ──
             // dim_perusahaan & dim_wirausaha (SCD2) disinkronkan INLINE
             // di dalam factBuilder, karena business key-nya baru
             // diketahui setelah jawaban per-alumni di-pivot.
-            $factResult = $this->factBuilder->buildAndInsertAllFacts($responses, $allAnswers, $idWaktu, $snapshotDate);
+            $factResult = $this->factBuilder->buildAndInsertAllFacts($responses, $allAnswers, $idWaktu, $snapshotDate, $etlRunId);
 
             $summary->addStage(
                 'fact_tracer_study',

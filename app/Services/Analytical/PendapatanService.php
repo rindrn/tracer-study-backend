@@ -15,10 +15,19 @@ class PendapatanService
 
     private const TARGET_PCT = 60.0;
     private const TTL        = 3600; // 1 jam
+    /** Ambang default (dulu hardcode di ETL) -- dipakai kalau FE tidak kirim ambang_ump_multiplier (mis. belum ada LAM/prodi terpilih). */
+    private const AMBANG_DEFAULT = 1.2;
 
     public function __construct(
         private readonly PendapatanRepository $repo,
     ) {}
+
+    private function ambang(array $params): float
+    {
+        return isset($params['ambang_ump_multiplier']) && $params['ambang_ump_multiplier'] !== ''
+            ? (float) $params['ambang_ump_multiplier']
+            : self::AMBANG_DEFAULT;
+    }
 
     // ──────────────────────────────────────────────────────────────
 
@@ -32,6 +41,7 @@ class PendapatanService
                 jurusan:        $params['jurusan']         ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
+                ambangMultiplier: $this->ambang($params),
             );
 
             return [
@@ -59,6 +69,7 @@ class PendapatanService
                 jurusan:        $params['jurusan']         ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
+                ambangMultiplier: $this->ambang($params),
             );
 
             return [
@@ -83,6 +94,8 @@ class PendapatanService
         $page    = (int) ($params['page']     ?? 1);
         $perPage = (int) ($params['per_page'] ?? 15);
 
+        $ambang = $this->ambang($params);
+
         $result = $this->repo->getDetailAlumni(
             segmenUmp:      $params['segmen_ump']      ?? null,
             jenjang:        $params['jenjang']         ?? null,
@@ -93,11 +106,13 @@ class PendapatanService
             search:         $params['search']          ?? null,
             page:           $page,
             perPage:        $perPage,
+            ambangMultiplier: $ambang,
         );
 
+        $ambangLabel = rtrim(rtrim(number_format($ambang, 1, ',', '.'), '0'), ',');
         $segmenLabel = match ($params['segmen_ump'] ?? null) {
-            'above_ump' => '≥ 1,2× UMP',
-            'below_ump' => '< 1,2× UMP',
+            'above_ump' => "≥ {$ambangLabel}× UMP",
+            'below_ump' => "< {$ambangLabel}× UMP",
             default     => $params['tahun_lulus'] ?? 'semua',
         };
 
@@ -126,6 +141,7 @@ class PendapatanService
                 jurusan:        $params['jurusan']         ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
+                ambangMultiplier: $this->ambang($params),
             );
         }, self::TTL);
 
