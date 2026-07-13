@@ -1,7 +1,9 @@
 # Pemetaan Semantik Dinamis — Dokumentasi Arsitektur & Perubahan
 
-> Status: implementasi selesai, diverifikasi terhadap database dev live.
-> Repo yang terdampak: `tracer-study-backend` (ETL + API), `tracer-study-analytics` (Cube.js), `fe-tracer-study` (admin UI).
+> Status: implementasi selesai, diverifikasi terhadap database dev live —
+> termasuk auto-trigger ETL (§10), cache invalidation (§11), dan snapshot
+> unik berbasis `id_waktu` (§12).
+> Repo yang terdampak: `tracer-study-backend` (ETL + API + queue), `tracer-study-analytics` (Cube.js), `fe-tracer-study` (admin UI + dashboard).
 
 ## Daftar isi
 
@@ -14,7 +16,10 @@
 7. [Verifikasi non-regresi](#7-verifikasi-non-regresi)
 8. [Bug yang ditemukan selama proses, dan apa yang bisa dipelajari darinya](#8-bug-yang-ditemukan-selama-proses)
 9. [Ambang threshold dinamis: masa tunggu & UMP mengikuti LAM terpilih](#9-ambang-threshold-dinamis)
-10. [Yang belum selesai](#10-yang-belum-selesai)
+10. [Auto-trigger ETL & status tracking (Langkah 1)](#10-auto-trigger-etl)
+11. [Cache invalidation — kenapa dashboard sempat tidak update setelah mapping berubah](#11-cache-invalidation)
+12. [Snapshot unik: `id_waktu` menggantikan teks `minggu_snapshot`](#12-snapshot-unik)
+13. [Yang belum selesai](#13-yang-belum-selesai)
 
 ## 1. Latar belakang
 
@@ -242,8 +247,13 @@ Dua cacat berikut **tidak** ada di rencana awal — keduanya baru terlihat saat 
 2. **`semantic_role` salah ketik di satu tooltip chart.** `Kpi6FieldRelevanceChart.tsx` memanggil formula dinamis dengan `semantic_role="kesesuaian_bidang"` — nama yang terdengar benar tapi tidak ada di registry (yang benar `relevansi_bidang`, lihat §1 tabel 4 kolom `question_code` untuk asal penamaannya). Akibatnya tooltip akan selalu kosong, gagal senyap tanpa error di console.
 3. **Endpoint `option_code` yang sudah dibangun untuk FE ternyata belum divalidasi di server (defense-in-depth gap).** Setelah bug #1 ditutup di jalur FE resmi, `POST /kpi-category-mappings` di backend ternyata masih menerima `option_code` apa saja tanpa mengecek keasliannya — celah yang sama, jalur berbeda (klien API lain selain FE resmi masih bisa lolos). Ditemukan lewat *test case yang sengaja dibuat salah* (kirim `option_code="bekerja_penuh_waktu"` langsung ke service layer), bukan lewat membaca kode. Diperbaiki dengan validasi di `KpiCategoryMappingService::store()` yang mencocokkan ke `SemanticMappingRepository::getOptionCandidatesForRole()` — sekarang 422 `invalid_option_code` di kedua jalur (FE dan langsung ke API).
 4. **Baseline seed `kpi_category_mapping` memakai `CURRENT_DATE`, merusak point-in-time lookup untuk data historis yang sudah ada (§2.6).** Ini bukan ditemukan dari membaca kode — ditemukan lewat urutan kejadian nyata: pengguna sendiri mengedit satu kategori lewat UI Edit yang baru dibangun (`mapped_by`/`deactivated_by` terisi user id asli, bukan `null` seperti skrip pengujian), lalu verifikasi numerik dua arah (query "old" vs "new" pada instan yang sama) menunjukkan hasil 0 yang mencurigakan untuk measure yang seharusnya masih punya data. Root cause: seed baseline memakai tanggal hari ini sebagai `effective_date`, sehingga di bawah aturan point-in-time yang baru, snapshot fact yang sudah ada SEBELUM seed dijalankan (24 Juni) terlihat "belum ada kategori apa pun". Diperbaiki dengan backdate baseline ke `2020-01-01` — hanya baris `mapped_by IS NULL` (seed asli) yang disentuh, baris hasil edit pengguna sendiri (`mapped_by` terisi) sengaja tidak ikut diubah.
+5. **`apiClient.ts::getKpiCategoryMappingFormula()` unwrap response satu level terlalu sedikit (silent failure, mirip pola bug #1).** Fungsi ini mengembalikan `response.data` dengan komentar eksplisit "Respons TIDAK dibungkus `{ data }`" — padahal `KpiCategoryMappingController::formula()` MEMBUNGKUS hasilnya persis seperti endpoint lain (`{ success, data }`). Akibatnya `result.data?.groups` di `useKpiFormula.ts` selalu mencari `.groups` di objek pembungkus terluar yang tidak punya properti itu, selalu `undefined`, dan tooltip DIAM-DIAM jatuh ke teks fallback statis ("A = bekerja, B = lanjut studi, ...") — persis seperti gejala bug #1 (kategorisasi tersimpan sukses, tapi tidak pernah terlihat memengaruhi apa pun) walau root cause-nya di lapisan HTTP client, bukan di data. Ditemukan dengan menguji `formula()` langsung lewat `php artisan tinker` (memastikan backend mengembalikan data yang benar) SEBELUM menyimpulkan bug ada di FE — kalau langsung dipercaya "backend pasti salah" tanpa bukti, perbaikan akan salah sasaran. Diperbaiki dengan `response.data.data`, komentar lama dihapus dan diganti penjelasan yang benar.
+6. **Drill-down bar "% Lulusan ≤ N Bulan" memakai `rentang: "0-3"` yang di-hardcode, bukan ambang dinamis.** Klik pada bar tren masa-tunggu-cepat (menampilkan agregat sesuai `batas_cepat_bulan` yang bisa berubah per LAM) selalu memicu drill-down dengan `rentang="0-3"` — bucket histogram TETAP, bukan definisi "cepat" yang sesungguhnya (`≤ batas_cepat_bulan`, bisa lebih dari 3 bulan). Kalau ambang sedang 6 bulan, angka di bar mencakup bucket 0-3 DAN 3-6, tapi daftar drill-down hanya menampilkan bucket 0-3 — jumlah baris di modal tidak pernah cocok dengan angka di bar (mis. bar bilang 262, modal cuma tampilkan 203). Ditemukan lewat laporan pengguna yang membandingkan angka bar vs isi modal secara manual. Diperbaiki dengan menambah mode `rentang="cepat"` end-to-end (`MasaTungguRepository::buildRentangFilters()` → `MasaTungguService::getDrillDown()` → `MasaTungguController` → hook FE → `Kpi5WaitingTimeChart.tsx`), memakai filter yang PERSIS sama dengan `cepatCountsByGroup()` yang menghasilkan angka di bar.
+7. **`masa_tunggu_bekerja = 0` (bekerja sebelum/tepat saat lulus) sengaja dikecualikan dari kategori "cepat" (`operator gt 0`, bukan `gte 0`).** Ditemukan saat memverifikasi perbaikan #6 secara numerik: jumlah "cepat" hasil perbaikan (200) masih tidak sama dengan jumlah bucket 0-3 + 3-6 (203+59=262) — selisihnya persis 62, yang ternyata adalah alumni dengan masa tunggu 0 bulan, dikecualikan oleh filter `gt 0` yang sudah ada sejak `cepatCountsByGroup()` pertama dibuat (bukan bug baru dari perbaikan #6, tapi baru KETAHUAN lewat verifikasi #6). Ini keputusan bisnis, bukan bug teknis murni — dikonsultasikan ke pengguna, dan diputuskan 0 bulan HARUS ikut dihitung "cepat" (lebih cepat dari siapa pun). Diperbaiki di kedua tempat yang punya filter sama (`cepatCountsByGroup()` dan `buildRentangFilters()` case `'cepat'`), `gt` → `gte`.
+8. **Filter snapshot berbasis teks `minggu_snapshot` ambigu kalau ada >1 ETL run di minggu kalender yang sama — dan fitur auto-trigger ETL (§10) membuat ini rutin terjadi, bukan lagi kasus langka.** Lihat kronologi penuh di §12. Ditemukan lewat laporan pengguna: angka di judul modal drill-down (60/130) tidak cocok dengan isi datanya (54) — root cause-nya BUKAN bug baru, tapi 2 baris `dim_waktu` dari 2 kali ETL test hari yang sama, keduanya berlabel `minggu_snapshot="29"`, sehingga difilter berbarengan dan meng-inflate angka agregat.
+9. **Tooltip formula KPI tidak point-in-time — selalu menampilkan definisi "hari ini", bukan definisi yang berlaku pada snapshot yang sedang dilihat.** Beda dari bug #5 (yang membuat tooltip SELALU fallback statis), bug ini baru terlihat SETELAH bug #5 diperbaiki: tooltip jadi dinamis, tapi nilainya "kadang benar kadang salah" tergantung snapshot mana yang sedang aktif di filter global — karena `formulaRows()` cuma memfilter `is_active=true` (definisi SEKARANG), padahal data chart-nya sendiri sudah point-in-time (§2.6) sejak awal. Kalau pengguna melihat snapshot lama sementara admin lain baru saja mengubah kategori hari ini, chart menampilkan definisi lama (benar) tapi tooltip menampilkan definisi baru (salah untuk konteks itu). Diperbaiki dengan membuat `formulaRows()` menerima `$snapshotDate` dan memakai kondisi point-in-time yang PERSIS sama dengan subquery Cube.js (`effective_date <= snapshotDate AND (deactivated_at IS NULL OR deactivated_at::date > snapshotDate)`, ambil baris `effective_date` terbaru per `option_code`) — lihat §9.5 untuk detail lengkap.
 
-Pelajaran yang diambil: constraint database dan validasi tipe menjamin data **berbentuk benar**, bukan **berarti benar** — kesalahan makna (option_code yang valid secara format tapi tidak pernah match, nama variabel yang valid secara sintaks tapi salah role, tanggal efektif yang valid tapi terlalu baru) hanya tertangkap lewat verifikasi langsung terhadap data nyata dan skenario yang sengaja dibuat gagal, bukan lewat lolos-tidaknya compiler atau constraint.
+Pelajaran yang diambil: constraint database dan validasi tipe menjamin data **berbentuk benar**, bukan **berarti benar** — kesalahan makna (option_code yang valid secara format tapi tidak pernah match, nama variabel yang valid secara sintaks tapi salah role, tanggal efektif yang valid tapi terlalu baru, response HTTP yang valid JSON tapi salah level pembungkusan) hanya tertangkap lewat verifikasi langsung terhadap data nyata dan skenario yang sengaja dibuat gagal, bukan lewat lolos-tidaknya compiler atau constraint. Pola yang berulang di bug #1/#5: kode BERASUMSI tentang bentuk data (dibungkus/tidak, cocok/tidak) tanpa memverifikasi asumsi itu terhadap sumber sebenarnya — komentar yang salah (#5) bahkan lebih berbahaya dari tidak ada komentar sama sekali, karena meyakinkan pembaca berikutnya bahwa asumsi itu sudah diverifikasi padahal tidak.
 
 ---
 
@@ -326,9 +336,241 @@ garis referensi target, tidak untuk menghitung data itu sendiri.
 tadinya menulis literal "6 Bulan"/"1,2×" (judul chart, label sumbu, formula,
 tooltip, nama seri) sekarang mengikuti angka ambang yang sedang aktif.
 
+### 9.5 Formula tooltip kategori KPI juga harus point-in-time
+
+Bug terpisah dari §9.1–9.4, tapi berasal dari kelas masalah yang sama dengan
+§2.6: `GET /kpi-category-mappings/formula` (dipakai `useKpiFormula` di semua
+chart Keterserapan/Kesesuaian Bidang/Masa Tunggu untuk menampilkan daftar
+status "sesuai"/"terserap" yang SEDANG berlaku di tooltip) awalnya cuma
+memfilter `is_active = true` — definisi **hari ini**, tanpa peduli snapshot
+mana yang sedang dilihat pengguna. Padahal data chart-nya sendiri SUDAH
+point-in-time sejak §2.6. Efeknya: tooltip tampak "kadang benar kadang
+salah" — benar kalau kebetulan snapshot yang dilihat = definisi hari ini,
+salah kalau sedang melihat snapshot lama yang definisinya sudah berubah
+sejak itu (lihat bug #9 di §8 untuk kronologi penemuan).
+
+**Perbaikan** — `KpiCategoryMappingRepository::formulaRows()` sekarang
+menerima `?string $snapshotDate` dan memakai kondisi PERSIS sama dengan
+subquery Cube.js di §2.6:
+
+```php
+->where('effective_date', '<=', $snapshotDate)
+->where(fn ($q) => $q->whereNull('deactivated_at')
+                     ->orWhereRaw('deactivated_at::date > ?', [$snapshotDate]))
+->orderByDesc('effective_date')
+// lalu di PHP: groupBy(option_code)->map(fn($g) => $g->first())
+// -- ambil baris effective_date TERBARU per option_code, mirror
+// "ORDER BY effective_date DESC LIMIT 1" per-baris di Cube.js.
+```
+
+`$snapshotDate` diresolusi dari `id_waktu` yang sedang aktif di filter
+global FE (`GET /kpi-category-mappings/formula?...&minggu_snapshot=<id_waktu>`,
+lihat §12 untuk kenapa parameter ini sekarang berisi `id_waktu`, bukan lagi
+teks minggu) lewat `KpiCategoryMappingRepository::tanggalRefreshForIdWaktu()`
+— null/kosong berarti pakai hari ini (perilaku lama, dipertahankan sebagai
+default). `useKpiFormula.ts` menambahkan `weekKey` (dari `GlobalFiltersContext`)
+ke query key React Query, supaya pindah snapshot memicu refetch tooltip,
+bukan diam memakai hasil cache dari snapshot sebelumnya.
+
+**Verifikasi** — dua snapshot yang sengaja mengalami perubahan kategori
+`relevansi_bidang` di antara keduanya (opsi "Sangat Erat" dipindah dari
+"sesuai" → "tidak_sesuai" hari ini) menghasilkan tooltip berbeda sesuai
+periodenya:
+
+| Snapshot | `sesuai` | `tidak_sesuai` |
+|---|---|---|
+| Lama (24 Jun) | Erat, Sangat Erat | Tidak Sama Sekali, Kurang Erat |
+| Terbaru (hari ini) | Erat | Sangat Erat, Tidak Sama Sekali, Kurang Erat |
+
 ---
 
-## 10. Yang belum selesai
+## 10. Auto-trigger ETL & status tracking
+
+### 10.1 Masalah: Langkah 1 butuh ETL, tapi tidak ada yang men-trigger atau memberi tahu penggunanya
+
+Langkah 2 (`kpi_category_mapping`) TIDAK PERNAH butuh ETL — Cube.js membaca
+tabel itu langsung lewat subquery point-in-time (§2.6) setiap query, jadi
+perubahan kategori terlihat di dashboard begitu cache di-invalidate (§11),
+tanpa proses batch apa pun.
+
+Langkah 1 (`question_semantic_mapping`) BEDA SECARA FUNDAMENTAL: memetakan
+kode pertanyaan baru ke sebuah role tidak otomatis mengisi kolom fact
+`fact_tracer_study` untuk jawaban yang SUDAH ADA di OLTP — itu perlu
+`AlumniFactBuilderService` benar-benar dijalankan ulang untuk menata ulang
+jawaban historis sesuai mapping baru. Sebelum perbaikan ini, ETL:
+
+- Hanya bisa dipicu manual (`php artisan etl:run`) atau lewat jadwal
+  mingguan (`Schedule::command('etl:run')`).
+- Tidak ada trigger otomatis setelah admin menyimpan/menonaktifkan mapping
+  Langkah 1 — admin harus tahu dan mengingat untuk menjalankan ETL sendiri.
+- Tidak ada UI yang memberi tahu status ETL ("sedang berjalan", "selesai",
+  "gagal") — kalaupun ETL dipicu, admin tidak tahu kapan aman mengecek
+  dashboard.
+
+### 10.2 Arsitektur
+
+Satu tabel status baru + satu queue job, murni aditif:
+
+```sql
+-- tracer_oltp.etl_runs (lihat 005_etl_runs_and_queue.sql)
+id, status ('queued'|'running'|'completed'|'failed'), reason,
+triggered_by, id_waktu, summary (jsonb), error_message,
+started_at, finished_at
+```
+
+`RunEtlJob implements ShouldQueue` membungkus `EtlOrchestratorService::run()`
+yang sudah ada (tidak ada logika ETL baru), menulis status ke `etl_runs`
+di setiap tahap (queued → running → completed/failed), lalu memanggil
+`Cache::store('redis')->tags(['analytics-dashboard'])->flush()` setelah
+selesai (§11) supaya dashboard langsung segar tanpa menunggu TTL.
+
+`QuestionSemanticMappingService::store()` dan `::deactivate()` masing-masing
+membuat baris `etl_runs` baru dan men-dispatch `RunEtlJob` setelah mapping
+tersimpan, mengembalikan `etl_run_id` di response API. FE (`QuestionMappingPage.tsx`)
+menyimpan id itu dan poll `GET /api/etl-runs/{id}` tiap 2 detik
+(`useEtlRunStatus`, `refetchInterval` React Query, berhenti otomatis begitu
+status `completed`/`failed`) untuk menampilkan banner status — "ETL sedang
+berjalan, jangan tutup halaman ini" sampai "ETL selesai, data sudah
+mengikuti mapping terbaru".
+
+**Kenapa `force: true`, bukan mode incremental default:** `EtlOrchestratorService::run()`
+normalnya hanya memproses response yang `updated_at >= snapshot terakhir`
+(mode incremental, cocok untuk jadwal mingguan). Tapi perubahan mapping
+Langkah 1 perlu menata ulang jawaban yang SUDAH ADA sejak dulu, bukan cuma
+response baru — kalau memakai mode incremental, alumni yang sudah lama
+mengisi kuesioner tidak akan pernah ter-refresh mengikuti mapping baru.
+`RunEtlJob` selalu memanggil `run(force: true)`, memproses ULANG seluruh
+response `submitted` tanpa syarat tanggal.
+
+**Kenapa queue, bukan langsung di request HTTP:** `EtlOrchestratorService::run()`
+memproses seluruh `fact_tracer_study`/`fact_multi_select`/`fact_range_evaluasi`
+dalam satu transaksi — bisa berlangsung lama tergantung volume data.
+Menjalankannya langsung di request `POST /question-semantic-mappings` akan
+membuat endpoint itu "menggantung" sampai ETL selesai. `QUEUE_CONNECTION`
+diubah dari `sync` ke `database` (tabel `jobs`/`job_batches`/`failed_jobs`
+standar Laravel, ditambahkan di `005_etl_runs_and_queue.sql`) supaya
+endpoint mapping tetap cepat merespons, ETL berjalan di background.
+
+**Prasyarat operasional yang WAJIB dipenuhi:** karena `QUEUE_CONNECTION=database`,
+job tidak akan pernah diproses tanpa worker berjalan
+(`php artisan queue:work`, atau `queue:listen` untuk dev). Ini BUKAN
+opsional — tanpa worker, `etl_runs.status` akan diam selamanya di `queued`
+dan FE akan terus menampilkan banner loading tanpa pernah selesai. Lihat
+README bagian Setup untuk instruksi menjalankan worker.
+
+### 10.3 Verifikasi
+
+Dijalankan langsung terhadap queue database live: `EtlRun::create()` +
+`RunEtlJob::dispatch()` lewat `php artisan tinker`, dikonfirmasi masuk ke
+tabel `jobs`, lalu diproses dengan `php artisan queue:work --once` —
+`etl_runs.status` berpindah `queued` → `running` → `completed` dengan
+`id_waktu` dan `summary` (jumlah baris per tahap) terisi benar.
+
+---
+
+## 11. Cache invalidation
+
+### 11.1 Masalah: dashboard tidak update setelah mapping berubah, tanpa error apa pun
+
+14 service di `app/Services/Analytical/*.php` (Keterserapan, MasaTunggu,
+Pendapatan, FilterMeta, dst) meng-cache seluruh response-nya di Redis lewat
+`WithCache::remember()` dengan TTL 1–24 jam, untuk mengurangi beban query
+ke Cube.js. Sebelum perbaikan ini, **tidak satu pun** panggilan `remember()`
+diberi `$tags` — parameter opsional yang ada di trait sejak awal
+(`forgetTag()` di `WithCache` hanya bisa menghapus entri yang PUNYA tag).
+Efeknya: admin mengubah kategori KPI atau mapping pertanyaan, cache lama
+tetap terpakai sampai TTL alaminya habis (bisa sampai 24 jam) — dashboard
+tampak "tidak berubah" tanpa error apa pun yang menjelaskan kenapa, gejala
+yang paling sering disalahartikan sebagai bug di mapping itu sendiri,
+padahal mapping-nya sudah benar sejak awal.
+
+### 11.2 Perbaikan
+
+Satu tag bersama `analytics-dashboard` ditambahkan ke SEMUA panggilan
+`remember()` di 14 service tsb (`}, self::TTL);` → `}, self::TTL,
+['analytics-dashboard']);`), lalu tiga titik mutasi memanggil
+`$this->forgetTag('analytics-dashboard')` setelah berhasil menyimpan
+perubahan:
+
+- `KpiCategoryMappingService::store()` dan `::deactivate()` (Langkah 2 —
+  invalidasi LANGSUNG, karena Cube.js membaca tabel ini live, tidak perlu
+  menunggu ETL).
+- `QuestionSemanticMappingService::store()` dan `::deactivate()` (Langkah 1
+  — invalidasi langsung SAAT mapping disimpan, ditambah invalidasi KEDUA
+  setelah `RunEtlJob` selesai di §10, karena datanya baru benar-benar
+  berubah setelah ETL, bukan saat mapping disimpan).
+
+### 11.3 Verifikasi
+
+Satu kali flush manual (`Cache::store('redis')->flush()`) dijalankan untuk
+membersihkan entri yang ter-cache SEBELUM perbaikan ini ada (tidak
+bertag, tidak akan pernah ter-invalidate oleh `forgetTag()` yang baru
+ditambahkan) — supaya efek perbaikan langsung terlihat tanpa menunggu TTL
+lama habis satu per satu.
+
+---
+
+## 12. Snapshot unik: `id_waktu` menggantikan teks `minggu_snapshot`
+
+### 12.1 Masalah, dan kenapa baru terasa SEKARANG
+
+Filter snapshot global (dropdown "Snapshot Minggu" di semua chart) sejak
+awal mencocokkan `DimWaktu.minggu_snapshot` — teks angka minggu ISO (mis.
+`"29"`). Kolom ini **tidak unik**: dua baris `dim_waktu` dari dua ETL run
+berbeda bisa punya `minggu_snapshot` yang identik kalau keduanya jatuh di
+minggu kalender yang sama. Sebelum §10 ada, ini kasus langka (ETL cuma
+jalan terjadwal mingguan). Begitu §10 selesai — ETL bisa ter-trigger KAPAN
+SAJA setiap Langkah 1 berubah — tabrakan "2 run di minggu yang sama" jadi
+RUTIN, bukan lagi edge case, karena admin bisa mengubah mapping beberapa
+kali dalam hari/minggu yang sama.
+
+Ditemukan lewat laporan pengguna nyata: angka di judul modal drill-down
+(60/130) tidak cocok dengan isi datanya (54) — root cause: dua baris
+`dim_waktu` (dari dua kali ETL test di hari yang sama) sama-sama berlabel
+`minggu_snapshot="29"`, sehingga filter berbasis teks mencocokkan
+KEDUANYA sekaligus, meng-inflate semua angka agregat (bar/pie/formula)
+sementara drill-down individual kebetulan tidak ikut dobel — hasilnya
+angka yang saling tidak konsisten antar bagian dashboard yang sama.
+
+### 12.2 Perbaikan
+
+`DimWaktu.id_waktu` sudah menjadi dimension `primary_key` di Cube.js sejak
+awal (`DimWaktu.js`) — TIDAK perlu perubahan apa pun di repo Cube.js.
+Perbaikan murni di sisi Laravel:
+
+- `BaseAnalyticalRepository::buildGlobalFilters()` — member filter diganti
+  dari `DimWaktu.minggu_snapshot` ke `DimWaktu.id_waktu`.
+- `FilterMetaRepository::getSnapshot()` — field `value` di tiap opsi
+  dropdown sekarang berisi `id_waktu` (mis. `"2"`), bukan lagi
+  `minggu_snapshot` mentah (`"29"`); field `label` (menampilkan
+  "2026 · Minggu 29 · Juli (13 Jul 2026)") tidak berubah.
+
+**Nama parameter SENGAJA tidak diubah** di seluruh codebase (query string
+`minggu_snapshot`, variable `$mingguSnapshot`/`weekKey`) — mengganti nama
+di puluhan file (semua repository Analytical, semua hook FE) hanya untuk
+konsistensi penamaan akan menambah risiko tanpa manfaat fungsional. Yang
+berubah hanya NILAI yang mengalir lewat parameter itu (id_waktu, bukan
+teks minggu) — FE tidak perlu ubah apa pun karena cuma meneruskan apa
+adanya nilai `value` yang diberikan dropdown dari backend.
+
+### 12.3 Verifikasi
+
+Baris duplikat (`id_waktu` dari ETL test) dihapus dari database dev,
+kemudian filter dengan `id_waktu` dibandingkan terhadap perhitungan manual
+per-bucket:
+
+| Query | Hasil |
+|---|---|
+| Drill-down `rentang=0-3`, filter `id_waktu=2` | 203 |
+| Drill-down `rentang=3-6`, filter `id_waktu=2` | 59 |
+| Drill-down `rentang=cepat`, filter `id_waktu=2` | 262 (=203+59) ✓ |
+| Bar agregat `count_masa_tunggu_cepat`, filter `id_waktu=2` | 262 ✓ MATCH |
+
+Tidak ada lagi selisih antara angka agregat dan drill-down.
+
+---
+
+## 13. Yang belum selesai
 
 Dicatat apa adanya sebagai daftar kerja lanjutan:
 
@@ -336,8 +578,15 @@ Dicatat apa adanya sebagai daftar kerja lanjutan:
 - Kolom "Dikelompokkan Oleh" di tabel audit Langkah 2 belum ada di skema `kpi_category_mapping` — sengaja tidak ditampilkan di UI daripada memalsukan nilai.
 
 - **`WirausahaRepository`, `KesesuaianRepository`, `SebaranInstansiRepository` (Laravel, sisi Analytical) masih hardcode `status_alumni_sk` literal** (`= '3'` untuk wirausaha, `= '1'` untuk bekerja) di 8 lokasi berbeda — pola yang sama persis dengan hardcode yang sudah dibereskan di `FactTracerStudy.js`, tapi belum tersentuh karena letaknya di query builder ad hoc Laravel→Cube.js, bukan di measure Cube.js sendiri. Ini LEBIH rapuh dari yang sudah diperbaiki: `status_alumni_sk` adalah surrogate key auto-increment yang menurut catatan di kode ini sendiri "bisa berubah antar-rebuild ETL", bukan `option_code` yang stabil. Rencana perbaikan: dua dimension boolean baru di `FactTracerStudy.js` (`is_bekerja_status`, `is_wirausaha_status`) yang dibangun point-in-time seperti measure lain, plus satu grouping baru (`digunakan_oleh='wirausaha_scope'`) supaya cakupan "wirausaha" (murni vs termasuk yang sambil studi lanjut) jadi bisa dikonfigurasi lewat UI, bukan permanen di kode. Belum dikerjakan.
+- **Ambang dinamis (§9) belum sampai ke halaman "Bandingkan Prodi".** Backend (`getBandingkan()` di `MasaTungguRepository`/`PendapatanRepository`) sudah menerima parameter ambang, tapi FE halaman perbandingan antar-prodi belum meneruskan `lam.dynamicParam?.value` seperti yang sudah dilakukan di chart utama (`Kpi5WaitingTimeChart`, `Kpi8IncomeChart`).
+- Label tampilan untuk `digunakan_oleh` (mis. `"iku2_keterserapan"` → `"IKU 2 — Keterserapan"`) masih kamus statis di FE, belum dari API.
+- Kolom "Dikelompokkan Oleh" di tabel audit Langkah 2 belum ada di skema `kpi_category_mapping` — sengaja tidak ditampilkan di UI daripada memalsukan nilai.
 
 Sudah selesai (dipindah dari daftar ini):
 - ~~Daftar kuesioner statis di FE~~ — endpoint `GET /question-semantic-mappings/questionnaires` sudah ada.
 - ~~`kpi_category_mapping` tidak point-in-time~~ — lihat §2.6, diverifikasi dengan ETL run nyata + dua snapshot berdampingan.
 - ~~Belum diuji lewat `php artisan etl:run` penuh terhadap data nyata~~ — sudah dijalankan (`--force`), menghasilkan snapshot kedua yang benar secara point-in-time.
+- ~~Tidak ada auto-trigger ETL setelah Langkah 1 berubah, tidak ada UI status~~ — lihat §10, `RunEtlJob` + `etl_runs` + polling FE.
+- ~~Cache Redis 14 service Analytical tidak pernah ter-invalidate~~ — lihat §11, tag `analytics-dashboard` + `forgetTag()` di titik mutasi.
+- ~~Filter snapshot ambigu (teks `minggu_snapshot`, bukan unik per run)~~ — lihat §12, diganti `DimWaktu.id_waktu`.
+- ~~Tooltip formula KPI tidak point-in-time~~ — lihat §9.5.

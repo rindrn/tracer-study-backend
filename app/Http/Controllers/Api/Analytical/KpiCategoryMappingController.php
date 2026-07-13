@@ -100,12 +100,15 @@ class KpiCategoryMappingController extends Controller
         ]);
     }
 
-    // GET /api/kpi-category-mappings/formula?semantic_role=&digunakan_oleh=
+    // GET /api/kpi-category-mappings/formula?semantic_role=&digunakan_oleh=&minggu_snapshot=
     public function formula(Request $request): JsonResponse
     {
         $request->validate([
-            'semantic_role'  => 'required|string|max:50',
-            'digunakan_oleh' => 'required|string|max:50',
+            'semantic_role'   => 'required|string|max:50',
+            'digunakan_oleh'  => 'required|string|max:50',
+            // id_waktu snapshot yang sedang aktif di filter global FE --
+            // supaya tooltip point-in-time, bukan selalu definisi hari ini.
+            'minggu_snapshot' => 'nullable|string|max:20',
         ]);
 
         return response()->json([
@@ -113,6 +116,7 @@ class KpiCategoryMappingController extends Controller
             'data'    => $this->service->formula(
                 $request->query('semantic_role'),
                 $request->query('digunakan_oleh'),
+                $request->query('minggu_snapshot'),
             ),
         ]);
     }

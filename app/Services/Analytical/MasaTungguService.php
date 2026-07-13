@@ -139,6 +139,7 @@ class MasaTungguService
             search:         $params['search']          ?? null,
             page:           $page,
             perPage:        $perPage,
+            batasCepatBulan: $this->batasCepat($params),
         );
 
         return new MasaTungguDrillDownDTO(

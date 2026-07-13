@@ -148,8 +148,9 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         ?string $search         = null,
         int     $page           = 1,
         int     $perPage        = 15,
+        float   $batasCepatBulan = self::BATAS_CEPAT_DEFAULT,
     ): array {
-        $rentangFilters = $this->buildRentangFilters($rentang);
+        $rentangFilters = $this->buildRentangFilters($rentang, $batasCepatBulan);
 
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
@@ -334,7 +335,11 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         $filters = array_merge($baseFilters, [
             $this->statusEligibleFilter(),
             ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'set'],
-            ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'gt', 'values' => ['0']],
+            // gte 0 (BUKAN gt 0) -- masa tunggu persis 0 bulan (sudah bekerja
+            // saat/sebelum lulus) tetap termasuk "cepat", bahkan yang paling
+            // cepat dari semua. Dulu dikecualikan, menyebabkan angka "cepat"
+            // lebih rendah dari seharusnya dibanding bucket histogram 0-3 bulan.
+            ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'gte', 'values' => ['0']],
             ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'lte', 'values' => [(string) $batasBulan]],
         ]);
 
@@ -355,8 +360,16 @@ class MasaTungguRepository extends BaseAnalyticalRepository
     /**
      * Bangun filter Cube.js untuk rentang masa tunggu (histogram 0-3/3-6/>6,
      * granularitas TETAP -- tidak berubah oleh ambang cepat dinamis).
+     *
+     * 'cepat' TERPISAH dari histogram di atas -- ini bukan salah satu bucket
+     * tetap, tapi persis filter yang dipakai cepatCountsByGroup() (gt 0, lte
+     * $batasCepatBulan). Drill-down dari bar "% Lulusan ≤ N Bulan" HARUS
+     * pakai 'cepat' (bukan '0-3' yang di-hardcode) -- kalau tidak, daftar
+     * alumni yang muncul cuma mencakup bucket 0-3 padahal angka di bar
+     * mencakup 0-3 DAN 3-6 (kalau ambang 6 bulan). Bug ini pernah membuat
+     * jumlah baris drill-down (40) tidak cocok dengan angka di bar (54).
      */
-    private function buildRentangFilters(string $rentang): array
+    private function buildRentangFilters(string $rentang, float $batasCepatBulan = self::BATAS_CEPAT_DEFAULT): array
     {
         $statusFilter = $this->statusEligibleFilter();
 
@@ -366,6 +379,13 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         ];
 
         return match ($rentang) {
+            'cepat' => [
+                $statusFilter,
+                $notNullFilter,
+                // gte 0 -- lihat catatan identik di cepatCountsByGroup().
+                ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'gte', 'values' => ['0']],
+                ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'lte', 'values' => [(string) $batasCepatBulan]],
+            ],
             '0-3' => [
                 $statusFilter,
                 $notNullFilter,

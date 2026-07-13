@@ -137,11 +137,18 @@ class KpiCategoryMappingService
     /**
      * THE DYNAMIC TOOLTIP ENDPOINT -- lihat kontrak untuk contoh response
      * lengkap. group by kpi_category, options = daftar option_label_snapshot
-     * terurut, hanya baris is_active.
+     * terurut, POINT-IN-TIME terhadap snapshot yang sedang dilihat FE
+     * (bukan cuma is_active=true) -- lihat catatan lengkap di
+     * KpiCategoryMappingRepository::formulaRows().
+     *
+     * $idWaktu = snapshot yang sedang aktif di filter global FE (nilai
+     * dropdown "Snapshot Minggu", sekarang berisi DimWaktu.id_waktu -- lihat
+     * BaseAnalyticalRepository::buildGlobalFilters()). null = pakai hari ini.
      */
-    public function formula(string $semanticRole, string $digunakanOleh): array
+    public function formula(string $semanticRole, string $digunakanOleh, ?string $idWaktu = null): array
     {
-        $rows = $this->repo->formulaRows($semanticRole, $digunakanOleh);
+        $snapshotDate = $this->repo->tanggalRefreshForIdWaktu($idWaktu);
+        $rows = $this->repo->formulaRows($semanticRole, $digunakanOleh, $snapshotDate);
 
         $groups = $rows->groupBy('kpi_category')->map(function (Collection $items, string $kpiCategory) {
             return [

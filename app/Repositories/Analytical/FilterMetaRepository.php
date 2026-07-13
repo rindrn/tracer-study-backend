@@ -52,28 +52,19 @@ class FilterMetaRepository extends BaseAnalyticalRepository
      * Semua snapshot yang ada di DW, diurutkan terbaru dulu.
      * Dipakai untuk: filter global "Snapshot" yang memilih periode DW.
      *
-     * NILAI FILTER masih `minggu_snapshot` mentah (TIDAK berubah -- lihat
-     * catatan di bawah), tapi respons sekarang menyertakan tahun_snapshot,
-     * bulan_snapshot, dan tanggal_refresh supaya FE bisa menampilkan label
-     * yang jelas ("2026 · Minggu 26 · Juni · 24 Jun 2026"), bukan cuma
-     * angka minggu mentah seperti sebelumnya.
-     *
-     * CATATAN PENTING -- BELUM sepenuhnya menyelesaikan potensi ambiguitas:
-     * filter yang benar-benar dipakai (lihat BaseAnalyticalRepository::
-     * buildGlobalFilters()) masih mencocokkan HANYA berdasarkan teks
-     * minggu_snapshot, bukan kombinasi minggu+tahun atau id_waktu unik.
-     * Kalau suatu saat ada 2 snapshot berbeda dengan angka minggu yang SAMA
-     * (lintas tahun, ATAU >1 kali ETL jalan di minggu kalender yang sama --
-     * mis. karena ada perubahan mapping, bukan jadwal mingguan), memilih
-     * salah satu di dropdown akan tetap mencocokkan KEDUANYA di query,
-     * bukan cuma yang dipilih. Memperbaiki ini butuh mengganti filter
-     * member dari DimWaktu.minggu_snapshot ke FactTracerStudy.id_waktu
-     * (satu-satunya identitas snapshot yang benar-benar unik) -- perubahan
-     * yang sengaja TIDAK dilakukan di sini karena mengubah makna parameter
-     * yang sudah dipakai di seluruh dashboard, perlu keputusan terpisah.
+     * NILAI FILTER sekarang DimWaktu.id_waktu (bukan minggu_snapshot mentah
+     * lagi) -- lihat BaseAnalyticalRepository::buildGlobalFilters(). Dua ETL
+     * run di minggu kalender yang SAMA (rutin terjadi sekarang karena
+     * Langkah 1 mapping auto-trigger ETL kapan saja, bukan cuma terjadwal
+     * mingguan) menghasilkan dua baris dim_waktu dengan minggu_snapshot
+     * IDENTIK -- kalau filter masih berbasis teks, memilih salah satu di
+     * dropdown akan tetap mencocokkan KEDUANYA sekaligus (angka agregat jadi
+     * dobel/kacau). id_waktu adalah primary key, selalu unik per run, jadi
+     * dedup di bawah ini juga cukup by id_waktu saja (bukan lagi kombinasi
+     * minggu|tahun|tanggal).
      *
      * @return array<array{
-     *   value: string,        -- dikirim sebagai minggu_snapshot ke filter (TIDAK berubah)
+     *   value: string,        -- id_waktu, dikirim sebagai param minggu_snapshot ke filter
      *   tahun_snapshot: string,
      *   bulan_snapshot: string,
      *   tanggal_refresh: string,
@@ -84,6 +75,7 @@ class FilterMetaRepository extends BaseAnalyticalRepository
     {
         return $this->cube->load([
             'dimensions' => [
+                'DimWaktu.id_waktu',
                 'DimWaktu.minggu_snapshot',
                 'DimWaktu.tahun_snapshot',
                 'DimWaktu.bulan_snapshot',
@@ -91,11 +83,13 @@ class FilterMetaRepository extends BaseAnalyticalRepository
             ],
             'order' => [
                 ['DimWaktu.tanggal_refresh', 'desc'],
+                ['DimWaktu.id_waktu', 'desc'],
             ],
         ])
-        ->filter(fn ($r) => !empty($r['DimWaktu.minggu_snapshot']))
-        ->unique(fn ($r) => $r['DimWaktu.minggu_snapshot'] . '|' . $r['DimWaktu.tahun_snapshot'] . '|' . $r['DimWaktu.tanggal_refresh'])
+        ->filter(fn ($r) => !empty($r['DimWaktu.id_waktu']))
+        ->unique(fn ($r) => $r['DimWaktu.id_waktu'])
         ->map(function ($r) {
+            $idWaktu  = $r['DimWaktu.id_waktu'];
             $minggu   = $r['DimWaktu.minggu_snapshot'];
             $tahun    = $r['DimWaktu.tahun_snapshot'] ?? '';
             $bulan    = $r['DimWaktu.bulan_snapshot'] ?? '';
@@ -103,7 +97,7 @@ class FilterMetaRepository extends BaseAnalyticalRepository
             $tanggalFormatted = $tanggal ? \Carbon\Carbon::parse($tanggal)->translatedFormat('d M Y') : '';
 
             return [
-                'value'           => $minggu,
+                'value'           => (string) $idWaktu,
                 'tahun_snapshot'  => $tahun,
                 'bulan_snapshot'  => $bulan,
                 'tanggal_refresh' => $tanggal,

@@ -129,16 +129,52 @@ class KpiCategoryMappingRepository
      * literal Postgres ("{a,b,c}") yang butuh parsing manual dan rawan
      * salah kalau option_label_snapshot suatu saat mengandung koma/kurung
      * kurawal -- grouping di PHP jauh lebih aman dan sama sederhananya.
+     *
+     * POINT-IN-TIME (BUKAN sekadar is_active=true) -- mirror PERSIS logic
+     * point-in-time di FactTracerStudy.js (Cube.js): effective_date <=
+     * snapshotDate AND (deactivated_at IS NULL OR deactivated_at::date >
+     * snapshotDate), ambil baris ter-effective_date-terbaru per option_code.
+     * Tanpa ini, tooltip formula selalu menampilkan definisi "hari ini",
+     * padahal chart yang sedang dilihat user bisa jadi snapshot LAMA yang
+     * mengikuti definisi lama -- membuat tooltip tampak "kadang benar kadang
+     * salah" tergantung snapshot mana yang sedang aktif di filter global.
+     * $snapshotDate null = pakai hari ini (perilaku lama, dipertahankan
+     * sebagai default kalau caller belum pilih snapshot).
      */
-    public function formulaRows(string $semanticRole, string $digunakanOleh): Collection
+    public function formulaRows(string $semanticRole, string $digunakanOleh, ?string $snapshotDate = null): Collection
     {
-        return $this->olap()->table('kpi_category_mapping')
+        $snapshotDate ??= now()->toDateString();
+
+        $rows = $this->olap()->table('kpi_category_mapping')
             ->where('semantic_role', $semanticRole)
             ->where('digunakan_oleh', $digunakanOleh)
-            ->where('is_active', true)
-            ->orderBy('kpi_category')
-            ->orderBy('id')
+            ->where('effective_date', '<=', $snapshotDate)
+            ->where(function ($q) use ($snapshotDate) {
+                $q->whereNull('deactivated_at')
+                  ->orWhereRaw('deactivated_at::date > ?', [$snapshotDate]);
+            })
+            ->orderByDesc('effective_date')
+            ->orderByDesc('id')
             ->get();
+
+        // Per option_code, baris pertama setelah sort effective_date DESC
+        // adalah yang paling baru berlaku pada snapshotDate -- persis
+        // ORDER BY effective_date DESC LIMIT 1 di Cube.js.
+        return $rows->groupBy('option_code')
+            ->map(fn (Collection $group) => $group->first())
+            ->values()
+            ->sortBy('kpi_category')
+            ->values();
+    }
+
+    /** Tanggal snapshot (dim_waktu.tanggal_refresh) untuk id_waktu tertentu -- null kalau tidak ditemukan. */
+    public function tanggalRefreshForIdWaktu(?string $idWaktu): ?string
+    {
+        if ($idWaktu === null || $idWaktu === '') {
+            return null;
+        }
+
+        return $this->olap()->table('dim_waktu')->where('id_waktu', $idWaktu)->value('tanggal_refresh');
     }
 
     /**
