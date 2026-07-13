@@ -49,27 +49,61 @@ class FilterMetaRepository extends BaseAnalyticalRepository
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Semua minggu snapshot yang ada di DW, diurutkan terbaru dulu.
+     * Semua snapshot yang ada di DW, diurutkan terbaru dulu.
      * Dipakai untuk: filter global "Snapshot" yang memilih periode DW.
      *
-     * @return array<array{minggu_snapshot:string, tahun_snapshot:string, label:string}>
+     * NILAI FILTER sekarang DimWaktu.id_waktu (bukan minggu_snapshot mentah
+     * lagi) -- lihat BaseAnalyticalRepository::buildGlobalFilters(). Dua ETL
+     * run di minggu kalender yang SAMA (rutin terjadi sekarang karena
+     * Langkah 1 mapping auto-trigger ETL kapan saja, bukan cuma terjadwal
+     * mingguan) menghasilkan dua baris dim_waktu dengan minggu_snapshot
+     * IDENTIK -- kalau filter masih berbasis teks, memilih salah satu di
+     * dropdown akan tetap mencocokkan KEDUANYA sekaligus (angka agregat jadi
+     * dobel/kacau). id_waktu adalah primary key, selalu unik per run, jadi
+     * dedup di bawah ini juga cukup by id_waktu saja (bukan lagi kombinasi
+     * minggu|tahun|tanggal).
      *
-     * Field `label` adalah string siap tampil di dropdown FE,
-     * contoh: "W-48 / 2024"
+     * @return array<array{
+     *   value: string,        -- id_waktu, dikirim sebagai param minggu_snapshot ke filter
+     *   tahun_snapshot: string,
+     *   bulan_snapshot: string,
+     *   tanggal_refresh: string,
+     *   label: string         -- siap tampil di dropdown FE
+     * }>
      */
     public function getSnapshot(): array
     {
         return $this->cube->load([
             'dimensions' => [
+                'DimWaktu.id_waktu',
                 'DimWaktu.minggu_snapshot',
+                'DimWaktu.tahun_snapshot',
+                'DimWaktu.bulan_snapshot',
+                'DimWaktu.tanggal_refresh',
             ],
             'order' => [
-                ['DimWaktu.minggu_snapshot', 'desc'],
+                ['DimWaktu.tanggal_refresh', 'desc'],
+                ['DimWaktu.id_waktu', 'desc'],
             ],
         ])
-        ->map(fn ($r) => $r['DimWaktu.minggu_snapshot'] ?? null)
-        ->unique()
-        ->filter()
+        ->filter(fn ($r) => !empty($r['DimWaktu.id_waktu']))
+        ->unique(fn ($r) => $r['DimWaktu.id_waktu'])
+        ->map(function ($r) {
+            $idWaktu  = $r['DimWaktu.id_waktu'];
+            $minggu   = $r['DimWaktu.minggu_snapshot'];
+            $tahun    = $r['DimWaktu.tahun_snapshot'] ?? '';
+            $bulan    = $r['DimWaktu.bulan_snapshot'] ?? '';
+            $tanggal  = $r['DimWaktu.tanggal_refresh'] ?? null;
+            $tanggalFormatted = $tanggal ? \Carbon\Carbon::parse($tanggal)->translatedFormat('d M Y') : '';
+
+            return [
+                'value'           => (string) $idWaktu,
+                'tahun_snapshot'  => $tahun,
+                'bulan_snapshot'  => $bulan,
+                'tanggal_refresh' => $tanggal,
+                'label'           => trim("{$tahun} · Minggu {$minggu} · {$bulan}" . ($tanggalFormatted ? " ({$tanggalFormatted})" : '')),
+            ];
+        })
         ->values()
         ->toArray();
     }

@@ -1,0 +1,198 @@
+<?php
+
+namespace App\Repositories\Config;
+
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Sumber public.kpi_category_mapping (koneksi olap -- sama fisik Postgres
+ * yang dibaca Cube.js, lihat file header 002_semantic_mapping_schema.sql).
+ * Gaya query builder murni, mengikuti konvensi OlapLoadRepository (tidak
+ * ada Eloquent di sisi olap).
+ */
+class KpiCategoryMappingRepository
+{
+    private function olap(): \Illuminate\Database\Connection
+    {
+        return DB::connection('olap');
+    }
+
+    /**
+     * $isActive null = TIDAK difilter (aktif + nonaktif sekaligus) -- WAJIB
+     * dipakai tab audit "Data Tersimpan" di FE, supaya baris yang dinonaktifkan
+     * tetap terlihat (forward-only artinya baris tidak pernah hilang dari
+     * database, tapi kalau API selalu memfilter is_active=true, efeknya SAMA
+     * SAJA dengan hilang dari sudut pandang admin -- bug yang sempat lolos
+     * sebelum ini diperbaiki).
+     */
+    public function list(?string $semanticRole, ?string $digunakanOleh, ?bool $isActive = true): Collection
+    {
+        $q = $this->olap()->table('kpi_category_mapping');
+
+        if ($isActive !== null) {
+            $q->where('is_active', $isActive);
+        }
+        if ($semanticRole !== null) {
+            $q->where('semantic_role', $semanticRole);
+        }
+        if ($digunakanOleh !== null) {
+            $q->where('digunakan_oleh', $digunakanOleh);
+        }
+
+        return $q->orderBy('kpi_category')->orderBy('id')->get();
+    }
+
+    /**
+     * Semua (digunakan_oleh, kpi_category, kpi_category_label) yang PERNAH
+     * ada untuk role ini -- aktif ATAU nonaktif. Beda dari list(): ini bukan
+     * daftar baris, tapi daftar "grouping apa saja yang pernah dikonfigurasi"
+     * (taksonomi), dipakai Langkah 2 UI supaya sebuah digunakan_oleh (mis.
+     * iku2_keterserapan) TETAP terlihat sebagai section yang bisa dikelola
+     * walau SEMUA baris aktifnya kebetulan sedang nonaktif (mis. baru saja
+     * dinonaktifkan semua untuk demo ulang) -- tanpa ini, Langkah 2 tidak
+     * pernah tahu grouping itu pernah ada sama sekali, dead-end "hubungi tim
+     * teknis" padahal cukup dipetakan ulang lewat UI yang sama.
+     */
+    public function taxonomyForRole(string $semanticRole): Collection
+    {
+        return $this->olap()->table('kpi_category_mapping')
+            ->where('semantic_role', $semanticRole)
+            ->select(['digunakan_oleh', 'kpi_category', 'kpi_category_label'])
+            ->distinct()
+            ->orderBy('digunakan_oleh')
+            ->orderBy('kpi_category')
+            ->get();
+    }
+
+    /**
+     * Sama seperti taxonomyForRole(), tapi untuk SEMUA semantic_role sekaligus
+     * (satu query, bukan N+1) -- dipakai selector "role yang sudah aktif" di
+     * Langkah 1 UI supaya admin langsung lihat KPI apa yang dipakai tiap role
+     * (mis. status_pekerjaan -> IKU 2 Keterserapan) tanpa perlu tahu istilah
+     * digunakan_oleh sebelumnya. Ini yang menjawab kebingungan berulang
+     * "f8 sudah termapping ke status_pekerjaan, tapi saya mau petakan ke
+     * keterserapan" -- keterserapan BUKAN role terpisah, dia salah satu
+     * digunakan_oleh milik status_pekerjaan, dan itu perlu terlihat di sini,
+     * bukan cuma dijelaskan di percakapan.
+     */
+    public function taxonomyForAllRoles(): Collection
+    {
+        return $this->olap()->table('kpi_category_mapping')
+            ->select(['semantic_role', 'digunakan_oleh', 'kpi_category', 'kpi_category_label'])
+            ->distinct()
+            ->orderBy('semantic_role')
+            ->orderBy('digunakan_oleh')
+            ->orderBy('kpi_category')
+            ->get();
+    }
+
+    public function find(int $id): ?object
+    {
+        return $this->olap()->table('kpi_category_mapping')->where('id', $id)->first();
+    }
+
+    /** Constraint unik (semantic_role, option_code, digunakan_oleh) WHERE is_active -- pre-check sebelum insert. */
+    public function findActiveConflict(string $semanticRole, string $optionCode, string $digunakanOleh): ?object
+    {
+        return $this->olap()->table('kpi_category_mapping')
+            ->where('semantic_role', $semanticRole)
+            ->where('option_code', $optionCode)
+            ->where('digunakan_oleh', $digunakanOleh)
+            ->where('is_active', true)
+            ->first();
+    }
+
+    public function insert(array $data): int
+    {
+        return $this->olap()->table('kpi_category_mapping')->insertGetId(array_merge($data, [
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]));
+    }
+
+    public function deactivate(int $id, ?int $userId): bool
+    {
+        return $this->olap()->table('kpi_category_mapping')->where('id', $id)->update([
+            'is_active'      => false,
+            'deactivated_at' => now(),
+            'deactivated_by' => $userId,
+            'updated_at'     => now(),
+        ]) > 0;
+    }
+
+    /**
+     * Baris FLAT (belum di-group) untuk endpoint formula tooltip -- caller
+     * (KpiCategoryMappingService) yang meng-group by kpi_category + susun
+     * array options. Sengaja TIDAK pakai array_agg() Postgres di sini:
+     * hasil array_agg via query builder mentah kembali sebagai string
+     * literal Postgres ("{a,b,c}") yang butuh parsing manual dan rawan
+     * salah kalau option_label_snapshot suatu saat mengandung koma/kurung
+     * kurawal -- grouping di PHP jauh lebih aman dan sama sederhananya.
+     *
+     * POINT-IN-TIME (BUKAN sekadar is_active=true) -- mirror PERSIS logic
+     * point-in-time di FactTracerStudy.js (Cube.js): effective_date <=
+     * snapshotDate AND (deactivated_at IS NULL OR deactivated_at::date >
+     * snapshotDate), ambil baris ter-effective_date-terbaru per option_code.
+     * Tanpa ini, tooltip formula selalu menampilkan definisi "hari ini",
+     * padahal chart yang sedang dilihat user bisa jadi snapshot LAMA yang
+     * mengikuti definisi lama -- membuat tooltip tampak "kadang benar kadang
+     * salah" tergantung snapshot mana yang sedang aktif di filter global.
+     * $snapshotDate null = pakai hari ini (perilaku lama, dipertahankan
+     * sebagai default kalau caller belum pilih snapshot).
+     */
+    public function formulaRows(string $semanticRole, string $digunakanOleh, ?string $snapshotDate = null): Collection
+    {
+        $snapshotDate ??= now()->toDateString();
+
+        $rows = $this->olap()->table('kpi_category_mapping')
+            ->where('semantic_role', $semanticRole)
+            ->where('digunakan_oleh', $digunakanOleh)
+            ->where('effective_date', '<=', $snapshotDate)
+            ->where(function ($q) use ($snapshotDate) {
+                $q->whereNull('deactivated_at')
+                  ->orWhereRaw('deactivated_at::date > ?', [$snapshotDate]);
+            })
+            ->orderByDesc('effective_date')
+            ->orderByDesc('id')
+            ->get();
+
+        // Per option_code, baris pertama setelah sort effective_date DESC
+        // adalah yang paling baru berlaku pada snapshotDate -- persis
+        // ORDER BY effective_date DESC LIMIT 1 di Cube.js.
+        return $rows->groupBy('option_code')
+            ->map(fn (Collection $group) => $group->first())
+            ->values()
+            ->sortBy('kpi_category')
+            ->values();
+    }
+
+    /** Tanggal snapshot (dim_waktu.tanggal_refresh) untuk id_waktu tertentu -- null kalau tidak ditemukan. */
+    public function tanggalRefreshForIdWaktu(?string $idWaktu): ?string
+    {
+        if ($idWaktu === null || $idWaktu === '') {
+            return null;
+        }
+
+        return $this->olap()->table('dim_waktu')->where('id_waktu', $idWaktu)->value('tanggal_refresh');
+    }
+
+    /**
+     * Label opsi (option_label_snapshot) untuk (role, digunakan_oleh, kategori)
+     * tertentu -- dipakai KeterserapanService menggantikan STATUS_TERSERAP
+     * hardcode. Urut by id supaya stabil antar-pemanggilan.
+     */
+    public function optionLabelsFor(string $semanticRole, string $digunakanOleh, string $kpiCategory): array
+    {
+        return $this->olap()->table('kpi_category_mapping')
+            ->where('semantic_role', $semanticRole)
+            ->where('digunakan_oleh', $digunakanOleh)
+            ->where('kpi_category', $kpiCategory)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->pluck('option_label_snapshot')
+            ->filter()
+            ->values()
+            ->all();
+    }
+}

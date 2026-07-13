@@ -47,23 +47,20 @@ class ThresholdValidator
     public function validateBulkStore(array $data): array
     {
         $v = Validator::make($data, [
-            'thresholds'              => ['required', 'array', 'min:1'],
-            'thresholds.*.indicator_id' => [
-                'required', 'integer',
-                'exists:oltp.threshold_indicators,id',
-                'distinct',   // tidak boleh indicator_id duplikat dalam 1 request
-            ],
-            'thresholds.*.baik'       => ['required', 'numeric', 'min:0', 'max:100'],
-            'thresholds.*.unggul'     => ['required', 'numeric', 'min:0', 'max:100'],
+            'thresholds'                 => ['required', 'array', 'min:1'],
+            'thresholds.*.indicator_id'  => ['required', 'integer', 'exists:oltp.threshold_indicators,id', 'distinct'],
+            // nullable — wajib-nya dicek di service (kecuali indikator system-calculated)
+            'thresholds.*.baik'          => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'thresholds.*.unggul'        => ['nullable', 'numeric', 'min:0', 'max:100'],
+            // param dinamis: jumlah bulan (employment_time) atau multiplier UMP (salary_above_ump)
+            'thresholds.*.param_value'   => ['nullable', 'numeric', 'min:0'],
         ], [
-            'thresholds.required'                    => 'Data threshold wajib diisi.',
-            'thresholds.*.indicator_id.required'     => 'Indikator wajib dipilih.',
-            'thresholds.*.indicator_id.exists'       => 'Indikator tidak valid.',
-            'thresholds.*.indicator_id.distinct'     => 'Indikator tidak boleh duplikat.',
-            'thresholds.*.baik.required'             => 'Nilai baik wajib diisi.',
-            'thresholds.*.unggul.required'           => 'Nilai unggul wajib diisi.',
-            'thresholds.*.baik.max'                  => 'Nilai baik maksimal 100.',
-            'thresholds.*.unggul.max'                => 'Nilai unggul maksimal 100.',
+            'thresholds.required'                => 'Data threshold wajib diisi.',
+            'thresholds.*.indicator_id.required' => 'Indikator wajib dipilih.',
+            'thresholds.*.indicator_id.exists'   => 'Indikator tidak valid.',
+            'thresholds.*.indicator_id.distinct' => 'Indikator tidak boleh duplikat.',
+            'thresholds.*.baik.max'              => 'Nilai baik maksimal 100.',
+            'thresholds.*.unggul.max'            => 'Nilai unggul maksimal 100.',
         ]);
 
         if ($v->fails()) throw new ValidationException($v);
@@ -72,21 +69,20 @@ class ThresholdValidator
 
     public function validateBulkUpdate(array $data): array
     {
-        // Untuk update, indicator_id tidak dikirim (sudah fix),
-        // yang dikirim adalah threshold_id (baik) + threshold_id (unggul) + value masing-masing
         $v = Validator::make($data, [
             'thresholds'                   => ['required', 'array', 'min:1'],
             'thresholds.*.indicator_id'    => ['required', 'integer', 'exists:oltp.threshold_indicators,id'],
             'thresholds.*.baik_id'         => ['required', 'integer', 'exists:oltp.thresholds,id'],
-            'thresholds.*.baik_value'      => ['required', 'numeric', 'min:0', 'max:100'],
+            'thresholds.*.baik_value'      => ['nullable', 'numeric', 'min:0', 'max:100'],
             'thresholds.*.unggul_id'       => ['required', 'integer', 'exists:oltp.thresholds,id'],
-            'thresholds.*.unggul_value'    => ['required', 'numeric', 'min:0', 'max:100'],
+            'thresholds.*.unggul_value'    => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'thresholds.*.param_value'     => ['nullable', 'numeric', 'min:0'],
         ], [
-            'thresholds.required'                 => 'Data threshold wajib diisi.',
-            'thresholds.*.baik_id.exists'         => 'Threshold baik tidak ditemukan.',
-            'thresholds.*.unggul_id.exists'       => 'Threshold unggul tidak ditemukan.',
-            'thresholds.*.baik_value.max'         => 'Nilai baik maksimal 100.',
-            'thresholds.*.unggul_value.max'       => 'Nilai unggul maksimal 100.',
+            'thresholds.required'           => 'Data threshold wajib diisi.',
+            'thresholds.*.baik_id.exists'   => 'Threshold baik tidak ditemukan.',
+            'thresholds.*.unggul_id.exists' => 'Threshold unggul tidak ditemukan.',
+            'thresholds.*.baik_value.max'   => 'Nilai baik maksimal 100.',
+            'thresholds.*.unggul_value.max' => 'Nilai unggul maksimal 100.',
         ]);
 
         if ($v->fails()) throw new ValidationException($v);

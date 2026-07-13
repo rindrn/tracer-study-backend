@@ -47,7 +47,7 @@ class KesesuaianService
                     'pct_tidak_sesuai'          => $pctTidak,
                 ];
             })->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KesesuaianBarDTO(
             data:    $data,
@@ -77,7 +77,7 @@ class KesesuaianService
                 ])->values()->toArray(),
                 'total' => $total,
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KesesuaianPieDTO(
             data:    $cached['data'],
@@ -98,7 +98,7 @@ class KesesuaianService
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             )->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KesesuaianAlasanDTO(
             data:    $data,

@@ -32,7 +32,7 @@ class KompetensiGapService
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
             return $this->joinKategori($raw)->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KompetensiGapDTO(
             data:    $data,
@@ -71,7 +71,7 @@ class KompetensiGapService
             }
 
             return ['data' => $data, 'prodiList' => array_values(array_unique($prodiList))];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KompetensiGapBandingkanDTO(
             data:      $cached['data'],

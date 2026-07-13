@@ -12,7 +12,7 @@ class LamService
 {
     use WithCache;
 
-    private const TTL = 1800; // 10 menit
+    private const TTL = 300; // 5 menit — data LAM/threshold berubah relatif sering, TTL pendek + invalidasi lewat tag
 
     public function __construct(
         private readonly LamRepository        $repo,
@@ -38,6 +38,7 @@ class LamService
                             ->map(fn($v) => [
                                 'id'           => $v->id,
                                 'year'         => $v->year,
+                                'year_end'     => $v->year_end ?? null,
                                 'version_name' => $v->version_name,
                                 'is_active'    => (bool) $v->is_active,
                             ])->toArray();
@@ -60,14 +61,14 @@ class LamService
                     return $data;
                 })
                 ->toArray();
-        }, self::TTL);
+        }, self::TTL, ['lams', 'thresholds']);
     }
 
     public function show(int $id): LamResponseDTO
     {
         $lam = $this->remember("lams:show:{$id}", function () use ($id) {
             return $this->repo->findById($id);
-        }, self::TTL);
+        }, self::TTL, ['lams']);
 
         if (! $lam) throw new BusinessException("LAM ID {$id} tidak ditemukan.", 404);
 
@@ -108,11 +109,15 @@ class LamService
 
             return [
                 'lam'        => ['id' => $row->lam_id, 'name' => $row->lam_name, 'code' => $row->lam_code],
-                'version'    => ['id' => $row->lam_version_id, 'year' => $row->year],
+                'version'    => [
+                    'id'       => $row->lam_version_id,
+                    'year'     => $row->year,
+                    'year_end' => $row->year_end ?? null,
+                ],
                 'programs'   => json_decode($row->programs ?? '[]', true),
                 'thresholds' => $grouped,
             ];
-        }, self::TTL);
+        }, self::TTL, ['lams', 'thresholds']);
     }
 
     public function create(array $data): LamResponseDTO

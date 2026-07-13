@@ -130,32 +130,45 @@ class ThresholdRepository
 
     public function byProdiAndIndicator(int $prodiId, string $indicatorKey): ?object
     {
-        // Return object berisi lam info + collection of versions+thresholds
-        // Pakai 1 query dengan join berantai
         $lamRow = DB::connection('oltp')
             ->table('lam_programs as lp')
-            ->join('lams as l',          'l.id',  '=', 'lp.lam_id')
+            ->join('lams as l', 'l.id', '=', 'lp.lam_id')
             ->where('lp.program_id', $prodiId)
             ->select('l.id as lam_id', 'l.name as lam_name', 'l.code as lam_code')
             ->first();
 
         if (! $lamRow) return null;
 
+        // year_end dihitung dulu di level lam_versions mentah (LEAD partition per lam_id)
+        // sebelum di-join ke thresholds — kalau dihitung setelah join, hasilnya salah
+        // karena tiap versi muncul 2x (baik/unggul) dan partition-nya jadi rusak.
+        $lamVersionsWithYearEnd = DB::connection('oltp')->table('lam_versions')
+            ->selectRaw('lam_versions.*, (LEAD(year) OVER (PARTITION BY lam_id ORDER BY year) - 1) as year_end');
+
         $rows = DB::connection('oltp')
-            ->table('lam_versions as lv')
-            ->join('thresholds as t',           't.lam_version_id',  '=', 'lv.id')
-            ->join('threshold_indicators as ti', 'ti.id',             '=', 't.indicator_id')
-            ->where('lv.lam_id',  $lamRow->lam_id)
-            ->where('ti.key',     $indicatorKey)
+            ->query()
+            ->fromSub($lamVersionsWithYearEnd, 'lv')
+            ->join('thresholds as t', 't.lam_version_id', '=', 'lv.id')
+            ->join('threshold_indicators as ti', 'ti.id', '=', 't.indicator_id')
+            ->leftJoin('threshold_configs as tc', function ($join) {
+                $join->on('tc.lam_version_id', '=', 't.lam_version_id')
+                    ->on('tc.indicator_id', '=', 't.indicator_id');
+            })
+            ->where('lv.lam_id', $lamRow->lam_id)
+            ->where('ti.key', $indicatorKey)
             ->select(
                 'lv.id as version_id',
                 'lv.year',
+                'lv.year_end',
                 'lv.version_name',
                 'lv.is_active',
                 'ti.key as indicator_key',
                 'ti.name as indicator_name',
                 'ti.unit as indicator_unit',
                 'ti.operator as indicator_operator',
+                'ti.dynamic_param_unit',
+                'ti.is_system_calculated',
+                'tc.param_value',
                 't.id as threshold_id',
                 't.level as threshold_level',
                 't.value as threshold_value',
@@ -164,9 +177,80 @@ class ThresholdRepository
             ->orderBy('t.level')
             ->get();
 
-        return (object) [
-            'lam'  => $lamRow,
-            'rows' => $rows,
-        ];
+        return (object) ['lam' => $lamRow, 'rows' => $rows];
+    }
+
+    public function upsertConfig(int $lamVersionId, int $indicatorId, float $paramValue): void
+    {
+        DB::connection('oltp')->table('threshold_configs')->updateOrInsert(
+            ['lam_version_id' => $lamVersionId, 'indicator_id' => $indicatorId],
+            ['param_value' => $paramValue, 'updated_at' => now(), 'created_at' => now()]
+        );
+    }
+
+    public function getConfig(int $lamVersionId, int $indicatorId): ?float
+    {
+        $row = DB::connection('oltp')->table('threshold_configs')
+            ->where('lam_version_id', $lamVersionId)
+            ->where('indicator_id', $indicatorId)
+            ->first();
+
+        return $row ? (float) $row->param_value : null;
+    }
+
+    public function getTracerResponseThreshold(int $programId, int $graduatedYear): ?object
+    {
+        return DB::connection('oltp')
+            ->table('tracer_response_thresholds')
+            ->where('program_id', $programId)
+            ->where('graduated_year', $graduatedYear)
+            ->first();
+    }
+
+    public function latestTracerResponseThreshold(int $programId): ?object
+    {
+        return DB::connection('oltp')
+            ->table('tracer_response_thresholds')
+            ->where('program_id', $programId)
+            ->orderByDesc('graduated_year')
+            ->first();
+    }
+
+    public function historyByProgram(int $programId): \Illuminate\Support\Collection
+    {
+        return DB::connection('oltp')
+            ->table('tracer_response_thresholds')
+            ->where('program_id', $programId)
+            ->orderBy('graduated_year')
+            ->get();
+    }
+
+    /** Total lulusan per tahun, digabung dari semua prodi — dasar hitung threshold agregat "Semua Prodi". */
+    public function totalLulusanPerYearAllPrograms(): \Illuminate\Support\Collection
+    {
+        return DB::connection('oltp')
+            ->table('tracer_response_thresholds')
+            ->selectRaw('graduated_year, SUM(total_lulusan) as total_lulusan')
+            ->groupBy('graduated_year')
+            ->orderBy('graduated_year')
+            ->get();
+    }
+
+    public function tracerResponseHistoryByLam(int $lamId): \Illuminate\Support\Collection
+    {
+        // Join lam_programs → dapat semua prodi di bawah LAM ini, lalu histori tiap prodi
+        return DB::connection('oltp')
+            ->table('lam_programs as lp')
+            ->join('programs as p', 'p.id', '=', 'lp.program_id')
+            ->join('tracer_response_thresholds as t', 't.program_id', '=', 'lp.program_id')
+            ->where('lp.lam_id', $lamId)
+            ->select(
+                'p.id as program_id', 'p.name as program_name', 'p.code as program_code',
+                't.graduated_year', 't.threshold_value', 't.total_lulusan',
+                't.min_responden', 't.margin_error', 't.calculated_at',
+            )
+            ->orderBy('p.name')
+            ->orderByDesc('t.graduated_year')
+            ->get();
     }
 }

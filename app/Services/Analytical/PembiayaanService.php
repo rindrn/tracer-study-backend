@@ -63,7 +63,7 @@ class PembiayaanService
             }
 
             return ['data' => $data, 'groupedBar' => $groupedBar, 'total' => $total];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new PembiayaanPieDTO(
             data:       $cached['data'],
@@ -86,7 +86,7 @@ class PembiayaanService
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
             return $this->reshapePerProdi($raw);
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new PembiayaanPerProdiDTO(
             data:    $data,
@@ -113,7 +113,7 @@ class PembiayaanService
             $data      = $this->reshapePerProdi($raw);
             $prodiList = array_values(array_unique(array_column($data, 'nama_prodi')));
             return ['data' => $data, 'prodiList' => $prodiList];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new PembiayaanBandingkanDTO(
             data:      $cached['data'],
@@ -153,7 +153,7 @@ class PembiayaanService
             }
 
             return ['data' => $data, 'availableTahun' => $availableTahun];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new PembiayaanAntarPeriodeDTO(
             data:           $cached['data'],

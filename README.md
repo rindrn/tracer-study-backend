@@ -12,9 +12,10 @@ Dibangun dengan **Laravel (PHP)** dan menerapkan **Layered Architecture** (Contr
 2. [Tech Stack](#tech-stack)
 3. [Struktur Project](#struktur-project)
 4. [Dokumentasi (`docs/`)](#dokumentasi-docs)
-5. [Setup & Menjalankan (Local)](#setup--menjalankan-local)
-6. [Konfigurasi `.env`](#konfigurasi-env)
-7. [Cara Menambah Modul Baru](#cara-menambah-modul-baru)
+5. [Pemetaan Semantik Dinamis](#pemetaan-semantik-dinamis)
+6. [Setup & Menjalankan (Local)](#setup--menjalankan-local)
+7. [Konfigurasi `.env`](#konfigurasi-env)
+8. [Cara Menambah Modul Baru](#cara-menambah-modul-baru)
 
 ---
 
@@ -153,6 +154,99 @@ tests/
 | `docs/database-blueprint-two-schema.md` | Rancangan/blueprint database (star schema, Kimball) |
 | `docs/migration-checklist.md` | Checklist migrasi |
 | `docs/api/` | Dokumentasi endpoint OLAP (13 segmen KPI) |
+| `docs/semantic-mapping-architecture.md` | Dokumentasi arsitektur lengkap pemetaan semantik dinamis (10 bagian, termasuk riwayat bug & fix) |
+
+---
+
+## Pemetaan Semantik Dinamis
+
+### Masalah yang diselesaikan
+
+Sebelum fitur ini ada, hubungan "kode pertanyaan OLTP → kolom fact OLAP" dan "opsi jawaban → kategori KPI" (mis. status apa saja yang dihitung "Terserap") **di-hardcode** di beberapa tempat sekaligus: `OltpExtractRepository::RELEVANT_QUESTION_CODES`, `AlumniFactBuilderService`, `StatusAlumniDimService`, dan `FactTracerStudy.js` (Cube.js). Setiap kuesioner baru dengan kode berbeda (mis. `f8` → `f8_new`) atau perubahan definisi KPI (mis. status mana yang termasuk "terserap") butuh deploy ulang kode di 2 repo sekaligus.
+
+4 tabel baru (murni aditif, tidak mengubah skema fact/dim yang ada) memindahkan hubungan ini ke data yang bisa diatur admin lewat UI, dengan versioning forward-only (`is_active` + `deactivated_at`, tidak pernah `DELETE`) mengikuti pola yang sudah ada di `lam_versions`/`thresholds`.
+
+### Desain tabel
+
+**1. `tracer_oltp.semantic_role_registry`** — kamus SEMUA "peran data" yang dikenal sistem. Baris ini **tidak berubah per kuesioner** — didefinisikan sekali oleh developer/admin sistem saat sebuah kebutuhan data baru muncul, bukan oleh alur mapping harian.
+
+| Kolom | Sumber | Untuk apa |
+|---|---|---|
+| `role_key` | Ditentukan manual (PK) | Nama teknis unik dipakai sebagai kunci lookup di seluruh sistem, mis. `status_pekerjaan`, `pendapatan` |
+| `label` | Ditentukan manual | Nama tampilan di UI (ini yang muncul sebagai isi kolom **"Peran Data"** di tabel Langkah 1) |
+| `category` | Ditentukan manual | Domain KPI untuk pengelompokan dropdown (`keterserapan`, `waktu_tunggu`, `pendapatan`, dst.) — murni bantuan visual, mencegah salah pilih peran lintas domain |
+| `expected_kind` | Ditentukan manual | Kontrak tipe data (`integer`/`decimal`/`categorical`/`boolean`/`text`/`date`) — divalidasi ETL saat menulis ke fact |
+| `value_min` / `value_max` | Ditentukan manual | Batas wajar untuk role numerik (mis. `masa_tunggu_bekerja` 0–120 bulan) — di luar rentang ini dicatat sebagai anomali |
+| `target_table` / `target_column` | Ditentukan manual | Kolom OLAP tujuan (fact/dim) tempat nilai role ini akhirnya ditulis oleh ETL |
+| `grain` | Ditentukan manual | `narrow` = satu nilai per alumni (1 mapping aktif per kuesioner); `wide` = banyak `question_code` sah berbagi role yang sama (mis. 14 kode kompetensi `f1761`–`f1774` semua berperan `kompetensi_evaluasi`, dibedakan lewat `dim_indikator_evaluasi`) |
+
+**2. `tracer_oltp.question_semantic_mapping`** — hasil **Langkah 1**: kode pertanyaan aktual di kuesioner tertentu ↔ salah satu `role_key` di atas.
+
+| Kolom | Sumber | Untuk apa |
+|---|---|---|
+| `questionnaire_id`, `question_code` | Dipilih admin dari dropdown kode yang belum termapping | Identitas pertanyaan asli di OLTP |
+| `question_text_snapshot` | Disalin otomatis dari `questionnaire_questions` saat mapping dibuat | Arsip teks pertanyaan pada saat itu (kuesioner bisa direvisi teksnya di masa depan tanpa mengubah histori ini) |
+| `semantic_role` | Dipilih admin | FK ke `semantic_role_registry.role_key` — ini keputusan inti Langkah 1 |
+| `grain` | Disalin dari registry saat insert | Duplikasi read-time karena predicate partial index Postgres harus immutable (tidak bisa subquery tabel lain) |
+| `effective_date`, `is_active`, `deactivated_at` | Sistem / admin | Versioning forward-only |
+| `mapped_by` | User login yang submit (baseline seed diarahkan ke `head.tracer@test.com`) | Atribusi/audit — kolom "Dipetakan Oleh" di tabel "Data Tersimpan" |
+
+**3. `public.kpi_category_mapping`** — hasil **Langkah 2**: mengelompokkan opsi jawaban (option_code) dari sebuah role kategorikal menjadi kategori KPI. Sengaja hidup di schema `public` (bukan `tracer_oltp`) supaya query Cube.js (yang hanya baca schema `public`) bisa langsung subquery ke sini.
+
+| Kolom | Sumber | Untuk apa |
+|---|---|---|
+| `semantic_role` | Sama seperti role di Langkah 1 (mis. `status_pekerjaan`) | Role kategorikal mana yang dikelompokkan |
+| `option_code` | Dipilih admin, **wajib** dari daftar opsi asli `questionnaire_options` (endpoint `option-candidates`) — validasi server menolak kode karangan | Nilai OLTP mentah yang dikelompokkan |
+| `option_label_snapshot` | Disalin otomatis dari opsi asli saat mapping dibuat | Label untuk tooltip dinamis di grafik ("Terserap = Bekerja + Wirausaha + ...") |
+| `kpi_category`, `kpi_category_label` | Ditentukan admin | Kategori hasil bucketing, mis. `terserap`/`tidak`, `sesuai`/`tidak_sesuai` |
+| `digunakan_oleh` | Ditentukan admin | Membedakan KPI mana yang mengonsumsi grouping ini — role yang sama bisa dipakai beberapa KPI dengan aturan bucket berbeda (lihat di bawah) |
+| `effective_date`, `is_active`, `deactivated_at` | Sistem / admin | Versioning forward-only, **dan** dicocokkan point-in-time terhadap `dim_waktu.tanggal_refresh` tiap baris fact di Cube.js — supaya perubahan mapping admin tidak mengubah interpretasi snapshot historis yang sudah ada |
+
+**4. `public.etl_anomaly_log`** — catatan gagal-validasi per jawaban saat ETL jalan (tipe tidak cocok `expected_kind`, atau di luar `value_min`/`value_max`). ETL tidak pernah crash karena ini — kolom fact terkait diisi `NULL` dan baris anomali dicatat untuk direview admin di menu "Log Anomali ETL".
+
+### Alur Langkah 1 → Langkah 2 → Cube.js
+
+```
+Langkah 1 (question_semantic_mapping)
+  "f8" di kuesioner Tracer 2026  →  role "status_pekerjaan"
+                                            │
+                                            ▼
+Langkah 2 (kpi_category_mapping) — HANYA untuk role kategorikal
+yang dikonsumsi sebagai bucket KPI, BUKAN semua role
+  option "1" (Bekerja)      → kategori "terserap" → digunakan_oleh "iku2_keterserapan"
+  option "1" (Bekerja)      → kategori "valid"    → digunakan_oleh "masa_tunggu_valid_status"
+  option "2" (Belum kerja)  → kategori "tidak"    → digunakan_oleh "iku2_keterserapan"
+                                            │
+                                            ▼
+Cube.js (FactTracerStudy.js) — measure count_terserap dkk melakukan
+subquery point-in-time ke kpi_category_mapping (bukan hardcode list lagi)
+                                            │
+                                            ▼
+Dashboard React (grafik Tren Keterserapan, dst.)
+```
+
+**Kenapa satu role bisa dipakai 3 `digunakan_oleh` sekaligus?** `status_pekerjaan` memberi makna berbeda tergantung KPI yang bertanya: untuk KPI Keterserapan, status "Melanjutkan Pendidikan" dihitung "terserap"; untuk KPI Masa Tunggu, status itu justru **dikecualikan** (tidak relevan dihitung masa tunggu kerja, karena melanjutkan studi bukan bekerja). Tanpa `digunakan_oleh`, satu baris mapping tidak bisa mewakili dua aturan bucket yang berbeda untuk role yang sama.
+
+### Semantic Role vs kolom "Peran Data" di UI
+
+**Keduanya konsep yang sama** — `semantic_role` adalah nama teknis (`role_key`), "Peran Data" adalah label Bahasa Indonesia yang ditampilkan (`semantic_role_registry.label`). Tidak ada perbedaan makna, hanya perbedaan representasi: satu untuk kode/API, satu untuk tampilan admin.
+
+### Kenapa kode bisa punya "Peran Data" terisi tapi tidak muncul di kategori KPI manapun?
+
+Karena **Langkah 2 hanya berlaku untuk role kategorikal yang perlu di-bucket jadi kategori KPI** (saat ini hanya `status_pekerjaan` dan `relevansi_bidang`). Sebagian besar role LAINNYA tidak pernah butuh Langkah 2 karena nilainya dipakai apa adanya oleh downstream:
+- Role numerik (`pendapatan`, `masa_tunggu_bekerja`, `bulan_sebelum_lulus`, `kompetensi_evaluasi`) — nilai mentahnya langsung dipakai untuk perhitungan (rata-rata, perbandingan ke ambang dinamis), bukan dikelompokkan jadi kategori diskrit.
+- Role teks (`nama_perusahaan`, `pt_lanjut`, `prodi_lanjut`, `jabatan_wirausaha`) — disimpan apa adanya sebagai atribut dimensi, tidak pernah jadi bucket KPI.
+- Role kategorikal lain yang jadi FK dimensi (`provinsi_kerja`, `kota_kerja`, `jenis_perusahaan`, `tingkat_instansi`, `kesesuaian_level`, `sumber_biaya_lanjut`, `sumber_biaya_studi`) — dipakai sebagai label dimensi langsung (mis. nama provinsi di peta sebaran), bukan dikelompokkan jadi kategori KPI biner.
+
+Jadi kode dengan "Peran Data" terisi tapi tanpa kategori KPI **bukan bug** — itu tandanya role tersebut bertipe numerik/teks/dimensi-langsung, bukan salah satu dari 2 role yang butuh bucketing eksplisit.
+
+### Kenapa ada ~19 semantic role, bukan ~5 seperti rencana awal?
+
+Rencana awal membayangkan hanya role yang punya threshold KPI eksplisit (mis. 5 "KPI inti": keterserapan, masa tunggu, kesesuaian bidang, pendapatan, kompetensi). Saat implementasi, ternyata **setiap kolom fact/dim yang sebelumnya diisi lewat kode pertanyaan hardcode** (bukan cuma yang punya threshold) perlu didaftarkan sebagai role supaya ETL bisa dijalankan sepenuhnya dari data mapping, bukan campuran data+kode. Contoh: `nama_perusahaan` atau `provinsi_kerja` tidak punya "KPI" dalam arti angka target, tapi tetap perlu tahu "kode pertanyaan mana yang mengisi kolom ini" secara dinamis supaya kuesioner baru dengan kode berbeda tidak butuh deploy ulang. Hasilnya: ~19 role menutup semua kolom yang tadinya hardcode, sementara hanya sebagian kecil (yang kategorikal dan dikonsumsi sebagai bucket KPI) lanjut ke Langkah 2.
+
+### Cache & invalidasi
+
+Semua endpoint `Analytical/*Service.php` (Keterserapan, MasaTunggu, Pendapatan, dst.) meng-cache response di Redis dengan TTL 1–24 jam untuk mengurangi beban ke Cube.js. Setiap `remember()` diberi tag `analytics-dashboard`. `KpiCategoryMappingService::store()/deactivate()` dan `QuestionSemanticMappingService::store()/deactivate()` memanggil `forgetTag('analytics-dashboard')` setelah berhasil menyimpan perubahan, sehingga perubahan mapping langsung terlihat di dashboard tanpa menunggu TTL habis.
 
 ---
 
@@ -307,6 +401,22 @@ php artisan schedule:work
 
 ---
 
+### Queue Worker — WAJIB untuk auto-trigger ETL
+
+Sejak fitur pemetaan semantik dinamis ada, menyimpan/menonaktifkan mapping di **Langkah 1** (`question_semantic_mapping`) otomatis men-trigger ETL penuh (`force: true`, menata ulang SEMUA jawaban historis, bukan cuma respons baru — lihat `App\Jobs\RunEtlJob`) lewat queue job, supaya endpoint simpan mapping tetap cepat dan tidak menggantung.
+
+`QUEUE_CONNECTION=database` (bukan `sync`) — job ini **tidak akan pernah diproses** tanpa worker yang berjalan:
+
+```bash
+php artisan queue:work
+```
+
+Jalankan di terminal terpisah selama development. Tanpa ini, status ETL di UI ("Pemetaan Data Pertanyaan") akan tetap `queued` selamanya setelah simpan mapping. Di produksi, jalankan lewat process manager (mis. Supervisor) supaya worker otomatis restart kalau crash.
+
+Status tiap eksekusi ETL (manual maupun auto-trigger) tercatat di `tracer_oltp.etl_runs` dan bisa dipoll lewat `GET /api/etl-runs/{id}` — inilah yang dipakai FE untuk menampilkan banner "ETL sedang berjalan...".
+
+---
+
 ## Konfigurasi `.env`
 
 Berikut adalah **semua variabel yang wajib diisi** untuk menjalankan sistem. Salin ke `.env` dan sesuaikan nilainya.
@@ -363,7 +473,9 @@ BPS_API_KEY=
 # ── Laravel Defaults (boleh dibiarkan) ────────────────────────
 DB_CONNECTION=oltp
 SESSION_DRIVER=array
-QUEUE_CONNECTION=sync
+# database (BUKAN sync) -- auto-trigger ETL (RunEtlJob) jalan lewat queue job,
+# WAJIB ada `php artisan queue:work` berjalan, lihat bagian Queue Worker di atas.
+QUEUE_CONNECTION=database
 LOG_CHANNEL=stack
 LOG_LEVEL=debug
 ```

@@ -34,6 +34,6 @@ class FilterMetaService
                 jurusan:    $this->repo->getJurusan(),
                 prodi:      $this->repo->getProdi(),
             );
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
     }
 }

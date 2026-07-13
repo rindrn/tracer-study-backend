@@ -28,51 +28,54 @@ use Illuminate\Support\Facades\DB;
 class OltpExtractRepository
 {
     /**
-     * Whitelist question_code yang benar-benar dipetakan ke OLAP.
-     * Field identitas (NIM, nama, email, dst) sengaja TIDAK termasuk --
-     * data alumni diambil dari alumni_profiles via alumni_id, bukan dari
-     * jawaban kuesioner.
+     * Whitelist question_code yang benar-benar dipetakan ke OLAP -- DULU
+     * hardcode const RELEVANT_QUESTION_CODES, SEKARANG dibaca dinamis dari
+     * tracer_oltp.question_semantic_mapping (lihat getRelevantQuestionCodes()
+     * di bawah). Field identitas (NIM, nama, email, dst) sengaja TIDAK
+     * pernah termasuk -- data alumni diambil dari alumni_profiles via
+     * alumni_id, bukan dari jawaban kuesioner.
      *
-     * Per kategori (lihat AlumniFactBuilderService untuk detail pemakaian):
-     *   - f8       : status alumni (dim_status_alumni)
-     *   - f14      : kesesuaian BIDANG studi dengan pekerjaan (dim_kesesuaian_bidang)
-     *               opsi: Sangat Erat, Erat, Cukup Erat, Kurang Erat, Tidak Sama Sekali
-     *   - f15      : kesesuaian LEVEL/tingkat pendidikan dengan pekerjaan (dim_kesesuaian_level)
-     *               opsi: Setingkat Lebih Tinggi, Tingkat yang Sama, Setingkat Lebih
-     *               Rendah, Tidak Perlu Pendidikan Tinggi -- INDEPENDEN dari f14,
-     *               BUKAN turunan/FK darinya (koreksi atas asumsi awal yang salah)
-     *   - f18a     : sumber biaya studi lanjut (dim_studi_lanjut.sumber_biaya, lookup option)
-     *   - f18b     : perguruan tinggi studi lanjut (dim_studi_lanjut.perguruan_tinggi)
-     *   - f18c     : program studi studi lanjut (dim_studi_lanjut.program_studi)
-     *   - f302     : bulan sebelum lulus mulai cari kerja (fact_tracer_study.bulan_sebelum_lulus)
-     *   - f502     : masa tunggu kerja (fact_tracer_study.masa_tunggu_bekerja)
-     *   - f505     : take home pay (fact_tracer_study.take_home_pay)
-     *   - f5a1     : provinsi tempat kerja
-     *   - f5a2     : kota tempat kerja
-     *   - f5b      : nama perusahaan (dim_perusahaan)
-     *   - f5c      : jabatan wirausaha (dim_wirausaha)
-     *   - f5d      : tingkat instansi (dim_perusahaan & dim_wirausaha)
-     *   - f1101    : jenis perusahaan (dim_perusahaan)
-     *   - f1761-f1774 : kompetensi A/B (fact_range_evaluasi, via dim_indikator_evaluasi)
-     *   - f21-f27     : metode pembelajaran (fact_range_evaluasi)
-     *   - f1601-f1613 : alasan kerja tidak sesuai (fact_multi_select)
-     *
-     * Daftar ini bisa diperluas seiring KPI baru ditambahkan -- jadikan
-     * satu sumber kebenaran tunggal supaya tidak ada whitelist ganda
-     * yang bisa saling tidak sinkron.
+     * Di-memoize di sini (bukan di-query ulang tiap kali dipanggil) supaya
+     * ke-4 call site (getAnswersForResponses/getOptionsForQuestionnaire/
+     * getQuestionMetaForQuestionnaire/getAllIndikatorEvaluasiCandidates)
+     * tetap hanya menghasilkan PALING BANYAK satu query DISTINCT tambahan
+     * per instance repository -- TIDAK PERNAH di dalam loop per-alumni,
+     * sama semangatnya dengan requirement "computed ONCE" di kontrak.
      */
-    public const RELEVANT_QUESTION_CODES = [
-        'f8', 'f14', 'f15', 'f18a', 'f18b', 'f18c', 'f302', 'f502', 'f505', 'f5a1', 'f5a2', 'f5b', 'f5c', 'f5d', 'f1101', 'f1201',
-        'f1761', 'f1762', 'f1763', 'f1764', 'f1765', 'f1766', 'f1767', 'f1768',
-        'f1769', 'f1770', 'f1771', 'f1772', 'f1773', 'f1774',
-        'f21', 'f22', 'f23', 'f24', 'f25', 'f26', 'f27',
-        'f1601', 'f1602', 'f1603', 'f1604', 'f1605', 'f1606', 'f1607', 'f1608',
-        'f1609', 'f1610', 'f1611', 'f1612', 'f1613',
-    ];
+    private ?array $relevantQuestionCodesCache = null;
 
     private function oltp(): \Illuminate\Database\Connection
     {
         return DB::connection('oltp');
+    }
+
+    /**
+     * Union dua sumber:
+     *   1. question_code AKTIF di question_semantic_mapping -- sumber
+     *      kebenaran utama sekarang, mencakup role narrow MAUPUN wide
+     *      (kompetensi/metode/alasan semuanya sudah termapping, lihat
+     *      003_semantic_mapping_seed.sql).
+     *   2. kode_field yang SUDAH tercatat di public.dim_indikator_evaluasi
+     *      (lintas koneksi ke 'olap' -- fisik satu Postgres yang sama,
+     *      lihat config/database.php) -- jaring pengaman supaya kalau
+     *      suatu saat mapping wide-grain dinonaktifkan tanpa sengaja, ETL
+     *      tidak langsung berhenti menarik jawaban untuk kode yang dim-nya
+     *      sudah established dari run-run sebelumnya.
+     */
+    public function getRelevantQuestionCodes(): array
+    {
+        if ($this->relevantQuestionCodesCache !== null) {
+            return $this->relevantQuestionCodesCache;
+        }
+
+        $mapped = $this->oltp()->table('question_semantic_mapping')
+            ->where('is_active', true)
+            ->distinct()
+            ->pluck('question_code');
+
+        $impliedByIndikator = DB::connection('olap')->table('dim_indikator_evaluasi')->pluck('kode_field');
+
+        return $this->relevantQuestionCodesCache = $mapped->merge($impliedByIndikator)->unique()->values()->all();
     }
 
     /**
@@ -112,7 +115,7 @@ class OltpExtractRepository
         return $this->oltp()->table('response_answers')
             ->select(['id', 'response_id', 'question_code', 'answer_text'])
             ->whereIn('response_id', $responseIds)
-            ->whereIn('question_code', self::RELEVANT_QUESTION_CODES)
+            ->whereIn('question_code', $this->getRelevantQuestionCodes())
             ->orderBy('response_id')
             ->get();
     }
@@ -127,7 +130,7 @@ class OltpExtractRepository
         return $this->oltp()->table('questionnaire_options as qo')
             ->join('questionnaire_questions as qq', 'qq.id', '=', 'qo.question_id')
             ->where('qq.questionnaire_id', $questionnaireId)
-            ->whereIn('qq.code', self::RELEVANT_QUESTION_CODES)
+            ->whereIn('qq.code', $this->getRelevantQuestionCodes())
             ->select(['qq.code as question_code', 'qo.option_code', 'qo.option_label'])
             ->get();
     }
@@ -140,7 +143,7 @@ class OltpExtractRepository
     {
         return $this->oltp()->table('questionnaire_questions')
             ->where('questionnaire_id', $questionnaireId)
-            ->whereIn('code', self::RELEVANT_QUESTION_CODES)
+            ->whereIn('code', $this->getRelevantQuestionCodes())
             ->select(['code as question_code', 'question_type', 'metadata'])
             ->get();
     }
@@ -148,14 +151,14 @@ class OltpExtractRepository
     /**
      * Sumber dim_indikator_evaluasi: pertanyaan question_type IN
      * (boolean, number) yang relevan (otomatis subset dari whitelist
-     * karena f1601-f1613, f1761-f1774, f21-f27 semua sudah ada di
-     * RELEVANT_QUESTION_CODES).
+     * dinamis karena f1601-f1613, f1761-f1774, f21-f27 semua sudah
+     * termapping ke role wide-grain di question_semantic_mapping).
      */
     public function getAllIndikatorEvaluasiCandidates(): Collection
     {
         return $this->oltp()->table('questionnaire_questions')
             ->whereIn('question_type', ['boolean', 'number'])
-            ->whereIn('code', self::RELEVANT_QUESTION_CODES)
+            ->whereIn('code', $this->getRelevantQuestionCodes())
             ->select(['code as question_code', 'question_text', 'question_type', 'metadata'])
             ->get();
     }

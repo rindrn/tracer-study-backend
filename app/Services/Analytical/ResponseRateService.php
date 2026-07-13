@@ -53,7 +53,7 @@ class ResponseRateService
             });
 
             return $this->applySort($data, $sort)->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new ResponseRateBarDTO(
             data:    $data,
@@ -84,7 +84,7 @@ class ResponseRateService
                 ],
                 'total' => $total,
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new ResponseRatePieDTO(
             data:    $cached['data'],
@@ -121,7 +121,7 @@ class ResponseRateService
                     ],
                 ];
             })->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new ResponseRateTrendDTO(
             data:    $data,

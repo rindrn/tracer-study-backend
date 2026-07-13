@@ -19,6 +19,7 @@ class LamRepository
         if (in_array('versions', $include)) {
             $versions = DB::connection('oltp')
                 ->table('lam_versions')
+                ->selectRaw('lam_versions.*, (LEAD(year) OVER (PARTITION BY lam_id ORDER BY year) - 1) as year_end')
                 ->whereIn('lam_id', $lamIds)
                 ->orderBy('year')
                 ->get();
@@ -88,13 +89,27 @@ class LamRepository
 
                 // Format: grouped per indicator
                 $lam->thresholds = collect($raw)->map(function ($levels, $indicatorId) {
-                    $first = collect($levels)->first();
+                    $first      = collect($levels)->first();
+                    $paramValue = $first->param_value ?? null;
+
+                    // Sama seperti ThresholdService::interpolateName() — vw_thresholds_complete
+                    // sudah bawa param_value, tapi belum ada yang memakainya di jalur GET /lams ini.
+                    $name = $first->indicator_name;
+                    if ($paramValue !== null && str_contains($name, '{value}')) {
+                        $formatted = rtrim(rtrim(number_format((float) $paramValue, 2, '.', ''), '0'), '.');
+                        $name = str_replace('{value}', $formatted, $name);
+                    }
+
                     return [
-                        'indicator_id'   => (int) $indicatorId,
-                        'indicator_key'  => $first->indicator_key,
-                        'indicator_name' => $first->indicator_name,
-                        'unit'           => $first->indicator_unit,
-                        'operator'       => $first->indicator_operator,
+                        'indicator_id'          => (int) $indicatorId,
+                        'indicator_key'         => $first->indicator_key,
+                        'indicator_name'        => $name,
+                        'unit'                  => $first->indicator_unit,
+                        'operator'              => $first->indicator_operator,
+                        'dynamic_param'         => $first->dynamic_param_unit
+                            ? ['value' => $paramValue !== null ? (float) $paramValue : null, 'unit' => $first->dynamic_param_unit]
+                            : null,
+                        'is_system_calculated'  => (bool) $first->is_system_calculated,
                         'baik'   => isset($levels['baik'])   ? ['threshold_id' => $levels['baik']->threshold_id,   'value' => (float) $levels['baik']->threshold_value]   : null,
                         'unggul' => isset($levels['unggul']) ? ['threshold_id' => $levels['unggul']->threshold_id, 'value' => (float) $levels['unggul']->threshold_value] : null,
                     ];

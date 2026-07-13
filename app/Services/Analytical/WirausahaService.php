@@ -61,7 +61,7 @@ class WirausahaService
                     'avg_masa_tunggu_wirausaha' => round($r['avg_masa_tunggu_wirausaha'], 1),
                 ];
             })->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new WirausahaBarDTO(
             data:    $data,
@@ -116,7 +116,7 @@ class WirausahaService
                 'sebaranKota' => $kotaRaw->values()->toArray(),
                 'total'       => $total,
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new WirausahaPieDTO(
             posisi:      $cached['posisi'],
@@ -221,7 +221,7 @@ class WirausahaService
             }
 
             return ['chart' => $chart, 'prodiList' => array_values(array_unique($prodiList))];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new WirausahaBandingkanDTO(
             chart:     $cached['chart'],

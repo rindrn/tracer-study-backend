@@ -14,10 +14,19 @@ class MasaTungguService
     use WithCache;
 
     private const TTL = 3600;
+    /** Ambang default (dulu hardcode di FactTracerStudy.js) -- dipakai kalau FE tidak kirim batas_cepat_bulan. */
+    private const BATAS_CEPAT_DEFAULT = 6.0;
 
     public function __construct(
         private readonly MasaTungguRepository $repo,
     ) {}
+
+    private function batasCepat(array $params): float
+    {
+        return isset($params['batas_cepat_bulan']) && $params['batas_cepat_bulan'] !== ''
+            ? (float) $params['batas_cepat_bulan']
+            : self::BATAS_CEPAT_DEFAULT;
+    }
 
     public function getBar(array $params): MasaTungguBarDTO
     {
@@ -30,6 +39,7 @@ class MasaTungguService
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
+                batasCepatBulan: $this->batasCepat($params),
             )->map(function ($r) {
                 $pctCepat = $r['count_terserap'] > 0
                     ? round($r['count_masa_tunggu_cepat'] / $r['count_terserap'] * 100, 1)
@@ -47,7 +57,7 @@ class MasaTungguService
                     'avg_masa_tunggu_bekerja' => $r['avg_masa_tunggu_bekerja'],
                 ];
             })->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new MasaTungguBarDTO(
             data:    $data,
@@ -77,7 +87,7 @@ class MasaTungguService
                 'min_masa_tunggu_bekerja'    => $r['min_masa_tunggu_bekerja'],
                 'max_masa_tunggu_bekerja'    => $r['max_masa_tunggu_bekerja'],
             ])->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new MasaTungguDistribusiDTO(
             data:    $data,
@@ -100,8 +110,9 @@ class MasaTungguService
                 jurusan:        $params['jurusan']         ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
+                batasCepatBulan: $this->batasCepat($params),
             );
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new MasaTungguBandingkanDTO(
             data:      $cached['data'],
@@ -128,6 +139,7 @@ class MasaTungguService
             search:         $params['search']          ?? null,
             page:           $page,
             perPage:        $perPage,
+            batasCepatBulan: $this->batasCepat($params),
         );
 
         return new MasaTungguDrillDownDTO(

@@ -25,6 +25,9 @@ class MasaTungguController extends Controller
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
+            // Ambang dinamis (dulu hardcode 6 bulan) -- dikirim FE dari useLamFilter's
+            // dynamicParam.value (indikator employment_time), default 6 kalau kosong.
+            'batas_cepat_bulan' => 'nullable|numeric|min:0.1|max:60',
         ]);
         $p = $this->scopedParams($request);
  
@@ -60,7 +63,11 @@ class MasaTungguController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'rentang'         => 'required|string|in:0-3,3-6,>6',
+            // 'cepat' -- lihat catatan MasaTungguRepository::buildRentangFilters():
+            // drill-down dari bar "% Lulusan <= N Bulan" HARUS pakai ini (bukan
+            // '0-3' yang dulu di-hardcode di FE), supaya jumlah baris cocok
+            // dengan angka cepat di bar saat ambang dinamis > 3 bulan.
+            'rentang'         => 'required|string|in:cepat,0-3,3-6,>6',
             'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
@@ -69,6 +76,7 @@ class MasaTungguController extends Controller
             'search'          => 'nullable|string|max:100',
             'page'            => 'nullable|integer|min:1',
             'per_page'        => 'nullable|integer|min:5|max:100',
+            'batas_cepat_bulan' => 'nullable|numeric|min:0.1|max:60',
         ]);
         $p = $this->scopedParams($request);
  
@@ -90,6 +98,7 @@ class MasaTungguController extends Controller
             'jurusan'         => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
+            'batas_cepat_bulan' => 'nullable|numeric|min:0.1|max:60',
         ]);
         $p = $this->scopedParams($request);
  

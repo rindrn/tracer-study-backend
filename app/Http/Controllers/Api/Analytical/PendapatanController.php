@@ -82,6 +82,9 @@ class PendapatanController extends Controller
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'minggu_snapshot' => 'nullable|string|max:10',
+            // Ambang dinamis (dulu hardcode 1.2x) -- dikirim FE dari useLamFilter's
+            // dynamicParam.value (indikator salary_above_ump), default 1.2 kalau kosong.
+            'ambang_ump_multiplier' => 'nullable|numeric|min:0.1|max:10',
         ]);
         $p = $this->scopedParams($request);
  
@@ -133,6 +136,9 @@ class PendapatanController extends Controller
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'minggu_snapshot' => 'nullable|string|max:10',
+            // Ambang dinamis (dulu hardcode 1.2x) -- dikirim FE dari useLamFilter's
+            // dynamicParam.value (indikator salary_above_ump), default 1.2 kalau kosong.
+            'ambang_ump_multiplier' => 'nullable|numeric|min:0.1|max:10',
         ]);
         $p = $this->scopedParams($request);
  
@@ -198,9 +204,10 @@ class PendapatanController extends Controller
             'search'          => 'nullable|string|max:100',
             'page'            => 'nullable|integer|min:1',
             'per_page'        => 'nullable|integer|min:5|max:100',
+            'ambang_ump_multiplier' => 'nullable|numeric|min:0.1|max:10',
         ]);
         $p = $this->scopedParams($request);
- 
+
         if (empty($p['segmen_ump']) && empty($p['tahun_lulus'])) {
             return response()->json([
                 'success' => false,
@@ -264,6 +271,9 @@ class PendapatanController extends Controller
             'jurusan'         => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
+            // Ambang dinamis (dulu hardcode 1.2x) -- dikirim FE dari useLamFilter's
+            // dynamicParam.value (indikator salary_above_ump), default 1.2 kalau kosong.
+            'ambang_ump_multiplier' => 'nullable|numeric|min:0.1|max:10',
         ]);
         $p = $this->scopedParams($request);
  

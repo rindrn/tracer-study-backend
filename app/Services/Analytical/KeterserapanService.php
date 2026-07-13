@@ -7,6 +7,7 @@ use App\DTOs\Analytical\Keterserapan\KeterserapanPieDTO;
 use App\DTOs\Analytical\Keterserapan\KeterserapanDrillDownDTO;
 use App\DTOs\Analytical\Keterserapan\KeterserapanBandingkanDTO;
 use App\Repositories\Analytical\KeterserapanRepository;
+use App\Repositories\Config\KpiCategoryMappingRepository;
 use App\Traits\WithCache;
 use Illuminate\Support\Collection;
 
@@ -30,17 +31,30 @@ class KeterserapanService
 
     private const TTL = 3600;
 
-    private const STATUS_TERSERAP = [
-        'Bekerja (full time / part time)',
-        'Wiraswasta',
-        'Melanjutkan Pendidikan',
-        'Melanjutkan pendidikan sambil bekerja',
-        'Melanjutkan pendidikan sambil wiraswasta',
-    ];
+    /**
+     * Dulu hardcode const STATUS_TERSERAP -- SEKARANG dibaca dinamis dari
+     * public.kpi_category_mapping (semantic_role='status_pekerjaan',
+     * digunakan_oleh='iku2_keterserapan', kpi_category='terserap'). Cache
+     * di memory per instance service (short-lived per request), TIDAK
+     * pakai Redis di sini -- data ini sudah dilindungi TTL cache di level
+     * getBar()/getPie() dkk, memoize sekali per request sudah cukup.
+     */
+    private ?array $statusTerserapCache = null;
 
     public function __construct(
         private readonly KeterserapanRepository $repo,
+        private readonly KpiCategoryMappingRepository $kpiMappingRepo,
     ) {}
+
+    /** @return string[] label status yang termasuk kategori "terserap" (IKU 2 Kemendikbud). */
+    private function statusTerserap(): array
+    {
+        return $this->statusTerserapCache ??= $this->kpiMappingRepo->optionLabelsFor(
+            'status_pekerjaan',
+            'iku2_keterserapan',
+            'terserap'
+        );
+    }
 
     // ── BAR ───────────────────────────────────────────────────────
 
@@ -60,13 +74,13 @@ class KeterserapanService
                 'rows'           => $this->pivotKeterserapanPerTahun($raw),
                 'availableTahun' => $this->repo->getAvailableTahunLulus(),
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KeterserapanBarDTO(
             rows:           $cached['rows'],
             availableTahun: $cached['availableTahun'],
             filters:        $this->activeFilters($params, ['jenjang', 'jurusan', 'nama_prodi', 'minggu_snapshot']),
-            statusTerserap: self::STATUS_TERSERAP,
+            statusTerserap: $this->statusTerserap(),
         );
     }
 
@@ -94,7 +108,7 @@ class KeterserapanService
                 ])->values()->toArray(),
                 'total' => $total,
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KeterserapanPieDTO(
             slices:  $cached['slices'],
@@ -121,7 +135,7 @@ class KeterserapanService
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KeterserapanBandingkanDTO(
             chart:     $cached['chart'],
@@ -204,7 +218,7 @@ class KeterserapanService
     {
         return match ($status) {
             null, '', 'semua' => null,
-            'terserap'        => self::STATUS_TERSERAP,
+            'terserap'        => $this->statusTerserap(),
             'tidak'           => 'Belum memungkinkan bekerja',
             default           => $status,
         };
@@ -220,7 +234,7 @@ class KeterserapanService
                 'status'   => $r['status'],
                 'count'    => $r['count'],
                 'pct'      => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
-                'kategori' => in_array($r['status'], self::STATUS_TERSERAP, true) ? 'terserap' : 'tidak',
+                'kategori' => in_array($r['status'], $this->statusTerserap(), true) ? 'terserap' : 'tidak',
             ])->sortBy('status')->values()->toArray();
 
             $countTerserap = collect($breakdown)->where('kategori', 'terserap')->sum('count');

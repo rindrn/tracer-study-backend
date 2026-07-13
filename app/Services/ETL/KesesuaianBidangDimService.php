@@ -4,52 +4,65 @@ namespace App\Services\ETL;
 
 use App\Repositories\ETL\OlapLoadRepository;
 use App\Repositories\ETL\OltpExtractRepository;
+use App\Repositories\ETL\SemanticMappingRepository;
+use Illuminate\Support\Facades\Log;
 
 /**
  * ETL untuk dim_kesesuaian_bidang. SCD Type 1 (overwrite + append
- * pattern) -- SAMA PERSIS pola StatusAlumniDimService, BUKAN hardcode
- * mapping manual seperti versi sebelumnya.
+ * pattern) -- SAMA PERSIS pola StatusAlumniDimService.
  *
- * Business key id_kesesuaian_bidang = "{questionnaire_id}:f14:{option_code}",
- * dipisah PER QUESTIONNAIRE (keputusan eksplisit user, sama alasannya
- * dengan dim_status_alumni): jika questionnaire baru mengubah skala
- * (misal jadi 1-7) atau redaksi label f14, opsi itu otomatis MASUK
- * sebagai baris baru -- BUKAN dianggap "tidak dikenal" lalu jatuh ke
- * sentinel "Tidak Ada Data". Ini memperbaiki risiko kehilangan data
- * alumni secara diam-diam yang melekat di pendekatan hardcode
- * sebelumnya (pendekatan label-as-business-key yang sudah DIHAPUS).
+ * Business key id_kesesuaian_bidang = "{questionnaire_id}:{question_code}:{option_code}",
+ * dengan question_code SEKARANG di-resolve dinamis dari semantic_role
+ * 'relevansi_bidang' via SemanticMappingRepository -- BUKAN hardcode 'f14'
+ * lagi (const QUESTION_CODE lama sudah DIHAPUS). Tetap dipisah PER
+ * QUESTIONNAIRE (keputusan eksplisit user, sudah ada sebelum perubahan
+ * ini): jika questionnaire baru mengubah skala atau redaksi label opsi,
+ * opsi itu otomatis MASUK sebagai baris baru -- BUKAN dianggap "tidak
+ * dikenal" lalu jatuh ke sentinel "Tidak Ada Data".
  *
  * Dijalankan SEBELUM fact dibangun, sama seperti StatusAlumniDimService,
- * supaya semua opsi f14 yang relevan di batch ini sudah ter-sync ke
- * dim sebelum AlumniFactBuilderService butuh resolve SK-nya.
+ * supaya semua opsi yang relevan di batch ini sudah ter-sync ke dim
+ * sebelum AlumniFactBuilderService butuh resolve SK-nya.
  */
 class KesesuaianBidangDimService
 {
-    private const QUESTION_CODE = 'f14';
+    private const ROLE_KEY = 'relevansi_bidang';
 
     public function __construct(
         private readonly OltpExtractRepository $oltpRepo,
         private readonly OlapLoadRepository $olapRepo,
+        private readonly SemanticMappingRepository $semanticRepo,
     ) {}
 
     /**
      * @param int[] $questionnaireIds questionnaire_id yang relevan di batch ini
      * @return array{processed:int, inserted:int, updated:int}
      */
-    public function sync(array $questionnaireIds): array
+    public function sync(array $questionnaireIds, ?string $etlRunId = null): array
     {
         $processed = 0;
         $inserted = 0;
         $updated = 0;
 
         foreach (array_unique($questionnaireIds) as $questionnaireId) {
+            $questionCode = $this->semanticRepo->questionCodeFor($questionnaireId, self::ROLE_KEY);
+
+            if ($questionCode === null) {
+                Log::warning('SemanticMapping: tidak ada question_code aktif untuk role narrow, questionnaire dilewati.', [
+                    'role'             => self::ROLE_KEY,
+                    'questionnaire_id' => $questionnaireId,
+                    'etl_run_id'       => $etlRunId,
+                ]);
+                continue;
+            }
+
             $options = $this->oltpRepo->getOptionsForQuestionnaire($questionnaireId)
-                ->where('question_code', self::QUESTION_CODE);
+                ->where('question_code', $questionCode);
 
             foreach ($options as $opt) {
                 $processed++;
 
-                $idKesesuaianBidang = $this->deriveBusinessKey($questionnaireId, $opt->option_code);
+                $idKesesuaianBidang = $this->deriveBusinessKey($questionnaireId, $questionCode, $opt->option_code);
                 $existingSk = $this->olapRepo->getKesesuaianBidangSk($idKesesuaianBidang);
 
                 $this->olapRepo->upsertKesesuaianBidang($idKesesuaianBidang, $opt->option_label);
@@ -61,18 +74,18 @@ class KesesuaianBidangDimService
     }
 
     /**
-     * Resolve id_kesesuaian_bidang untuk satu jawaban f14 mentah, dipakai
-     * oleh AlumniFactBuilderService saat membangun fact row. $rawOptionCode
-     * adalah option_code MENTAH (sebelum di-resolve ke label), sama
-     * pola resolveIdStatusAlumni().
+     * Resolve id_kesesuaian_bidang untuk satu jawaban mentah, dipakai
+     * AlumniFactBuilderService. $questionCode adalah kode AKTIF hasil
+     * resolve role 'relevansi_bidang' untuk questionnaire ini (caller
+     * sudah resolve lewat SemanticMappingRepository::questionCodeFor()).
      */
-    public function resolveIdKesesuaianBidang(int $questionnaireId, string $rawOptionCode): string
+    public function resolveIdKesesuaianBidang(int $questionnaireId, string $questionCode, string $rawOptionCode): string
     {
-        return $this->deriveBusinessKey($questionnaireId, $rawOptionCode);
+        return $this->deriveBusinessKey($questionnaireId, $questionCode, $rawOptionCode);
     }
 
-    private function deriveBusinessKey(int $questionnaireId, string $optionCode): string
+    private function deriveBusinessKey(int $questionnaireId, string $questionCode, string $optionCode): string
     {
-        return "{$questionnaireId}:" . self::QUESTION_CODE . ":{$optionCode}";
+        return "{$questionnaireId}:{$questionCode}:{$optionCode}";
     }
 }

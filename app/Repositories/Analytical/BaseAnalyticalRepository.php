@@ -53,8 +53,24 @@ abstract class BaseAnalyticalRepository
         }
 
         if ($mingguSnapshot !== null && $mingguSnapshot !== '') {
+            // Filter by DimWaktu.id_waktu (UNIK per snapshot run), BUKAN
+            // DimWaktu.minggu_snapshot (teks, mis. "29") -- nama parameter
+            // ($mingguSnapshot / query string minggu_snapshot) sengaja TIDAK
+            // diubah di seluruh codebase (FE, controller, DTO) supaya diff
+            // kecil, tapi NILAI yang mengalir lewat sini sekarang adalah
+            // id_waktu (lihat FilterMetaRepository::getSnapshot(), yang
+            // mengisi field "value" dropdown dengan id_waktu, bukan lagi
+            // minggu_snapshot mentah).
+            //
+            // Alasan: dua ETL run di minggu kalender yang SAMA (rutin terjadi
+            // sekarang karena Langkah 1 mapping auto-trigger ETL kapan saja,
+            // bukan cuma terjadwal mingguan) menghasilkan DUA baris dim_waktu
+            // dengan minggu_snapshot yang IDENTIK -- filter berbasis teks
+            // akan mencocokkan KEDUANYA sekaligus, meng-inflate/mengacaukan
+            // semua angka agregat. id_waktu adalah primary key, selalu unik
+            // per run, tidak punya ambiguitas ini.
             $filters[] = [
-                'member'   => 'DimWaktu.minggu_snapshot',
+                'member'   => 'DimWaktu.id_waktu',
                 'operator' => 'equals',
                 'values'   => [$mingguSnapshot],
             ];

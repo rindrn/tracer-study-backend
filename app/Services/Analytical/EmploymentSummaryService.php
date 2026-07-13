@@ -147,7 +147,7 @@ class EmploymentSummaryService
                 'avg_pendapatan'    => $this->buildPendapatanCard($pendapatanRaw, $tl),
                 'level_nasional'    => $this->buildLevelNasionalCard($tingkatRaw),
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new EmploymentSummaryDTO(
             cards:   $cached,
