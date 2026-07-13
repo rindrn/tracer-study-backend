@@ -16,8 +16,6 @@
 9. [Ambang threshold dinamis: masa tunggu & UMP mengikuti LAM terpilih](#9-ambang-threshold-dinamis)
 10. [Yang belum selesai](#10-yang-belum-selesai)
 
----
-
 ## 1. Latar belakang
 
 Sistem tracer study ini menggunakan arsitektur OLTP → ETL → OLAP: jawaban kuesioner alumni disimpan sebagai EAV (`question_code` + `answer_text`) di `tracer_oltp.response_answers`, lalu proses ETL memindahkan subset yang relevan ke star schema OLAP (`fact_tracer_study`, `dim_status_alumni`, dst) yang dibaca Cube.js untuk dashboard.
@@ -102,7 +100,6 @@ LIMIT 1
 `dw.tanggal_refresh` adalah tanggal snapshot milik baris fact itu sendiri (`dim_waktu` via `${CUBE}.id_waktu`) — jadi tiap baris fact dicocokkan ke definisi yang **efektif pada tanggalnya sendiri**, bukan definisi terbaru secara global. Snapshot lama otomatis terkunci ke definisi lama; snapshot baru (dan snapshot mendatang) otomatis ikut definisi terbaru karena tanggalnya juga baru.
 
 **Jebakan migrasi yang baru ketahuan lewat verifikasi langsung, bukan lewat membaca kode** (lihat §8 untuk kronologi lengkap): baseline seed pertama sempat memakai `effective_date = CURRENT_DATE` (tanggal seed dijalankan). Akibatnya, snapshot fact yang **sudah ada sebelum seed dijalankan** terlihat seolah "belum punya kategori apa pun" di bawah aturan point-in-time — kebalikan dari yang diinginkan. Baseline harus di-backdate ke tanggal yang pasti lebih lama dari data historis manapun (`2020-01-01`, merepresentasikan "definisi ini sudah berlaku sejak sebelum sistem ini ada"), sementara perubahan admin yang genuin sesudahnya tetap memakai tanggal aslinya.
-
 ---
 
 ## 3. Arsitektur akhir
@@ -234,6 +231,7 @@ Kedelapan angka identik — perubahan format business key (§5, `id_status_alumn
 | `count_sesuai_bidang` (bagian relevansi) | 4.225 | 1.492 | Snapshot baru mengikuti kategori "Sangat Erat" yang baru diubah hari ini; snapshot lama tetap pakai definisi lama |
 | Jumlah baris fact per snapshot | 8.367 | 8.367 | Tidak ada baris lama yang hilang/tertimpa |
 
+
 ---
 
 ## 8. Bug yang ditemukan selama proses
@@ -336,6 +334,7 @@ Dicatat apa adanya sebagai daftar kerja lanjutan:
 
 - Label tampilan untuk `digunakan_oleh` (mis. `"iku2_keterserapan"` → `"IKU 2 — Keterserapan"`) masih kamus statis di FE, belum dari API.
 - Kolom "Dikelompokkan Oleh" di tabel audit Langkah 2 belum ada di skema `kpi_category_mapping` — sengaja tidak ditampilkan di UI daripada memalsukan nilai.
+
 - **`WirausahaRepository`, `KesesuaianRepository`, `SebaranInstansiRepository` (Laravel, sisi Analytical) masih hardcode `status_alumni_sk` literal** (`= '3'` untuk wirausaha, `= '1'` untuk bekerja) di 8 lokasi berbeda — pola yang sama persis dengan hardcode yang sudah dibereskan di `FactTracerStudy.js`, tapi belum tersentuh karena letaknya di query builder ad hoc Laravel→Cube.js, bukan di measure Cube.js sendiri. Ini LEBIH rapuh dari yang sudah diperbaiki: `status_alumni_sk` adalah surrogate key auto-increment yang menurut catatan di kode ini sendiri "bisa berubah antar-rebuild ETL", bukan `option_code` yang stabil. Rencana perbaikan: dua dimension boolean baru di `FactTracerStudy.js` (`is_bekerja_status`, `is_wirausaha_status`) yang dibangun point-in-time seperti measure lain, plus satu grouping baru (`digunakan_oleh='wirausaha_scope'`) supaya cakupan "wirausaha" (murni vs termasuk yang sambil studi lanjut) jadi bisa dikonfigurasi lewat UI, bukan permanen di kode. Belum dikerjakan.
 
 Sudah selesai (dipindah dari daftar ini):
