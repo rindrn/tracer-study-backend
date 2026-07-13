@@ -57,7 +57,7 @@ class MasaTungguService
                     'avg_masa_tunggu_bekerja' => $r['avg_masa_tunggu_bekerja'],
                 ];
             })->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new MasaTungguBarDTO(
             data:    $data,
@@ -87,7 +87,7 @@ class MasaTungguService
                 'min_masa_tunggu_bekerja'    => $r['min_masa_tunggu_bekerja'],
                 'max_masa_tunggu_bekerja'    => $r['max_masa_tunggu_bekerja'],
             ])->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new MasaTungguDistribusiDTO(
             data:    $data,
@@ -112,7 +112,7 @@ class MasaTungguService
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
                 batasCepatBulan: $this->batasCepat($params),
             );
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new MasaTungguBandingkanDTO(
             data:      $cached['data'],

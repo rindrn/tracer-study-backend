@@ -74,7 +74,7 @@ class KeterserapanService
                 'rows'           => $this->pivotKeterserapanPerTahun($raw),
                 'availableTahun' => $this->repo->getAvailableTahunLulus(),
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KeterserapanBarDTO(
             rows:           $cached['rows'],
@@ -108,7 +108,7 @@ class KeterserapanService
                 ])->values()->toArray(),
                 'total' => $total,
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KeterserapanPieDTO(
             slices:  $cached['slices'],
@@ -135,7 +135,7 @@ class KeterserapanService
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new KeterserapanBandingkanDTO(
             chart:     $cached['chart'],

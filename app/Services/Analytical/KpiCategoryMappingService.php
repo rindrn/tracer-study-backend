@@ -5,6 +5,7 @@ namespace App\Services\Analytical;
 use App\Exceptions\BusinessException;
 use App\Repositories\Config\KpiCategoryMappingRepository;
 use App\Repositories\ETL\SemanticMappingRepository;
+use App\Traits\WithCache;
 use Illuminate\Support\Collection;
 
 /**
@@ -14,6 +15,8 @@ use Illuminate\Support\Collection;
  */
 class KpiCategoryMappingService
 {
+    use WithCache;
+
     public function __construct(
         private readonly KpiCategoryMappingRepository $repo,
         private readonly SemanticMappingRepository $semanticRepo,
@@ -42,6 +45,27 @@ class KpiCategoryMappingService
                     'id'    => $r->kpi_category,
                     'label' => $r->kpi_category_label,
                 ])->values()->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Taksonomi SEMUA role sekaligus, di-group per semantic_role -- dipakai
+     * selector "role yang sudah aktif" di Langkah 1 supaya admin langsung
+     * lihat KPI apa saja yang dipakai tiap role (mis. status_pekerjaan ->
+     * IKU 2 Keterserapan, Masa Tunggu, Kesesuaian Bidang) tanpa perlu tanya
+     * atau menebak istilah digunakan_oleh.
+     *
+     * @return array<array{semantic_role: string, digunakan_oleh: string[]}>
+     */
+    public function taxonomyAllRoles(): array
+    {
+        return $this->repo->taxonomyForAllRoles()
+            ->groupBy('semantic_role')
+            ->map(fn (Collection $rows, string $role) => [
+                'semantic_role'  => $role,
+                'digunakan_oleh' => $rows->pluck('digunakan_oleh')->unique()->values()->all(),
             ])
             ->values()
             ->all();
@@ -94,6 +118,8 @@ class KpiCategoryMappingService
             'mapped_by'             => $userId,
         ]);
 
+        $this->forgetTag('analytics-dashboard');
+
         return (array) $this->repo->find($newId);
     }
 
@@ -105,6 +131,7 @@ class KpiCategoryMappingService
         }
 
         $this->repo->deactivate($id, $userId);
+        $this->forgetTag('analytics-dashboard');
     }
 
     /**

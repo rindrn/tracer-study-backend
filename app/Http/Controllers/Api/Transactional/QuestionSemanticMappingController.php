@@ -20,7 +20,11 @@ class QuestionSemanticMappingController extends Controller
     {
         $request->validate([
             'questionnaire_id' => 'nullable|integer',
-            'is_active'        => 'nullable|boolean',
+            // BUKAN 'boolean' -- lihat catatan di KpiCategoryMappingController::index(),
+            // axios mengirim boolean JS sebagai string "true"/"false" di query string,
+            // rule 'boolean' bawaan Laravel menolaknya (422) walau $request->boolean()
+            // di bawah menafsirkannya dengan benar.
+            'is_active'        => 'nullable|in:0,1,true,false',
         ]);
 
         $questionnaireId = $request->filled('questionnaire_id') ? (int) $request->query('questionnaire_id') : null;
@@ -95,11 +99,12 @@ class QuestionSemanticMappingController extends Controller
     // POST /api/question-semantic-mappings/{id}/deactivate
     public function deactivate(Request $request, int $id): JsonResponse
     {
-        $this->service->deactivate($id, $request->user()?->id);
+        $etlRunId = $this->service->deactivate($id, $request->user()?->id);
 
         return response()->json([
             'success' => true,
             'message' => 'Mapping berhasil dinonaktifkan.',
+            'data'    => ['etl_run_id' => $etlRunId],
         ]);
     }
 }

@@ -14,7 +14,7 @@ class DatabaseSeeder extends Seeder
         // run first. 002/003 are additive-only scripts layered on top, so
         // they must run every time init.sql runs (a fresh import wipes the
         // tables they create, since those tables aren't part of the dump).
-        foreach (['dump/init.sql', 'dump/002_semantic_mapping_schema.sql', 'dump/003_semantic_mapping_seed.sql', 'dump/004_pg_trgm.sql'] as $relative) {
+        foreach (['dump/init.sql', 'dump/002_semantic_mapping_schema.sql', 'dump/003_semantic_mapping_seed.sql', 'dump/004_pg_trgm.sql', 'dump/005_etl_runs_and_queue.sql'] as $relative) {
             $path = database_path($relative);
 
             $command = sprintf(

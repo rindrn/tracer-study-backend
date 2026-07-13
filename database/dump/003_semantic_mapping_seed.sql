@@ -90,7 +90,14 @@ SELECT
   srr.grain,
   CURRENT_DATE,
   true,
-  NULL -- system-seeded baseline, not mapped by a human admin
+  -- Baseline ini "dipetakan" otomatis oleh migrasi, bukan admin manual --
+  -- tapi kolom "Dipetakan Oleh" di UI Data Tersimpan tetap butuh atribusi
+  -- yang bisa dibaca (bukan kosong/NULL selamanya). Diarahkan ke akun
+  -- Pelaksana Tracer Study (head.tracer@test.com) sebagai penanggung jawab
+  -- default baseline -- lookup by email, bukan id literal, supaya tidak
+  -- rapuh kalau urutan insert user berbeda di lingkungan lain. NULL kalau
+  -- akun itu belum ada di lingkungan tsb (mis. seed segar tanpa user seeder).
+  (SELECT id FROM tracer_oltp.users WHERE email = 'head.tracer@test.com' LIMIT 1)
 FROM tracer_oltp.questionnaire_questions qq
 JOIN code_role_map crm ON crm.question_code = qq.code
 JOIN tracer_oltp.semantic_role_registry srr ON srr.role_key = crm.semantic_role

@@ -48,7 +48,7 @@ class PendapatanService
                 'rows'           => $rows->values()->toArray(),
                 'availableTahun' => $rows->pluck('tahun_lulus')->unique()->sort()->values()->toArray(),
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new PendapatanBarDTO(
             rows:           $cached['rows'],
@@ -76,7 +76,7 @@ class PendapatanService
                 'rows'           => $rows->values()->toArray(),
                 'availableTahun' => $rows->pluck('tahun_lulus')->unique()->sort()->values()->toArray(),
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new PendapatanDistribusiDTO(
             rows:           $cached['rows'],
@@ -143,7 +143,7 @@ class PendapatanService
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
                 ambangMultiplier: $this->ambang($params),
             );
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new PendapatanBandingkanDTO(
             chart:     $cached['chart'],

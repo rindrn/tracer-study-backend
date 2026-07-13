@@ -65,6 +65,28 @@ class KpiCategoryMappingRepository
             ->get();
     }
 
+    /**
+     * Sama seperti taxonomyForRole(), tapi untuk SEMUA semantic_role sekaligus
+     * (satu query, bukan N+1) -- dipakai selector "role yang sudah aktif" di
+     * Langkah 1 UI supaya admin langsung lihat KPI apa yang dipakai tiap role
+     * (mis. status_pekerjaan -> IKU 2 Keterserapan) tanpa perlu tahu istilah
+     * digunakan_oleh sebelumnya. Ini yang menjawab kebingungan berulang
+     * "f8 sudah termapping ke status_pekerjaan, tapi saya mau petakan ke
+     * keterserapan" -- keterserapan BUKAN role terpisah, dia salah satu
+     * digunakan_oleh milik status_pekerjaan, dan itu perlu terlihat di sini,
+     * bukan cuma dijelaskan di percakapan.
+     */
+    public function taxonomyForAllRoles(): Collection
+    {
+        return $this->olap()->table('kpi_category_mapping')
+            ->select(['semantic_role', 'digunakan_oleh', 'kpi_category', 'kpi_category_label'])
+            ->distinct()
+            ->orderBy('semantic_role')
+            ->orderBy('digunakan_oleh')
+            ->orderBy('kpi_category')
+            ->get();
+    }
+
     public function find(int $id): ?object
     {
         return $this->olap()->table('kpi_category_mapping')->where('id', $id)->first();

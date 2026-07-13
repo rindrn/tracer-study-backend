@@ -2,7 +2,10 @@
 namespace App\Services\Transactional;
 
 use App\Exceptions\BusinessException;
+use App\Jobs\RunEtlJob;
+use App\Models\Transactional\EtlRun;
 use App\Repositories\ETL\SemanticMappingRepository;
+use App\Traits\WithCache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +18,8 @@ use Illuminate\Support\Facades\DB;
  */
 class QuestionSemanticMappingService
 {
+    use WithCache;
+
     public function __construct(
         private readonly SemanticMappingRepository $repo,
     ) {}
@@ -171,10 +176,13 @@ class QuestionSemanticMappingService
             ]);
         });
 
-        return (array) $this->repo->findMappingById($newId);
+        $this->forgetTag('analytics-dashboard');
+        $etlRunId = $this->triggerEtl('langkah1_mapping_store', $userId);
+
+        return array_merge((array) $this->repo->findMappingById($newId), ['etl_run_id' => $etlRunId]);
     }
 
-    public function deactivate(int $id, ?int $userId): void
+    public function deactivate(int $id, ?int $userId): int
     {
         $row = $this->repo->findMappingById($id);
         if ($row === null) {
@@ -182,6 +190,28 @@ class QuestionSemanticMappingService
         }
 
         $this->repo->deactivateMapping($id, $userId);
+        $this->forgetTag('analytics-dashboard');
+
+        return $this->triggerEtl('langkah1_mapping_deactivate', $userId);
+    }
+
+    /**
+     * Jawaban OLTP yang sudah lama (bukan cuma response baru) perlu ditata
+     * ulang begitu mapping Langkah 1 berubah -- lihat catatan force:true di
+     * RunEtlJob. Dijalankan lewat queue (bukan langsung di request ini)
+     * supaya endpoint mapping tetap cepat; FE poll id yang dikembalikan.
+     */
+    private function triggerEtl(string $reason, ?int $userId): int
+    {
+        $run = EtlRun::create([
+            'status'       => 'queued',
+            'reason'       => $reason,
+            'triggered_by' => $userId,
+        ]);
+
+        RunEtlJob::dispatch($run->id);
+
+        return $run->id;
     }
 
     /**

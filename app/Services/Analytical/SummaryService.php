@@ -100,7 +100,7 @@ class SummaryService
                     'hint'  => 'Follow-up',
                 ],
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new SummaryDTO(
             cards:   $cached,

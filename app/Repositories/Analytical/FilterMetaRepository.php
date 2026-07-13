@@ -49,27 +49,67 @@ class FilterMetaRepository extends BaseAnalyticalRepository
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Semua minggu snapshot yang ada di DW, diurutkan terbaru dulu.
+     * Semua snapshot yang ada di DW, diurutkan terbaru dulu.
      * Dipakai untuk: filter global "Snapshot" yang memilih periode DW.
      *
-     * @return array<array{minggu_snapshot:string, tahun_snapshot:string, label:string}>
+     * NILAI FILTER masih `minggu_snapshot` mentah (TIDAK berubah -- lihat
+     * catatan di bawah), tapi respons sekarang menyertakan tahun_snapshot,
+     * bulan_snapshot, dan tanggal_refresh supaya FE bisa menampilkan label
+     * yang jelas ("2026 · Minggu 26 · Juni · 24 Jun 2026"), bukan cuma
+     * angka minggu mentah seperti sebelumnya.
      *
-     * Field `label` adalah string siap tampil di dropdown FE,
-     * contoh: "W-48 / 2024"
+     * CATATAN PENTING -- BELUM sepenuhnya menyelesaikan potensi ambiguitas:
+     * filter yang benar-benar dipakai (lihat BaseAnalyticalRepository::
+     * buildGlobalFilters()) masih mencocokkan HANYA berdasarkan teks
+     * minggu_snapshot, bukan kombinasi minggu+tahun atau id_waktu unik.
+     * Kalau suatu saat ada 2 snapshot berbeda dengan angka minggu yang SAMA
+     * (lintas tahun, ATAU >1 kali ETL jalan di minggu kalender yang sama --
+     * mis. karena ada perubahan mapping, bukan jadwal mingguan), memilih
+     * salah satu di dropdown akan tetap mencocokkan KEDUANYA di query,
+     * bukan cuma yang dipilih. Memperbaiki ini butuh mengganti filter
+     * member dari DimWaktu.minggu_snapshot ke FactTracerStudy.id_waktu
+     * (satu-satunya identitas snapshot yang benar-benar unik) -- perubahan
+     * yang sengaja TIDAK dilakukan di sini karena mengubah makna parameter
+     * yang sudah dipakai di seluruh dashboard, perlu keputusan terpisah.
+     *
+     * @return array<array{
+     *   value: string,        -- dikirim sebagai minggu_snapshot ke filter (TIDAK berubah)
+     *   tahun_snapshot: string,
+     *   bulan_snapshot: string,
+     *   tanggal_refresh: string,
+     *   label: string         -- siap tampil di dropdown FE
+     * }>
      */
     public function getSnapshot(): array
     {
         return $this->cube->load([
             'dimensions' => [
                 'DimWaktu.minggu_snapshot',
+                'DimWaktu.tahun_snapshot',
+                'DimWaktu.bulan_snapshot',
+                'DimWaktu.tanggal_refresh',
             ],
             'order' => [
-                ['DimWaktu.minggu_snapshot', 'desc'],
+                ['DimWaktu.tanggal_refresh', 'desc'],
             ],
         ])
-        ->map(fn ($r) => $r['DimWaktu.minggu_snapshot'] ?? null)
-        ->unique()
-        ->filter()
+        ->filter(fn ($r) => !empty($r['DimWaktu.minggu_snapshot']))
+        ->unique(fn ($r) => $r['DimWaktu.minggu_snapshot'] . '|' . $r['DimWaktu.tahun_snapshot'] . '|' . $r['DimWaktu.tanggal_refresh'])
+        ->map(function ($r) {
+            $minggu   = $r['DimWaktu.minggu_snapshot'];
+            $tahun    = $r['DimWaktu.tahun_snapshot'] ?? '';
+            $bulan    = $r['DimWaktu.bulan_snapshot'] ?? '';
+            $tanggal  = $r['DimWaktu.tanggal_refresh'] ?? null;
+            $tanggalFormatted = $tanggal ? \Carbon\Carbon::parse($tanggal)->translatedFormat('d M Y') : '';
+
+            return [
+                'value'           => $minggu,
+                'tahun_snapshot'  => $tahun,
+                'bulan_snapshot'  => $bulan,
+                'tanggal_refresh' => $tanggal,
+                'label'           => trim("{$tahun} · Minggu {$minggu} · {$bulan}" . ($tanggalFormatted ? " ({$tanggalFormatted})" : '')),
+            ];
+        })
         ->values()
         ->toArray();
     }

@@ -35,7 +35,7 @@ class MetodePembelajaranService
                 'avg_skor'        => round($r['avg_skor'], 2),
                 'count_responden' => $r['count'],
             ])->values()->toArray();
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new MetodePembelajaranDTO(
             data:    $data,
@@ -79,7 +79,7 @@ class MetodePembelajaranService
             }
 
             return ['data' => $data, 'prodiList' => array_values(array_unique($prodiList))];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new MetodePembelajaranBandingkanDTO(
             data:      $cached['data'],

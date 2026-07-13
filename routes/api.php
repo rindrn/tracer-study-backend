@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Transactional\ProgramController;
 use App\Http\Controllers\Api\Transactional\RefUmpController;
 use App\Http\Controllers\Api\Transactional\SemanticRoleController;
 use App\Http\Controllers\Api\Transactional\QuestionSemanticMappingController;
+use App\Http\Controllers\Api\Transactional\EtlRunController;
 use App\Http\Controllers\Api\Analytical\KpiCategoryMappingController;
 use App\Http\Controllers\Api\Analytical\EtlAnomalyLogController;
 
@@ -144,12 +145,14 @@ Route::middleware("auth:sanctum")->group(function () {
     });
 
     Route::prefix('kpi-category-mappings')->group(function () {
-        Route::get('/',         [KpiCategoryMappingController::class, 'index']);
-        Route::get('formula',   [KpiCategoryMappingController::class, 'formula']);
-        Route::get('taxonomy',  [KpiCategoryMappingController::class, 'taxonomy']);
+        Route::get('/',             [KpiCategoryMappingController::class, 'index']);
+        Route::get('formula',       [KpiCategoryMappingController::class, 'formula']);
+        Route::get('taxonomy-all',  [KpiCategoryMappingController::class, 'taxonomyAll']);
+        Route::get('taxonomy',      [KpiCategoryMappingController::class, 'taxonomy']);
     });
 
     Route::get('etl-anomaly-log', [EtlAnomalyLogController::class, 'index']);
+    Route::get('etl-runs/{id}', [EtlRunController::class, 'show']);
 
     Route::middleware('role:kotc')->group(function () {
         Route::post('question-semantic-mappings',              [QuestionSemanticMappingController::class, 'store']);

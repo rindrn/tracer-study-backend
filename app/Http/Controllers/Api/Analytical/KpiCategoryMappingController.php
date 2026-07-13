@@ -28,8 +28,15 @@ class KpiCategoryMappingController extends Controller
         $request->validate([
             'semantic_role'  => 'nullable|string|max:50',
             'digunakan_oleh' => 'nullable|string|max:50',
-            'is_active'      => 'nullable|boolean',
-            'all'            => 'nullable|boolean',
+            // BUKAN 'boolean' -- rule bawaan Laravel itu HANYA menerima
+            // true/false/0/1/'0'/'1' (in_array strict), sedangkan axios
+            // mengirim boolean JS sebagai literal string "true"/"false" di
+            // query string -- selalu gagal validasi (422) walau ditulis
+            // dengan benar di FE. $request->boolean() di bawah sudah benar
+            // menafsirkan "true"/"false" via filter_var(), jadi celahnya
+            // murni di rule validasi, bukan di logika sesudahnya.
+            'is_active'      => 'nullable|in:0,1,true,false',
+            'all'            => 'nullable|in:0,1,true,false',
         ]);
 
         $isActive = $request->boolean('all')
@@ -54,6 +61,17 @@ class KpiCategoryMappingController extends Controller
         return response()->json([
             'success' => true,
             'data'    => $this->service->taxonomy($request->query('semantic_role')),
+        ]);
+    }
+
+    // GET /api/kpi-category-mappings/taxonomy-all -- semua role sekaligus,
+    // dipakai selector "role yang sudah aktif" di Langkah 1 (lihat catatan
+    // di KpiCategoryMappingService::taxonomyAllRoles()).
+    public function taxonomyAll(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->taxonomyAllRoles(),
         ]);
     }
 

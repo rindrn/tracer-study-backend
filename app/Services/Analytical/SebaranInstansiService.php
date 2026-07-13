@@ -57,7 +57,7 @@ class SebaranInstansiService
                 ])->values()->toArray(),
                 'total' => $total,
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new SebaranInstansiJenisDTO(
             data:    $cached['data'],
@@ -124,7 +124,7 @@ class SebaranInstansiService
             }
 
             return ['data' => $data, 'groupedBar' => $groupedBar];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new SebaranInstansiTingkatDTO(
             data:       $cached['data'],
@@ -193,7 +193,7 @@ class SebaranInstansiService
             }
 
             return ['data' => $data, 'prodiList' => $prodiList];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new SebaranInstansiBandingkanDTO(
             data:      $cached['data'],
@@ -228,7 +228,7 @@ class SebaranInstansiService
                     limit:          $limit,
                 )->values()->toArray(),
             ];
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new SebaranInstansiLokasiDTO(
             topKota:     $cached['topKota'],

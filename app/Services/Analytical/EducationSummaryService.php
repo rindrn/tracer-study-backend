@@ -57,7 +57,7 @@ class EducationSummaryService
                 $this->buildMetodeCards($metodeRaw),
                 $this->buildPembiayaanCards($pembiayaanRaw),
             );
-        }, self::TTL);
+        }, self::TTL, ['analytics-dashboard']);
 
         return new EducationSummaryDTO(
             cards:   $cached,
