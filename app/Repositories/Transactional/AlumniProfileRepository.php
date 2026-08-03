@@ -45,6 +45,7 @@ class AlumniProfileRepository
                 'alumni_profiles.is_active',
                 'alumni_profiles.nik',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.code as program_code',
                 'programs.degree as program_degree',
             )
@@ -73,6 +74,7 @@ class AlumniProfileRepository
             ->select(
                 'alumni_profiles.*',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
             )
             ->where('alumni_profiles.id', $id)
@@ -93,6 +95,7 @@ class AlumniProfileRepository
             ->select(
                 'alumni_profiles.*',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
                 'employment_records.employment_status',
                 'employment_records.waiting_months',
@@ -120,22 +123,20 @@ class AlumniProfileRepository
     }
 
     /**
-     * Sama seperti paginateForAdmin tapi ditambah kolom `has_responded` (0/1)
-     * — menandakan apakah alumni sudah mengisi kuesioner global (kementrian).
-     *
-     * Definisi "sudah mengisi": ada minimal 1 row di `responses` untuk alumni tsb
-     * dengan questionnaire_id milik kuesioner global published (program_id NULL).
+     * Sama seperti paginateForAdmin tapi ditambah kolom `response_status`:
+     *   - 'finish'        → responses.status IN ('submitted','verified')
+     *   - 'ongoing'       → responses.status = 'started'
+     *   - 'belum_mengisi' → no response row
      *
      * Dipakai di halaman Data Alumni Prodi (kaprodi).
      *
-     * @param array{program_id?: int, search?: string} $filters
+     * @param array{program_id?: int, search?: string, jurusan?: string, graduation_year?: int} $filters
      */
     public function paginateForAdminWithResponseStatus(array $filters, int $perPage): LengthAwarePaginator
     {
         $conn = DB::connection(self::CONN);
 
-        // Subquery: ambil id kuesioner global published (harusnya 1 row saja,
-        // tapi kita pakai IN agar aman kalau ada lebih dari satu)
+        // Subquery: ambil id kuesioner global published
         $globalQnrIds = $conn->table('questionnaires')
             ->whereNull('program_id')
             ->where('status', 'published')
@@ -150,12 +151,25 @@ class AlumniProfileRepository
             ->select(
                 'alumni_profiles.*',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
-                DB::raw('CASE WHEN responses.id IS NOT NULL THEN 1 ELSE 0 END as has_responded'),
+                DB::raw("CASE
+                    WHEN responses.status IN ('submitted','verified') THEN 'finish'
+                    WHEN responses.status = 'started' THEN 'ongoing'
+                    ELSE 'belum_mengisi'
+                END as response_status"),
             );
 
         if (!empty($filters['program_id'])) {
             $query->where('alumni_profiles.program_id', $filters['program_id']);
+        }
+
+        if (!empty($filters['jurusan'])) {
+            $query->where('programs.jurusan', $filters['jurusan']);
+        }
+
+        if (!empty($filters['graduation_year'])) {
+            $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
         }
 
         if (!empty($filters['search'])) {
@@ -166,16 +180,93 @@ class AlumniProfileRepository
             });
         }
 
-        return $query->orderBy('alumni_profiles.id')->paginate($perPage);
+        return $query->orderByDesc('alumni_profiles.graduation_year')->orderByDesc('alumni_profiles.id')->paginate($perPage);
+    }
+
+    /**
+     * List semua alumni yang ditargetkan oleh kuesioner tertentu,
+     * termasuk yang belum mengisi (LEFT JOIN responses).
+     *
+     * Status hanya 2:
+     *   - 'ongoing'  → belum ada response ATAU status = 'started'
+     *   - 'finished' → status IN ('submitted','verified')
+     *
+     * @param array{program_id?: int, search?: string, questionnaire_id: int} $filters
+     */
+    public function paginateRespondentsByQuestionnaire(array $filters, int $perPage): LengthAwarePaginator
+    {
+        $conn = DB::connection(self::CONN);
+        $questionnaireId = $filters['questionnaire_id'];
+
+        // Ambil info kuesioner untuk filter target
+        $questionnaire = $conn->table('questionnaires')
+            ->where('id', $questionnaireId)
+            ->select('program_id', 'target_graduation_years')
+            ->first();
+
+        $query = $conn->table('alumni_profiles')
+            ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+            ->leftJoin('responses', function ($join) use ($questionnaireId) {
+                $join->on('responses.alumni_id', '=', 'alumni_profiles.id')
+                     ->where('responses.questionnaire_id', '=', $questionnaireId);
+            })
+            ->select(
+                'alumni_profiles.id',
+                'alumni_profiles.nim',
+                'alumni_profiles.name',
+                'alumni_profiles.email',
+                'alumni_profiles.program_id',
+                'alumni_profiles.graduation_year',
+                'programs.name as program_name',
+                'programs.degree as program_degree',
+                'programs.jurusan as jurusan_name',
+                'responses.id as response_id',
+                DB::raw("CASE WHEN responses.status IN ('submitted','verified') THEN 'finished' ELSE 'ongoing' END as response_status"),
+                'responses.submitted_at as response_submitted_at',
+                'responses.created_at as response_created_at',
+                'responses.updated_at as response_updated_at',
+            );
+
+        // Scope berdasarkan target kuesioner
+        if ($questionnaire && $questionnaire->program_id) {
+            $query->where('alumni_profiles.program_id', $questionnaire->program_id);
+        }
+
+        if ($questionnaire && $questionnaire->target_graduation_years) {
+            $years = json_decode($questionnaire->target_graduation_years, true);
+            if (!empty($years)) {
+                $query->whereIn('alumni_profiles.graduation_year', $years);
+            }
+        }
+
+        // Filter tambahan dari request
+        if (!empty($filters['program_id'])) {
+            $query->where('alumni_profiles.program_id', $filters['program_id']);
+        }
+
+        if (!empty($filters['jurusan'])) {
+            $query->where('programs.jurusan', $filters['jurusan']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('alumni_profiles.nim', 'like', "%{$search}%")
+                  ->orWhere('alumni_profiles.name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->orderByRaw("CASE WHEN responses.status IN ('submitted','verified') THEN 2 ELSE 1 END")
+            ->orderBy('alumni_profiles.name')
+            ->paginate($perPage);
     }
 
     /**
      * Hitung stats alumni per prodi (atau semua kalau $programId null).
      *
-     * Return: ['total' => int, 'answered' => int, 'unanswered' => int]
-     * Dipakai di halaman Data Alumni Prodi (kaprodi) dan dashboard admin.
+     * Return: ['total' => int, 'finish' => int, 'ongoing' => int, 'belum_mengisi' => int, 'answered' => int, 'unanswered' => int]
      */
-    public function countStatsByProgram(?int $programId): array
+    public function countStatsByProgram(?int $programId, ?string $jurusan = null, ?int $graduationYear = null): array
     {
         $conn = DB::connection(self::CONN);
 
@@ -183,35 +274,82 @@ class AlumniProfileRepository
         $totalQuery = $conn->table('alumni_profiles');
         if ($programId !== null) {
             $totalQuery->where('program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $totalQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                ->where('programs.jurusan', $jurusan);
+        }
+        if ($graduationYear !== null) {
+            $totalQuery->where('alumni_profiles.graduation_year', $graduationYear);
         }
         $total = $totalQuery->count();
 
-        // Answered (yang punya row di responses untuk kuesioner global published)
+        // Kuesioner global published
         $globalQnrIds = $conn->table('questionnaires')
             ->whereNull('program_id')
             ->where('status', 'published')
             ->pluck('id');
 
         if ($globalQnrIds->isEmpty()) {
-            return ['total' => $total, 'answered' => 0, 'unanswered' => $total];
+            return ['total' => $total, 'finish' => 0, 'ongoing' => 0, 'belum_mengisi' => $total, 'answered' => 0, 'unanswered' => $total];
         }
 
-        $answeredQuery = $conn->table('alumni_profiles')
+        // Finish: submitted or verified
+        $finishQuery = $conn->table('alumni_profiles')
             ->join('responses', 'responses.alumni_id', '=', 'alumni_profiles.id')
-            ->whereIn('responses.questionnaire_id', $globalQnrIds->toArray());
-
+            ->whereIn('responses.questionnaire_id', $globalQnrIds->toArray())
+            ->whereIn('responses.status', ['submitted', 'verified']);
         if ($programId !== null) {
-            $answeredQuery->where('alumni_profiles.program_id', $programId);
+            $finishQuery->where('alumni_profiles.program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $finishQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                ->where('programs.jurusan', $jurusan);
         }
+        if ($graduationYear !== null) {
+            $finishQuery->where('alumni_profiles.graduation_year', $graduationYear);
+        }
+        $finish = $finishQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
 
-        // distinct agar alumni yang punya multiple response ke qnr global tidak double-count
-        $answered = $answeredQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
+        // Ongoing: started
+        $ongoingQuery = $conn->table('alumni_profiles')
+            ->join('responses', 'responses.alumni_id', '=', 'alumni_profiles.id')
+            ->whereIn('responses.questionnaire_id', $globalQnrIds->toArray())
+            ->where('responses.status', 'started');
+        if ($programId !== null) {
+            $ongoingQuery->where('alumni_profiles.program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $ongoingQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                ->where('programs.jurusan', $jurusan);
+        }
+        if ($graduationYear !== null) {
+            $ongoingQuery->where('alumni_profiles.graduation_year', $graduationYear);
+        }
+        $ongoing = $ongoingQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
+
+        $belumMengisi = max($total - $finish - $ongoing, 0);
 
         return [
-            'total'      => $total,
-            'answered'   => $answered,
-            'unanswered' => max($total - $answered, 0),
+            'total'         => $total,
+            'finish'        => $finish,
+            'ongoing'       => $ongoing,
+            'belum_mengisi' => $belumMengisi,
+            'answered'      => $finish,
+            'unanswered'    => $total - $finish,
         ];
+    }
+
+    public function getAvailableGraduationYears(?int $programId, ?string $jurusan = null): array
+    {
+        $query = DB::connection(self::CONN)->table('alumni_profiles')
+            ->whereNotNull('graduation_year');
+
+        if ($programId !== null) {
+            $query->where('program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $query->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                ->where('programs.jurusan', $jurusan);
+        }
+
+        return $query->distinct()->orderByDesc('graduation_year')->pluck('graduation_year')->toArray();
     }
 
     /**
@@ -234,6 +372,7 @@ class AlumniProfileRepository
                 'alumni_profiles.*',
                 'responses.id as response_id',
                 'programs.name as program_name',
+                'programs.degree as program_degree',
                 'programs.code as program_code',
                 'programs.jurusan as jurusan_name',
             );
@@ -264,7 +403,7 @@ class AlumniProfileRepository
     * dibaca bertahap -- karena itu ->orderBy('alumni_profiles.id') WAJIB
     * ada di sini, jangan dihapus.
     *
-    * @param array{program_id?: int, questionnaire_id?: int, graduation_year?: int} $filters
+    * @param array{program_id?: int, questionnaire_id?: int, graduation_year?: int, jurusan?: string} $filters
     */
     public function getForReportQuery(array $filters = []): Builder
     {
@@ -289,7 +428,13 @@ class AlumniProfileRepository
         if (!empty($filters['graduation_year'])) {
             $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
         }
-    
+        // Scope kajur: dibatasi ke jurusannya sendiri. Tanpa klausa ini filter
+        // 'jurusan' yang dikirim ReportService diabaikan diam-diam dan kajur
+        // ikut melihat alumni jurusan lain.
+        if (!empty($filters['jurusan'])) {
+            $query->where('programs.jurusan', $filters['jurusan']);
+        }
+
         return $query;
     }
     
@@ -339,5 +484,16 @@ class AlumniProfileRepository
         return DB::connection(self::CONN)->table('alumni_profiles')->insertGetId(
             array_merge($data, ['nim' => $nim, 'created_at' => $now, 'updated_at' => $now])
         );
+    }
+
+    /** Bulk insert alumni rows (used by Excel import). */
+    public function bulkInsert(array $rows): void
+    {
+        $now = now();
+        $records = array_map(fn ($row) => array_merge($row, ['created_at' => $now, 'updated_at' => $now]), $rows);
+
+        foreach (array_chunk($records, 100) as $chunk) {
+            DB::connection(self::CONN)->table('alumni_profiles')->insert($chunk);
+        }
     }
 }

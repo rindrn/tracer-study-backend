@@ -11,7 +11,7 @@ class AuthService
     public function demoAccounts(): array
     {
         return User::query()
-            ->select(['id', 'name', 'email', 'role', 'program_id'])
+            ->select(['id', 'name', 'email', 'role', 'program_id', 'jurusan'])
             ->with('program:id,name,code,degree')
             ->orderBy('role')
             ->orderBy('name')
@@ -25,6 +25,7 @@ class AuthService
                 'program_name' => $user->program?->name,
                 'program_code' => $user->program?->code,
                 'program_degree' => $user->program?->degree,
+                'jurusan' => $user->jurusan,
                 'password_hint' => 'password123',
             ])
             ->all();
@@ -37,6 +38,12 @@ class AuthService
         if (! $user || ! Hash::check($password, $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Email atau password salah.'],
+            ]);
+        }
+
+        if (! $user->isActive()) {
+            throw ValidationException::withMessages([
+                'email' => ['Akun Anda telah dinonaktifkan. Hubungi administrator.'],
             ]);
         }
  
@@ -56,6 +63,7 @@ class AuthService
             programName:   $user->program?->name,
             programCode:   $user->program?->code,
             programDegree: $user->program?->degree,
+            jurusan:       $user->jurusan,
             token:         $token,
         );
     }
@@ -78,6 +86,7 @@ class AuthService
             'program_name'   => $user->program?->name,
             'program_code'   => $user->program?->code,
             'program_degree' => $user->program?->degree,
+            'jurusan'        => $user->jurusan,
         ];
     }
 }

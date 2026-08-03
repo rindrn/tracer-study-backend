@@ -8,6 +8,8 @@ use App\Http\Requests\Api\Admin\UpdateAlumniRequest;
 use App\Services\Transactional\AdminAlumniService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Admin/AlumniController — CRUD alumni untuk panel admin.
@@ -23,12 +25,19 @@ class AlumniController extends Controller
         private readonly AdminAlumniService $service,
     ) {}
 
-    /** GET /api/admin/alumni */
+    /** GET /api/alumni */
     public function index(Request $request): JsonResponse
     {
+        $questionnaireId = $request->query('questionnaire_id');
         $result = $this->service->list(
             user:    $request->user(),
-            filters: ['search' => $request->query('search')],
+            filters: [
+                'search' => $request->query('search'),
+                'questionnaire_id' => $questionnaireId ? (int) $questionnaireId : null,
+                'jurusan' => $request->query('jurusan'),
+                'program_id' => $request->query('program_id') ? (int) $request->query('program_id') : null,
+                'graduation_year' => $request->query('graduation_year') ? (int) $request->query('graduation_year') : null,
+            ],
             perPage: (int) $request->query('per_page', 15),
         );
 
@@ -45,8 +54,22 @@ class AlumniController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data'    => $this->service->getStats($request->user()),
+            'data'    => $this->service->getStats($request->user(), $request->query('graduation_year') ? (int) $request->query('graduation_year') : null),
         ]);
+    }
+
+    /**
+     * GET /api/admin/alumni/template
+     *
+     * Download template Excel kosongan (hanya header) untuk acuan import alumni.
+     * Dipakai admin / kepala tracer sebelum mengisi data untuk bulk import.
+     */
+    public function downloadTemplate(Request $request): BinaryFileResponse
+    {
+        return Excel::download(
+            $this->service->buildImportTemplate(),
+            'Template_Import_Alumni.xlsx',
+        );
     }
 
     /** GET /api/admin/alumni/{id} */
@@ -87,6 +110,43 @@ class AlumniController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data alumni berhasil dihapus.',
+        ]);
+    }
+
+    /** POST /api/admin/alumni/import */
+    public function importAlumni(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
+        ]);
+
+        $result = $this->service->importFromExcel($request->file('file'));
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$result['imported']} data alumni berhasil diimpor.",
+            'data'    => $result,
+        ]);
+    }
+
+    /** POST /api/alumni/{alumniId}/reset-response */
+    public function resetResponse(Request $request, int $alumniId): JsonResponse
+    {
+        $request->validate(['questionnaire_id' => ['required', 'integer']]);
+
+        $repo = app(\App\Repositories\Transactional\ResponseRepository::class);
+        $reset = $repo->resetToOngoing((int) $request->input('questionnaire_id'), $alumniId);
+
+        if (!$reset) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Responden tidak dalam status finished atau tidak ditemukan.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Status responden berhasil direset ke ongoing.',
         ]);
     }
 }

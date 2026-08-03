@@ -6,6 +6,7 @@ use App\Exceptions\BusinessException;
 use App\Repositories\Transactional\ProgramRepository;
 use App\Repositories\Transactional\QuestionnaireRepository;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * QuestionnaireFetchService — fetch kuesioner aktif (global + prodi) untuk alumni UI.
@@ -23,10 +24,14 @@ class QuestionnaireFetchService
     /**
      * Ambil daftar kuesioner aktif untuk prodi tertentu (berdasarkan kode prodi).
      *
-     * @return array  list of questionnaire objects dengan nested sections/questions
+     * @param string|null $kodeProdi      kode prodi alumni (misal "TI3")
+     * @param int|null    $graduationYear tahun lulus alumni — kalau ada, filter per tahun
+     *                                    (round 5: target_graduation_years filter)
+     *
+     * @return array list of questionnaire objects dengan nested sections/questions
      * @throws BusinessException 400 kalau kode prodi kosong, 404 kalau tidak dikenal
      */
-    public function getActiveForms(?string $kodeProdi): array
+    public function getActiveForms(?string $kodeProdi, ?int $graduationYear = null): array
     {
         if (!$kodeProdi) {
             throw new BusinessException(
@@ -40,7 +45,10 @@ class QuestionnaireFetchService
             throw new BusinessException('Kode program studi tidak dikenali.', 404);
         }
 
-        $questionnaires = $this->questionnaireRepo->findActiveForProdi($program->id);
+        // Year-aware filter saat $graduationYear tersedia, fallback ke list semua published
+        $questionnaires = $graduationYear !== null
+            ? $this->questionnaireRepo->findActiveForProdiAndYear($program->id, $graduationYear)
+            : $this->questionnaireRepo->findActiveForProdi($program->id);
 
         if ($questionnaires->isEmpty()) {
             return [];
@@ -129,5 +137,25 @@ class QuestionnaireFetchService
                 'value' => $o->option_code, // FE pakai option_code sebagai value
             ])->values(),
         ];
+    }
+
+    /**
+     * Cek apakah alumni (by NIM) sudah pernah submit response ke salah satu kuesioner aktif.
+     */
+    public function hasAlumniResponded(string $nim, array $questionnaires): bool
+    {
+        $alumniId = DB::connection('oltp')->table('alumni_profiles')
+            ->where('nim', $nim)->value('id');
+
+        if (!$alumniId) {
+            return false;
+        }
+
+        $questionnaireIds = collect($questionnaires)->pluck('id')->toArray();
+
+        return DB::connection('oltp')->table('responses')
+            ->where('alumni_id', $alumniId)
+            ->whereIn('questionnaire_id', $questionnaireIds)
+            ->exists();
     }
 }

@@ -77,7 +77,10 @@ class TracerStudySubmitService
             $alumniId = $this->upsertAlumni($validated, $program->id);
 
             // 2. Persist response ke kuesioner global (wajib ada)
-            $globalQnr = $this->questionnaireRepo->findActiveGlobal();
+            $graduationYear = (int) ($validated['tahun_lulus'] ?? 0);
+            $globalQnr = $graduationYear > 0
+                ? $this->questionnaireRepo->findActiveGlobalForYear($graduationYear)
+                : $this->questionnaireRepo->findActiveGlobal();
             if (!$globalQnr) {
                 throw new BusinessException('Sistem belum memiliki referensi Kuesioner aktif.', 500);
             }
@@ -87,7 +90,9 @@ class TracerStudySubmitService
             $this->persistResponse($globalQnr->id, $alumniId, $expandedAnswers);
 
             // 3. Persist response ke kuesioner prodi (opsional)
-            $prodiQnr = $this->questionnaireRepo->findActiveByProgram($program->id);
+            $prodiQnr = $graduationYear > 0
+                ? $this->questionnaireRepo->findActiveByProgramForYear($program->id, $graduationYear)
+                : $this->questionnaireRepo->findActiveByProgram($program->id);
             if ($prodiQnr) {
                 $prodiCodes = $this->questionnaireRepo->getQuestionCodesByQuestionnaireId($prodiQnr->id);
                 $this->persistResponse(
@@ -117,10 +122,17 @@ class TracerStudySubmitService
 
     private function upsertAlumni(array $validated, int $programId): int
     {
+        $phone = $validated['phone'] ?? null;
+        if ($phone) {
+            $phone = preg_replace('/[\s\-\(\)]/', '', $phone);
+            if (str_starts_with($phone, '08')) $phone = '+62' . substr($phone, 1);
+            elseif (str_starts_with($phone, '62')) $phone = '+' . $phone;
+        }
+
         return $this->alumniRepo->upsertByNim($validated['nim'], [
             'name'            => $validated['name'],
             'email'           => $validated['email'],
-            'phone'           => $validated['phone'],
+            'phone'           => $phone,
             'program_id'      => $programId,
             'graduation_year' => $validated['tahun_lulus'],
             'kode_pt'         => $validated['kode_pt'] ?? null,
@@ -162,12 +174,20 @@ class TracerStudySubmitService
             if (in_array($key, self::IDENTITY_KEYS, strict: true) || $value === null) {
                 continue;
             }
+            if ($key === 'questionnaire_ids') {
+                continue;
+            }
             if ($filterCodes !== null && !in_array($key, $filterCodes, strict: true)) {
                 continue;
             }
+            $text = match (true) {
+                is_bool($value) => $value ? '1' : '0',
+                is_array($value) => json_encode($value),
+                default => (string) $value,
+            };
             $records[] = [
                 'question_code' => $key,
-                'answer_text'   => is_bool($value) ? ($value ? '1' : '0') : (string) $value,
+                'answer_text'   => $text,
             ];
         }
 

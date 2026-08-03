@@ -59,6 +59,7 @@ class ReportService
     ): TracerStudyMultiSheetExport {
         $filters = array_filter([
             'program_id'      => $user->isKaprodi() ? $user->program_id : null,
+            'jurusan'         => $user->isKajur() ? $user->jurusan : null,
             'questionnaire_id' => $questionnaireId,
             'graduation_year' => $tahunLulus,
         ], fn ($v) => $v !== null);

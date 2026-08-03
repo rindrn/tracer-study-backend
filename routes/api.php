@@ -1,15 +1,15 @@
 <?php
- 
+
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\AuthController;
 
 use App\Http\Controllers\Api\Transactional\ThresholdIndicatorController;
 use App\Http\Controllers\Api\Auth\AlumniAuthController;
 use App\Http\Controllers\Api\Transactional\ThresholdController;
-use App\Http\Controllers\Api\Transactional\LamController; 
-use App\Http\Controllers\Api\Transactional\LamVersionController; 
-use App\Http\Controllers\Api\Transactional\LamProgramController; 
-use App\Http\Controllers\Api\Transactional\ProgramController; 
+use App\Http\Controllers\Api\Transactional\LamController;
+use App\Http\Controllers\Api\Transactional\LamVersionController;
+use App\Http\Controllers\Api\Transactional\LamProgramController;
+use App\Http\Controllers\Api\Transactional\ProgramController;
 use App\Http\Controllers\Api\Transactional\RefUmpController;
 use App\Http\Controllers\Api\Transactional\SemanticRoleController;
 use App\Http\Controllers\Api\Transactional\QuestionSemanticMappingController;
@@ -19,10 +19,11 @@ use App\Http\Controllers\Api\Analytical\EtlAnomalyLogController;
 
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireController;
-
-// Form Submission & Fetch Tracer Study
+use App\Http\Controllers\Api\Transactional\ApprovalController;
 use App\Http\Controllers\Api\Transactional\TracerStudySubmitController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
+use App\Http\Controllers\Api\Transactional\RoleController;
+use App\Http\Controllers\Api\Transactional\UserController;
 
 use App\Http\Controllers\Api\Analytical\Kpi13Controller;
 // Controllers — Dashboard (OLAP page config)
@@ -44,43 +45,45 @@ use App\Http\Controllers\Api\Analytical\EmploymentSummaryController;
 
 // Controllers — DataPipeline (ETL)
 // use App\Http\Controllers\Api\DataPipeline\ExcelImportController;
- 
+
 // ═══════════════════════════════════════════════════════════
-// PUBLIC — tidak butuh autentikasi
+// PUBLIC
 // ═══════════════════════════════════════════════════════════
 Route::prefix('auth')->group(function () {
     Route::get('demo-accounts', [AuthController::class, 'demoAccounts']);
     Route::post('login', [AuthController::class, 'login']);
-    Route::post('alumni-login', [AlumniAuthController::class, 'login']);  // Login alumni untuk isi kuesioner
+    Route::post('alumni-login', [AlumniAuthController::class, 'login']);
 });
- 
-// ═══════════════════════════════════════════════════════════
-// PROTECTED — wajib login (Sanctum token)
-// ═══════════════════════════════════════════════════════════
-Route::get('tracer-study/forms', [QuestionnaireFetchController::class, 'getActiveForms']); // Endpoint penarik soal untuk frontend UI
-Route::post('tracer-study/submit', [TracerStudySubmitController::class, 'store']); // Bisa dibuat public atau diproteksi sanctum sesuai policy. Disini diset public dahulu krn blm ada kepastian login as alumni.
 
-Route::apiResource('questionnaires', QuestionnaireController::class)->only(['show']); // Public show for student form fetch
+Route::get('tracer-study/forms', [QuestionnaireFetchController::class, 'getActiveForms']);
+Route::post('tracer-study/submit', [TracerStudySubmitController::class, 'store']);
+Route::apiResource('questionnaires', QuestionnaireController::class)->only(['show']);
 
-Route::middleware("auth:sanctum")->group(function () {
- 
+// ═══════════════════════════════════════════════════════════
+// PROTECTED — wajib login (Sanctum)
+// ═══════════════════════════════════════════════════════════
+Route::middleware('auth:sanctum')->group(function () {
+
     // Auth
     Route::post('auth/logout', [AuthController::class, 'logout']);
-    Route::get('auth/me',     [AuthController::class, 'me']);
+    Route::get('auth/me', [AuthController::class, 'me']);
 
-    // Questionnaires — index inside auth so we can filter by role
+    // Questionnaires — index (semua role bisa lihat list)
     Route::get('questionnaires', [QuestionnaireController::class, 'index']);
- 
-    // Programs — hanya admin yang bisa CRUD (p2mpp & prodi hanya GET)
-    Route::get('programs',       [ProgramController::class, 'index']);
-    Route::get('programs/{id}',  [ProgramController::class, 'show']);
- 
-    Route::middleware('role:admin')->group(function () {
-        Route::post('programs',          [ProgramController::class, 'store']);
-        Route::put('programs/{id}',      [ProgramController::class, 'update']);
-        Route::delete('programs/{id}',   [ProgramController::class, 'destroy']);
-    });
 
+    // Programs — read (semua role)
+    Route::get('programs/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadPrograms']);
+    Route::get('programs', [ProgramController::class, 'index']);
+    Route::get('programs/{id}', [ProgramController::class, 'show']);
+
+    // Regions — read (semua role)
+    Route::get('provinces/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadProvinces']);
+    Route::get('provinces', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'provinces']);
+    Route::get('cities/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadCities']);
+    Route::get('cities', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'cities']);
+
+    // Roles — read (semua role)
+    Route::get('roles', [RoleController::class, 'index']);
 
     // LAMs — semua role bisa GET
     Route::get('lams',          [LamController::class, 'index']);
@@ -96,13 +99,42 @@ Route::middleware("auth:sanctum")->group(function () {
     Route::get('lam-versions/{id}/thresholds', [ThresholdController::class, 'byVersion']);
     Route::get('lams/{lamId}/thresholds/tracer-response', [ThresholdController::class, 'tracerResponseByLam']);
 
-    // ── Admin only ───────────────────────────────────────────
-    Route::middleware('role:kotc')->group(function () {
+    // ── Super Admin only (head_tracer) ───────────────────────────────────
+    // Catatan merge: gate lama 'role:kotc' (Integrasi) dan 'role:admin'
+    // diseragamkan ke 'role:head_tracer' — 'kotc' tidak ada di RoleSeeder
+    // maupun enum users, jadi endpoint-nya akan selalu 403 kalau dibiarkan.
+    Route::middleware('role:head_tracer')->group(function () {
 
-        // Programs
+        // Roles CUD
+        Route::post('roles', [RoleController::class, 'store']);
+        Route::put('roles/{role}', [RoleController::class, 'update']);
+        Route::delete('roles/{role}', [RoleController::class, 'destroy']);
+
+        // Users (staff) CRUD
+        Route::apiResource('users', UserController::class);
+        Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
+
+        // Programs CRUD
         Route::post('programs',        [ProgramController::class, 'store']);
         Route::put('programs/{id}',    [ProgramController::class, 'update']);
         Route::delete('programs/{id}', [ProgramController::class, 'destroy']);
+
+        // Provinces CRUD
+        Route::post('provinces', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'storeProvince']);
+        Route::put('provinces/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'updateProvince']);
+        Route::delete('provinces/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'destroyProvince']);
+
+        // Cities CRUD
+        Route::post('cities', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'storeCity']);
+        Route::put('cities/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'updateCity']);
+        Route::delete('cities/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'destroyCity']);
+
+        // Questionnaire delete (langsung tanpa approval)
+        Route::delete('questionnaires/{questionnaire}', [QuestionnaireController::class, 'destroy']);
+
+        // Approval management (approve/reject)
+        Route::post('approvals/{id}/approve', [ApprovalController::class, 'approve']);
+        Route::post('approvals/{id}/reject', [ApprovalController::class, 'reject']);
 
         // LAMs
         Route::post('lams',        [LamController::class, 'store']);
@@ -132,8 +164,8 @@ Route::middleware("auth:sanctum")->group(function () {
     });
 
     // ── Semantic Role Mapping (ETL admin config) ──────────────────────
-    // Read: semua role login (auth:sanctum). Write: hanya kotc, sama gate
-    // dengan Threshold/LamVersion (lihat blok role:kotc di bawah).
+    // Read: semua role login (auth:sanctum). Write: hanya head_tracer, sama gate
+    // dengan Threshold/LamVersion (lihat blok role:head_tracer di bawah).
     Route::get('semantic-roles', [SemanticRoleController::class, 'index']);
 
     Route::prefix('question-semantic-mappings')->group(function () {
@@ -154,7 +186,7 @@ Route::middleware("auth:sanctum")->group(function () {
     Route::get('etl-anomaly-log', [EtlAnomalyLogController::class, 'index']);
     Route::get('etl-runs/{id}', [EtlRunController::class, 'show']);
 
-    Route::middleware('role:kotc')->group(function () {
+    Route::middleware('role:head_tracer')->group(function () {
         Route::post('question-semantic-mappings',              [QuestionSemanticMappingController::class, 'store']);
         Route::post('question-semantic-mappings/{id}/deactivate', [QuestionSemanticMappingController::class, 'deactivate']);
 
@@ -162,7 +194,7 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::post('kpi-category-mappings/{id}/deactivate',   [KpiCategoryMappingController::class, 'deactivate']);
     });
 
-    Route::middleware('role:kotc')->prefix('ump')->group(function () {
+    Route::middleware('role:head_tracer')->prefix('ump')->group(function () {
         Route::get('years',                              [RefUmpController::class, 'years']);
         Route::get('template',                           [RefUmpController::class, 'template']);
         Route::get('{tahun}',                            [RefUmpController::class, 'show']);
@@ -172,23 +204,50 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::patch('{tahun}/provinces/{idProvinsi}',   [RefUmpController::class, 'updateSingle']);
     });
 
-    // ── Manajemen Staff & Tim Tracer (admin + head_tracer) ─────────────────
-    // Scaffolding untuk endpoint CRUD staff / team — controller belum dibuat,
-    // biarkan group kosong dulu agar struktur konsisten dengan permission FE:
-    //   admin.staff (CRUD akun staff) + admin.team (CRUD tim tracer).
-    Route::middleware("role:admin,head_tracer")->group(function () {
-        // Route::apiResource('admin/staff',        StaffController::class);
-        // Route::apiResource('admin/tracer-team',  TracerTeamController::class);
+    // ── Super Admin + Admin (head_tracer, tracer_team) ───────────────────
+    Route::middleware('role:head_tracer,tracer_team')->group(function () {
+        // Create & edit kuesioner (tracer_team creates as draft, head_tracer can publish)
+        Route::post('questionnaires', [QuestionnaireController::class, 'store']);
+        Route::put('questionnaires/{questionnaire}', [QuestionnaireController::class, 'update']);
+
+        // Approval list (head_tracer sees all, tracer_team sees own)
+        Route::get('approvals', [ApprovalController::class, 'index']);
+
+        // Request delete (tracer_team submits)
+        Route::post('approvals/request-delete', [ApprovalController::class, 'requestDelete']);
+
+        // Thresholds
+        Route::apiResource('thresholds', ThresholdController::class);
+
+        // Reset respondent status from finished to ongoing
+        Route::post('alumni/{alumniId}/reset-response', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'resetResponse']);
     });
 
-    // ── Manajemen Alumni (Admin & Prodi & P2MPP) ─────
-    // Route stats HARUS sebelum apiResource agar tidak ketangkap oleh `/{id}`.
-    Route::get('admin/alumni/stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
-    Route::apiResource('admin/alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
+    // ── Admin request (tracer_team) — perlu approval ─────────────────────
+    Route::middleware('role:tracer_team')->group(function () {
+        // Route::post('approval-requests', [ApprovalRequestController::class, 'store']);
+        // Route::get('approval-requests/mine', [ApprovalRequestController::class, 'myRequests']);
+    });
+
+    // ── Data viewers — semua role bisa akses sesuai scope ────────────────
+    // Alumni management
+    Route::get('alumni/stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
+    Route::get('alumni/template', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'downloadTemplate']);
+    Route::post('alumni/import', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'importAlumni']);
+    Route::apiResource('alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
+
+    // Stakeholder Contacts
+    Route::get('stakeholder-contacts/export', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'export']);
+    Route::get('stakeholder-contacts', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'index']);
+    Route::post('stakeholder-contacts', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'store']);
 
     // ── Reports (Laporan / Unduhan) ──────────────────
+    // Dua path ke handler yang sama: 'admin/reports/...' dipakai FE sisi
+    // Integrasi, 'reports/...' dipakai FE sisi Faiz. Keduanya dipertahankan
+    // supaya tidak ada frontend yang patah setelah merge.
     Route::get('admin/reports/export-alumni', [\App\Http\Controllers\Api\Admin\ReportController::class, 'exportAlumniResponses']);
- 
+    Route::get('reports/export-alumni', [\App\Http\Controllers\Api\Admin\ReportController::class, 'exportAlumniResponses']);
+
     // ── ETL — hanya admin ───────────────────────────────────
     // Route::middleware("role:admin")->group(function () {
     //     Route::post("data-pipeline/import", [ExcelImportController::class, "store"]);

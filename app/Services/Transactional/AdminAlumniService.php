@@ -11,7 +11,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * AdminAlumniService — business logic CRUD alumni untuk panel admin.
  *
  * Tanggung jawab:
- * - Translate role user (admin, p2mpp, kaprodi) jadi filter scope.
+ * - Translate role user (head_tracer, tracer_team, wadir, kajur, kaprodi) jadi filter scope.
  * - Enforce business rule: P2MPP read-only; kaprodi hanya bisa akses prodinya.
  * - Orkestrasi ke AlumniProfileRepository.
  */
@@ -27,6 +27,10 @@ class AdminAlumniService
     public function list(User $user, array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $filters = $this->applyRoleScope($user, $filters);
+        if (!empty($filters['questionnaire_id'])) {
+            return $this->alumniRepo->paginateRespondentsByQuestionnaire($filters, $perPage);
+        }
+
         return $this->alumniRepo->paginateForAdminWithResponseStatus($filters, $perPage);
     }
 
@@ -40,17 +44,35 @@ class AdminAlumniService
      * kuesioner global (program_id NULL, status published) — lihat
      * AlumniProfileRepository::countStatsByProgram.
      */
-    public function getStats(User $user): array
+    public function getStats(User $user, ?int $graduationYear = null): array
     {
         $programId = $user->isKaprodi() ? $user->program_id : null;
+        $jurusan = $user->isKajur() ? $user->jurusan : null;
 
-        $stats = $this->alumniRepo->countStatsByProgram($programId);
+        $stats = $this->alumniRepo->countStatsByProgram($programId, $jurusan, $graduationYear);
 
         $stats['response_rate'] = $stats['total'] > 0
             ? round($stats['answered'] / $stats['total'] * 100, 1)
             : 0.0;
 
+        $stats['graduation_years'] = $this->alumniRepo->getAvailableGraduationYears($programId, $jurusan);
+
         return $stats;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // IMPORT TEMPLATE — download Excel kosongan berisi header
+    // ═══════════════════════════════════════════════════════════
+    /**
+     * Bangun export object untuk template Excel kosong (header saja).
+     *
+     * Dipakai oleh admin / kepala tracer untuk dapat "blueprint" kolom yang
+     * harus diisi sebelum meng-import data alumni. Fitur upload/parse akan
+     * diimplementasikan di round berikutnya.
+     */
+    public function buildImportTemplate(): \App\Exports\AlumniImportTemplateExport
+    {
+        return new \App\Exports\AlumniImportTemplateExport();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -124,23 +146,43 @@ class AdminAlumniService
     }
 
     // ═══════════════════════════════════════════════════════════
+    // IMPORT FROM EXCEL
+    // ═══════════════════════════════════════════════════════════
+    /**
+     * Import alumni dari file Excel yang di-upload.
+     * Return: ['imported' => int, 'errors' => string[]]
+     */
+    public function importFromExcel(\Illuminate\Http\UploadedFile $file): array
+    {
+        $import = new \App\Imports\AlumniImport($this->alumniRepo);
+        \Maatwebsite\Excel\Facades\Excel::import($import, $file);
+
+        return [
+            'imported' => $import->getImportedCount(),
+            'errors'   => $import->getErrors(),
+        ];
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // Helpers (private)
     // ═══════════════════════════════════════════════════════════
 
-    /** Tambahkan filter program_id untuk kaprodi supaya hanya lihat alumni prodinya. */
+    /** Tambahkan filter scope berdasarkan role user. */
     private function applyRoleScope(User $user, array $filters): array
     {
         if ($user->isKaprodi() && $user->program_id) {
             $filters['program_id'] = $user->program_id;
+        } elseif ($user->isKajur() && $user->jurusan) {
+            $filters['jurusan'] = $user->jurusan;
         }
         return $filters;
     }
 
-    /** P2MPP read-only — block semua operasi tulis. */
+    /** Viewer roles (wadir, kajur, kaprodi) — block semua operasi tulis. */
     private function assertCanWrite(User $user): void
     {
-        if ($user->isP2mpp()) {
-            throw new BusinessException('P2MPP tidak diizinkan mengubah data alumni.', 403);
+        if ($user->isWadir() || $user->isKajur() || $user->isKaprodi()) {
+            throw new BusinessException('Role Anda tidak diizinkan mengubah data alumni.', 403);
         }
     }
 

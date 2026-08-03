@@ -1,7 +1,6 @@
 <?php
 namespace App\DTOs\Auth;
- 
-// ── Response setelah login berhasil ──────────────────────────
+
 class ResponseAuthDTO
 {
     public function __construct(
@@ -13,9 +12,10 @@ class ResponseAuthDTO
         public readonly ?string $programName,
         public readonly ?string $programCode,
         public readonly ?string $programDegree,
+        public readonly ?string $jurusan,
         public readonly string  $token,
     ) {}
- 
+
     public function toArray(): array
     {
         return [
@@ -28,6 +28,7 @@ class ResponseAuthDTO
                 'program_name'   => $this->programName,
                 'program_code'   => $this->programCode,
                 'program_degree' => $this->programDegree,
+                'jurusan'        => $this->jurusan,
             ],
             'token'      => $this->token,
             'token_type' => 'Bearer',

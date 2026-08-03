@@ -41,6 +41,36 @@ class QuestionnaireRepository
         return collect($query->orderByDesc('id')->get());
     }
 
+    /**
+     * Paginated list with optional graduation_year filter.
+     */
+    public function paginateHeaders(?int $programId, array $filters, int $perPage): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = DB::connection(self::CONN)->table('questionnaires');
+
+        if ($programId !== null) {
+            $query->where(function ($q) use ($programId) {
+                $q->whereNull('program_id')
+                  ->orWhere('program_id', $programId);
+            });
+        }
+
+        if (!empty($filters['graduation_year'])) {
+            $year = (int) $filters['graduation_year'];
+            $query->whereRaw("target_graduation_years::jsonb @> ?", [json_encode([$year])]);
+        }
+
+        if (!empty($filters['search'])) {
+            $s = $filters['search'];
+            $query->where(function ($q) use ($s) {
+                $q->where('title', 'ilike', "%{$s}%")
+                  ->orWhere('code', 'ilike', "%{$s}%");
+            });
+        }
+
+        return $query->orderByDesc('id')->paginate($perPage);
+    }
+
     public function findHeaderById(int $id): ?object
     {
         return DB::connection(self::CONN)
@@ -67,6 +97,38 @@ class QuestionnaireRepository
             ->first();
     }
 
+    // ── Year-aware variant (round 5) ─────────────────────────
+    /**
+     * Kuesioner aktif global yang target_graduation_years-nya match dengan tahun lulus alumni.
+     * Backward compat: target_graduation_years NULL atau empty array dianggap "berlaku semua".
+     */
+    public function findActiveGlobalForYear(int $graduationYear): ?object
+    {
+        return DB::connection(self::CONN)->table('questionnaires')
+            ->whereNull('program_id')
+            ->where('status', 'published')
+            ->where(function ($q) use ($graduationYear) {
+                $q->whereNull('target_graduation_years')
+                  ->orWhereRaw("target_graduation_years::text = '[]'")
+                  ->orWhereJsonContains('target_graduation_years', $graduationYear);
+            })
+            ->first();
+    }
+
+    /** Kuesioner aktif prodi yang target year-nya match dengan tahun lulus alumni. */
+    public function findActiveByProgramForYear(int $programId, int $graduationYear): ?object
+    {
+        return DB::connection(self::CONN)->table('questionnaires')
+            ->where('program_id', $programId)
+            ->where('status', 'published')
+            ->where(function ($q) use ($graduationYear) {
+                $q->whereNull('target_graduation_years')
+                  ->orWhereRaw("target_graduation_years::text = '[]'")
+                  ->orWhereJsonContains('target_graduation_years', $graduationYear);
+            })
+            ->first();
+    }
+
     /** Published kuesioner untuk global OR prodi tertentu (list). */
     public function findActiveForProdi(int $programId): Collection
     {
@@ -76,6 +138,28 @@ class QuestionnaireRepository
                 ->where(function ($q) use ($programId) {
                     $q->whereNull('program_id')
                       ->orWhere('program_id', $programId);
+                })
+                ->get()
+        );
+    }
+
+    /**
+     * Sama dengan findActiveForProdi tapi tambah filter target_graduation_years.
+     * Dipakai di alumni form fill agar hanya muncul kuesioner sesuai tahun lulus.
+     */
+    public function findActiveForProdiAndYear(int $programId, int $graduationYear): Collection
+    {
+        return collect(
+            DB::connection(self::CONN)->table('questionnaires')
+                ->where('status', 'published')
+                ->where(function ($q) use ($programId) {
+                    $q->whereNull('program_id')
+                      ->orWhere('program_id', $programId);
+                })
+                ->where(function ($q) use ($graduationYear) {
+                    $q->whereNull('target_graduation_years')
+                      ->orWhereRaw("target_graduation_years::text = '[]'")
+                      ->orWhereJsonContains('target_graduation_years', $graduationYear);
                 })
                 ->get()
         );
@@ -175,6 +259,28 @@ class QuestionnaireRepository
             ->toArray();
     }
 
+    /**
+     * Get options map keyed by question code.
+     * Returns: [question_code => [option_code => option_label, ...]]
+     */
+    public function getOptionsByQuestionCodes(array $codes): array
+    {
+        if (empty($codes)) return [];
+
+        $rows = DB::connection(self::CONN)->table('questionnaire_options as o')
+            ->join('questionnaire_questions as q', 'o.question_id', '=', 'q.id')
+            ->whereIn('q.code', $codes)
+            ->orderBy('o.order_no')
+            ->select('q.code as question_code', 'o.option_code', 'o.option_label')
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row->question_code][$row->option_code] = $row->option_label;
+        }
+        return $map;
+    }
+
     // ═══════════════════════════════════════════════════════════
     // READ — versi / counter
     // ═══════════════════════════════════════════════════════════
@@ -198,13 +304,20 @@ class QuestionnaireRepository
      * Count responses per questionnaire. Kalau $programId ada, filter per prodi.
      * Return: collection of [questionnaire_id => count].
      */
-    public function countResponsesGroupedAll(?int $programId = null): Collection
+    public function countResponsesGroupedAll(?int $programId = null, ?string $jurusan = null): Collection
     {
-        $query = DB::connection(self::CONN)->table('responses');
+        $conn = DB::connection(self::CONN);
+
+        $query = $conn->table('responses')
+            ->join('alumni_profiles', 'responses.alumni_id', '=', 'alumni_profiles.id')
+            ->join('questionnaires', 'responses.questionnaire_id', '=', 'questionnaires.id')
+            ->whereRaw("alumni_profiles.graduation_year::text = ANY(SELECT jsonb_array_elements_text(questionnaires.target_graduation_years))");
 
         if ($programId !== null) {
-            $query->join('alumni_profiles', 'responses.alumni_id', '=', 'alumni_profiles.id')
-                  ->where('alumni_profiles.program_id', $programId);
+            $query->where('alumni_profiles.program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $query->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
+                  ->where('programs.jurusan', $jurusan);
         }
 
         return $query

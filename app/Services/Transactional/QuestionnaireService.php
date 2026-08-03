@@ -35,9 +35,10 @@ class QuestionnaireService
     public function list(?User $user): array
     {
         $programId = ($user && $user->isKaprodi()) ? $user->program_id : null;
+        $jurusan = ($user && $user->isKajur()) ? $user->jurusan : null;
 
         $rows = $this->questionnaireRepo->listHeaders($programId);
-        $responseCounts = $this->questionnaireRepo->countResponsesGroupedAll($programId);
+        $responseCounts = $this->questionnaireRepo->countResponsesGroupedAll($programId, $jurusan);
 
         return $rows->map(function ($row) use ($responseCounts) {
             $questionnaire = $this->loadQuestionnaire((int) $row->id);
@@ -46,6 +47,34 @@ class QuestionnaireService
             }
             return $questionnaire;
         })->values()->toArray();
+    }
+
+    /**
+     * Paginated list with filters.
+     */
+    public function listPaginated(?User $user, array $filters = [], int $perPage = 100): array
+    {
+        $programId = ($user && $user->isKaprodi()) ? $user->program_id : null;
+        $jurusan = ($user && $user->isKajur()) ? $user->jurusan : null;
+
+        $paginator = $this->questionnaireRepo->paginateHeaders($programId, $filters, $perPage);
+        $responseCounts = $this->questionnaireRepo->countResponsesGroupedAll($programId, $jurusan);
+
+        $items = collect($paginator->items())->map(function ($row) use ($responseCounts) {
+            $questionnaire = $this->loadQuestionnaire((int) $row->id);
+            if ($questionnaire) {
+                $questionnaire['response_count'] = (int) ($responseCounts[$row->id] ?? 0);
+            }
+            return $questionnaire;
+        })->filter()->values()->toArray();
+
+        return [
+            'data'         => $items,
+            'current_page' => $paginator->currentPage(),
+            'last_page'    => $paginator->lastPage(),
+            'per_page'     => $paginator->perPage(),
+            'total'        => $paginator->total(),
+        ];
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -75,19 +104,20 @@ class QuestionnaireService
             $version   = $validated['version'] ?? $this->questionnaireRepo->nextVersionForCode($baseCode);
 
             $id = $this->questionnaireRepo->insertHeader([
-                'code'               => $baseCode,
-                'title'              => $validated['title'],
-                'description'        => $validated['description'] ?? null,
-                'target'             => $validated['target'] ?? null,
-                'sample_respondents' => isset($validated['respondents'])
+                'code'                    => $baseCode,
+                'title'                   => $validated['title'],
+                'description'             => $validated['description'] ?? null,
+                'target'                  => $validated['target'] ?? null,
+                'sample_respondents'      => isset($validated['respondents'])
                     ? json_encode(array_values($validated['respondents']))
                     : null,
-                'period_year'        => (int) ($validated['period_year'] ?? (int) $now->format('Y')),
-                'version'            => $version,
-                'status'             => $validated['status'],
-                'program_id'         => $programId,
-                'published_at'       => $validated['status'] === 'published' ? $now : null,
-                'created_by'         => auth()->id(),
+                'period_year'             => (int) ($validated['period_year'] ?? (int) $now->format('Y')),
+                'target_graduation_years' => $this->encodeGraduationYears($validated),
+                'version'                 => $version,
+                'status'                  => $validated['status'],
+                'program_id'              => $programId,
+                'published_at'            => $validated['status'] === 'published' ? $now : null,
+                'created_by'              => auth()->id(),
             ]);
 
             $this->syncSections($id, $validated['sections'], $now);
@@ -116,18 +146,19 @@ class QuestionnaireService
             $version   = $validated['version'] ?? $existing->version;
 
             $this->questionnaireRepo->updateHeader($id, [
-                'code'               => $code,
-                'title'              => $validated['title'],
-                'description'        => $validated['description'] ?? null,
-                'target'             => $validated['target'] ?? null,
-                'sample_respondents' => isset($validated['respondents'])
+                'code'                    => $code,
+                'title'                   => $validated['title'],
+                'description'             => $validated['description'] ?? null,
+                'target'                  => $validated['target'] ?? null,
+                'sample_respondents'      => isset($validated['respondents'])
                     ? json_encode(array_values($validated['respondents']))
                     : null,
-                'period_year'        => (int) ($validated['period_year'] ?? $existing->period_year),
-                'version'            => $version,
-                'status'             => $validated['status'],
-                'program_id'         => $programId,
-                'published_at'       => $validated['status'] === 'published'
+                'period_year'             => (int) ($validated['period_year'] ?? $existing->period_year),
+                'target_graduation_years' => $this->encodeGraduationYears($validated, $existing->target_graduation_years ?? null),
+                'version'                 => $version,
+                'status'                  => $validated['status'],
+                'program_id'              => $programId,
+                'published_at'            => $validated['status'] === 'published'
                     ? ($existing->published_at ?? $now)
                     : $existing->published_at,
             ]);
@@ -174,6 +205,33 @@ class QuestionnaireService
         return $fallback;
     }
 
+    /**
+     * Encode list tahun lulusan target ke JSON untuk disimpan di kolom jsonb.
+     * Empty array → null (artinya "tidak ada filter / berlaku semua alumni").
+     * Backward compat: kalau payload tidak ada key, pakai $fallback existing.
+     */
+    private function encodeGraduationYears(array $validated, ?string $fallback = null): ?string
+    {
+        if (!array_key_exists('target_graduation_years', $validated)) {
+            return $fallback;
+        }
+
+        $years = $validated['target_graduation_years'];
+        if (!is_array($years) || empty($years)) {
+            return null;
+        }
+
+        $clean = collect($years)
+            ->map(fn ($y) => (int) $y)
+            ->filter(fn ($y) => $y > 1900 && $y < 2200)
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
+        return empty($clean) ? null : json_encode($clean);
+    }
+
     /** Insert semua section + question + option untuk 1 kuesioner. */
     private function syncSections(int $questionnaireId, array $sections, Carbon $now): void
     {
@@ -187,12 +245,18 @@ class QuestionnaireService
             ]);
 
             foreach (array_values($sectionData['questions']) as $questionIndex => $questionData) {
+                // Determine DB type — override to 'boolean' if group_code present (grouped boolean from template)
+                $dbType = $this->mapQuestionTypeToDatabase($questionData['type']);
+                if (!empty($questionData['group_code'])) {
+                    $dbType = 'boolean';
+                }
+
                 $questionId = $this->questionnaireRepo->insertQuestion([
                     'questionnaire_id' => $questionnaireId,
                     'section_id'       => $sectionId,
                     'code'             => $questionData['code'] ?: Str::slug($questionData['question']) . '-' . ($questionIndex + 1),
                     'question_text'    => $questionData['question'],
-                    'question_type'    => $this->mapQuestionTypeToDatabase($questionData['type']),
+                    'question_type'    => $dbType,
                     'is_required'      => (bool) ($questionData['required'] ?? false),
                     'order_no'         => (int) ($questionData['order_no'] ?? ($questionIndex + 1)),
                     'metadata'         => json_encode($this->buildQuestionMetadata($questionData)),
@@ -212,6 +276,7 @@ class QuestionnaireService
                         'option_value' => $value,
                         'order_no'     => (int) ($optionData['order_no'] ?? ($optionIndex + 1)),
                         'is_active'    => true,
+                        'is_hidden'    => (bool) ($optionData['is_hidden'] ?? false),
                     ]);
                 }
             }
@@ -228,15 +293,20 @@ class QuestionnaireService
             'dropdown'        => 'single_choice',
             'linear_scale'    => 'number',
             'rating'          => 'number',
-            'boolean'         => 'single_choice',
+            'boolean'         => 'boolean',
             'date'            => 'date',
             'time'            => 'short_text',
             default           => 'short_text',
         };
     }
 
-    private function mapQuestionTypeToFrontend(string $dbType): string
+    private function mapQuestionTypeToFrontend(string $dbType, array $metadata = []): string
     {
+        // number with scale metadata → linear_scale (not short)
+        if ($dbType === 'number' && (isset($metadata['scale_min']) || isset($metadata['scaleMin']))) {
+            return 'linear_scale';
+        }
+
         return match ($dbType) {
             'short_text'      => 'short',
             'long_text'       => 'paragraph',
@@ -256,14 +326,37 @@ class QuestionnaireService
             'allowOther'    => $questionData['allowOther'] ?? false,
         ];
 
-        foreach (['scaleMin', 'scaleMax'] as $key) {
-            if (isset($questionData[$key])) {
-                $metadata[$key] = $questionData[$key];
-            }
+        // Scale metadata — store as snake_case for consistency with seeder
+        if (isset($questionData['scaleMin'])) {
+            $metadata['scale_min'] = $questionData['scaleMin'];
         }
+        if (isset($questionData['scaleMax'])) {
+            $metadata['scale_max'] = $questionData['scaleMax'];
+        }
+
+        if (!empty($questionData['scaleLabels'])) {
+            $metadata['scale_labels'] = $questionData['scaleLabels'];
+        }
+
         foreach (['gridRows', 'gridColumns'] as $key) {
             if (!empty($questionData[$key])) {
                 $metadata[$key] = array_values($questionData[$key]);
+            }
+        }
+
+        // Preserve group metadata (for grouped boolean questions from template)
+        foreach (['group_code', 'group_label', 'group_title'] as $key) {
+            if (!empty($questionData[$key])) {
+                $metadata[$key] = $questionData[$key];
+            }
+        }
+
+        // Simpan pertanyaan bersyarat (logic) sebagai show_if di metadata.
+        if (!empty($questionData['logic']) && ($questionData['logic']['type'] ?? '') === 'in_array') {
+            $depCode = $questionData['logic']['dependsOn'] ?? '';
+            $values  = $questionData['logic']['values'] ?? [];
+            if ($depCode && !empty($values)) {
+                $metadata['show_if'] = [$depCode => array_values($values)];
             }
         }
 
@@ -322,7 +415,10 @@ class QuestionnaireService
             'respondents'  => $questionnaire->sample_respondents
                 ? json_decode($questionnaire->sample_respondents, true)
                 : [],
-            'period_year'  => (int) $questionnaire->period_year,
+            'period_year'             => (int) $questionnaire->period_year,
+            'target_graduation_years' => isset($questionnaire->target_graduation_years) && $questionnaire->target_graduation_years
+                ? json_decode($questionnaire->target_graduation_years, true)
+                : null,
             'version'      => (int) $questionnaire->version,
             'status'       => $questionnaire->status,
             'program_id'   => $questionnaire->program_id,
@@ -341,7 +437,7 @@ class QuestionnaireService
             'code'          => $question->code,
             'question'      => $question->question_text,
             'question_text' => $question->question_text,
-            'type'          => $metadata['original_type'] ?? $this->mapQuestionTypeToFrontend($question->question_type),
+            'type'          => $metadata['original_type'] ?? $this->mapQuestionTypeToFrontend($question->question_type, $metadata),
             'description'   => null,
             'options'       => ($optionsGrouped->get($question->id, collect()))->map(fn ($o) => [
                 'id'       => $o->id,
@@ -349,13 +445,16 @@ class QuestionnaireService
                 'label'    => $o->option_label,
                 'value'    => $o->option_value,
                 'order_no' => $o->order_no,
+                'is_hidden' => (bool) ($o->is_hidden ?? false),
             ])->values()->toArray(),
             'required'    => (bool) $question->is_required,
             'allowOther'  => $metadata['allowOther'] ?? false,
-            'scaleMin'    => $metadata['scaleMin']   ?? 1,
-            'scaleMax'    => $metadata['scaleMax']   ?? 5,
+            'scaleMin'    => $metadata['scaleMin']   ?? $metadata['scale_min'] ?? 1,
+            'scaleMax'    => $metadata['scaleMax']   ?? $metadata['scale_max'] ?? 5,
+            'scaleLabels' => $metadata['scale_labels'] ?? [],
             'gridRows'    => $metadata['gridRows']   ?? [],
             'gridColumns' => $metadata['gridColumns'] ?? [],
+            'metadata'    => $metadata, // includes show_if for conditional logic
         ];
     }
 }

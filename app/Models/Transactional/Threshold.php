@@ -1,29 +1,44 @@
 <?php
+// app/Models/Transactional/Threshold.php
 namespace App\Models\Transactional;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Threshold extends Model
 {
     protected $connection = 'oltp';
     protected $table      = 'thresholds';
-    protected $fillable   = [
-        'lam_version_id',
-        'indicator_id',
-        'level',       // 'baik' | 'unggul'
-        'value',
-        'created_by',
-    ];
-    protected $casts = ['value' => 'decimal:2'];
+    // 'name' wajib ikut fillable: kolomnya NOT NULL di
+    // 2026_03_22_000004_create_thresholds_table.
+    // 'level' = 'baik' | 'unggul' (2026_06_01_000005_add_lam_fields_to_thresholds_table).
+    protected $fillable   = ['name', 'value', 'created_by', 'lam_version_id', 'indicator_id', 'level'];
+    protected $casts      = ['value' => 'decimal:2'];
 
-    public function indicator(): BelongsTo
+    // Relasi many-to-many ke programs via threshold_programs
+    public function programs(): BelongsToMany
     {
-        return $this->belongsTo(ThresholdIndicator::class, 'indicator_id');
+        return $this->belongsToMany(
+            Program::class,
+            'threshold_programs',
+            'threshold_id',
+            'program_id'
+        )->withPivot("created_at");
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function lamVersion(): BelongsTo
     {
         return $this->belongsTo(LamVersion::class, 'lam_version_id');
+    }
+
+    public function indicator(): BelongsTo
+    {
+        return $this->belongsTo(ThresholdIndicator::class, 'indicator_id');
     }
 }
