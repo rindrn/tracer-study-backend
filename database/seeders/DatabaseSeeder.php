@@ -4,13 +4,43 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use RuntimeException;
 
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
+    /**
+     * Database tracer_study punya dua schema yang disediakan lewat jalur
+     * berbeda:
+     *
+     *   tracer_oltp  -> 40 file di database/migrations/transactional.
+     *                   Koneksi 'oltp' (default), search_path = tracer_oltp.
+     *                   Dibuat oleh `php artisan migrate`, diisi seeder di
+     *                   bawah.
+     *
+     *   public       -> database/dump/olap_schema.sql (rangka star schema +
+     *                   data config kpi_category_mapping). Koneksi 'olap',
+     *                   search_path = public. TIDAK punya migration sama
+     *                   sekali, jadi tanpa import ini seluruh dashboard OLAP
+     *                   error saat query.
+     *
+     * Isi 11 dim_* dan 3 fact_* sengaja TIDAK dibawa di dump: itu data
+     * turunan yang dihitung ulang oleh `php artisan etl:run` dari
+     * tracer_oltp. Membawanya hanya akan membuat OLAP berisi hasil olahan
+     * lama yang tidak cocok dengan isi OLTP hasil seeder di bawah.
+     *
+     * Schema ketiga, dev_pre_aggregations, dikelola sendiri oleh Cube.js
+     * (dipakai FE) dan sengaja tidak disentuh di sini.
+     *
+     * Urutan: import OLAP dulu, baru seeder OLTP. Keduanya independen,
+     * tapi import OLAP menjatuhkan seluruh schema public sehingga lebih
+     * aman dijalankan sebelum data OLTP ditulis.
+     */
     public function run(): void
     {
+        $this->importOlapSchema();
+
         $this->call([
             ProgramSeeder::class,
             ProvinceSeeder::class,
@@ -24,5 +54,124 @@ class DatabaseSeeder extends Seeder
             ResponseSeeder::class,
             StakeholderContactSeeder::class,
         ]);
+
+        $this->importSql(
+            'dump/oltp_master_data.sql',
+            'data master OLTP (lams, thresholds)',
+            'OLTP',
+        );
+
+        $this->importOltpSupplement();
+    }
+
+    /**
+     * Import tabel tracer_oltp yang tidak punya migration.
+     *
+     * Sembilan tabel ini datang dari sisi OLAP/ETL (develop-form) yang dulu
+     * hanya hidup di init.sql: question_semantic_mapping, semantic_role_registry,
+     * ref_ump, etl_runs, threshold_configs, tracer_response_thresholds, plus
+     * tiga tabel queue Laravel (QUEUE_CONNECTION=database, dipakai RunEtlJob).
+     * Tanpa ini `php artisan etl:run` gagal: SemanticMappingRepository dan
+     * dim_ump membaca langsung dari tabel-tabel tersebut.
+     *
+     * Dijalankan SETELAH seeder OLTP karena FK-nya menunjuk ke programs,
+     * questionnaires, provinces, dan users yang baru dibuat seeder.
+     *
+     * Ini tambalan, bukan solusi akhir -- idealnya sembilan tabel ini
+     * ditulis jadi migration sungguhan.
+     */
+    private function importOltpSupplement(): void
+    {
+        $this->importSql(
+            'dump/oltp_supplement.sql',
+            'tabel pelengkap OLTP',
+            'OLTP',
+        );
+    }
+
+    /**
+     * Jalankan satu file .sql lewat psql pada koneksi yang diminta.
+     *
+     * @param string $relative Path relatif terhadap database_path().
+     * @param string $label    Nama manusiawi untuk pesan konsol.
+     * @param string $conn     'OLTP' atau 'OLAP' -- menentukan prefix env
+     *                         mana yang dipakai untuk kredensial.
+     */
+    private function importSql(string $relative, string $label, string $conn): void
+    {
+        $path = database_path($relative);
+
+        if (!is_file($path)) {
+            throw new RuntimeException("File dump tidak ditemukan: {$path}");
+        }
+
+        putenv('PGPASSWORD=' . env("{$conn}_DB_PASSWORD"));
+
+        $dsn = sprintf(
+            '-h %s -p %s -U %s -d %s',
+            escapeshellarg(env("{$conn}_DB_HOST", '127.0.0.1')),
+            escapeshellarg(env("{$conn}_DB_PORT", '5432')),
+            escapeshellarg(env("{$conn}_DB_USERNAME", 'postgres')),
+            escapeshellarg(env("{$conn}_DB_DATABASE", 'study_tracer')),
+        );
+
+        $this->command?->info("Mengimpor {$relative} ({$label})...");
+        passthru("psql {$dsn} -v ON_ERROR_STOP=1 -f " . escapeshellarg($path), $status);
+        if ($status !== 0) {
+            throw new RuntimeException("Import {$relative} gagal.");
+        }
+    }
+
+    /**
+     * Import schema OLAP (public) dari pg_dump.
+     *
+     * olap_schema.sql adalah dump POLOS -- tidak mengandung DROP apa pun, jadi
+     * CREATE-nya hanya aman di schema kosong. `migrate:fresh` tidak membantu
+     * di sini: dia bekerja di koneksi default (oltp / search_path
+     * tracer_oltp) dan tidak menyentuh public sama sekali. Karena itu schema
+     * public dijatuhkan eksplisit dulu supaya reseed berulang tidak gagal
+     * "already exists" / "duplicate key".
+     *
+     * Drop ini aman terhadap tracking migration: tabel `migrations` milik
+     * Laravel ada di tracer_oltp, bukan public.
+     */
+    private function importOlapSchema(): void
+    {
+        $path = database_path('dump/olap_schema.sql');
+
+        if (!is_file($path)) {
+            throw new RuntimeException("Dump OLAP tidak ditemukan: {$path}");
+        }
+
+        $dsn = sprintf(
+            '-h %s -p %s -U %s -d %s',
+            escapeshellarg(env('OLAP_DB_HOST', '127.0.0.1')),
+            escapeshellarg(env('OLAP_DB_PORT', '5432')),
+            escapeshellarg(env('OLAP_DB_USERNAME', 'postgres')),
+            escapeshellarg(env('OLAP_DB_DATABASE', 'tracer_study')),
+        );
+
+        putenv('PGPASSWORD=' . env('OLAP_DB_PASSWORD'));
+
+        $this->command?->info('Menjatuhkan dan membuat ulang schema public (OLAP)...');
+        passthru(
+            "psql {$dsn} -v ON_ERROR_STOP=1 -c "
+            . escapeshellarg('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;'),
+            $status
+        );
+        if ($status !== 0) {
+            throw new RuntimeException('Gagal reset schema public sebelum import OLAP.');
+        }
+
+        $this->command?->info('Mengimpor database/dump/olap_schema.sql...');
+        passthru(
+            "psql {$dsn} -v ON_ERROR_STOP=1 -f " . escapeshellarg($path),
+            $status
+        );
+        if ($status !== 0) {
+            throw new RuntimeException('Import database/dump/olap_schema.sql gagal.');
+        }
+
+        $this->command?->info('Schema OLAP siap.');
     }
 }
