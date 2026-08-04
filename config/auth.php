@@ -42,6 +42,26 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // Guard staff (head_tracer, tracer_team, wadir, kajur, kaprodi).
+        //
+        // PENTING: 'provider' WAJIB diisi. Sanctum mendaftarkan guard ini
+        // otomatis dengan provider null (SanctumServiceProvider), dan provider
+        // null membuat Guard::hasValidProvider() selalu true — artinya token
+        // milik siapa pun, termasuk alumni, akan diterima di seluruh endpoint
+        // 'auth:sanctum'. Dengan dipatok ke 'users', hanya token milik User
+        // yang lolos.
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
+
+        // Guard alumni (pengisi kuesioner). Terpisah total dari staff:
+        // token alumni hanya berlaku di endpoint 'auth:alumni'.
+        'alumni' => [
+            'driver' => 'sanctum',
+            'provider' => 'alumni',
+        ],
     ],
 
     /*
@@ -65,6 +85,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model'  => App\Models\Transactional\User::class,  // update ini
+        ],
+
+        'alumni' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\Transactional\AlumniProfile::class,
         ],
 
         // 'users' => [

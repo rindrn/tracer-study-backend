@@ -56,8 +56,21 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::get('tracer-study/forms', [QuestionnaireFetchController::class, 'getActiveForms']);
-Route::post('tracer-study/submit', [TracerStudySubmitController::class, 'store']);
 Route::apiResource('questionnaires', QuestionnaireController::class)->only(['show']);
+
+// ═══════════════════════════════════════════════════════════
+// ALUMNI — wajib login alumni (Sanctum, guard 'alumni')
+// ═══════════════════════════════════════════════════════════
+// Guard terpisah dari staff: token alumni tidak berlaku di 'auth:sanctum',
+// dan token staff tidak berlaku di sini (lihat catatan di config/auth.php).
+Route::middleware('auth:alumni')->group(function () {
+    Route::post('auth/alumni-logout', [AlumniAuthController::class, 'logout']);
+
+    // Submit kuesioner. Dulu publik — siapa pun bisa mengirim jawaban atas
+    // nama NIM mana pun tanpa login. Sekarang NIM pada payload wajib cocok
+    // dengan alumni pemegang token (dicek di controller).
+    Route::post('tracer-study/submit', [TracerStudySubmitController::class, 'store']);
+});
 
 // ═══════════════════════════════════════════════════════════
 // PROTECTED — wajib login (Sanctum)
