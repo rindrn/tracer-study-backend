@@ -101,7 +101,12 @@ class SebaranInstansiController extends Controller
         $request->validate([
             'jenis_instansi'   => 'nullable|array',
             'jenis_instansi.*' => 'string|max:100',
-            'tingkat_instansi' => 'nullable|string|in:Lokal,Nasional,Internasional',
+            // Label asli di gudang data adalah kalimat penuh — mis.
+            // 'Lokal/Wilayah/Wiraswasta tidak berbadan hukum' dan
+            // 'Multinasional/Internasional'. Whitelist lama
+            // (Lokal,Nasional,Internasional) menolak nilai yang sah dan
+            // meloloskan nilai yang tidak pernah cocok saat difilter 'equals'.
+            'tingkat_instansi' => 'nullable|string|max:100',
             'jenjang'          => 'nullable|string|in:D3,D4,S2,S1',
             'nama_prodi'       => 'nullable|string|max:100',
             'tahun_lulus'      => 'nullable|string|max:5',

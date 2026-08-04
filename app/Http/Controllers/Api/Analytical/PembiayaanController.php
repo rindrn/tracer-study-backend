@@ -96,7 +96,13 @@ class PembiayaanController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'sumber_biaya'    => 'nullable|string|max:100',
+            // Boleh satu label, boleh daftar label. Daftar dipakai saat pie
+            // menggabungkan beberapa nilai mentah ke satu irisan (mis. "Lainnya",
+            // yang aslinya "Lainnya, tuliskan" dan kawan-kawan).
+            // max:100 berlaku dua arti sesuai tipe — panjang string, atau jumlah
+            // elemen kalau yang dikirim daftar. Keduanya memang dibatasi.
+            'sumber_biaya'    => 'nullable|max:100',
+            'sumber_biaya.*'  => 'string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'jurusan'         => 'nullable|string|max:100',

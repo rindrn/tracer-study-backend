@@ -61,11 +61,37 @@ class LamRepository
             // Map version_id → lam_id
             $versionLamMap = $activeVersions->pluck('lam_id', 'id')->toArray();
 
+            // Query ini dulu memakai vw_thresholds_complete, tapi view itu TIDAK
+            // punya kolom param_value, dynamic_param_unit, maupun
+            // is_system_calculated. Akibatnya seluruh indikator dinamis tampil
+            // tanpa nilai parameter di tabel Kelola Threshold (kolomnya "…"),
+            // padahal grafik benar — grafik lewat ThresholdRepository yang
+            // memang JOIN threshold_configs. Join di bawah menyamakan bentuk
+            // baris dengan jalur itu, jadi kedua jalur baca sumber yang sama.
             $thresholds = DB::connection('oltp')
-                ->table('vw_thresholds_complete')
-                ->whereIn('lam_version_id', $versionIds)
-                ->orderBy('indicator_id')
-                ->orderBy('threshold_level')
+                ->table('thresholds as t')
+                ->join('threshold_indicators as ti', 'ti.id', '=', 't.indicator_id')
+                ->leftJoin('threshold_configs as tc', function ($join) {
+                    $join->on('tc.lam_version_id', '=', 't.lam_version_id')
+                         ->on('tc.indicator_id', '=', 't.indicator_id');
+                })
+                ->whereIn('t.lam_version_id', $versionIds)
+                ->select(
+                    't.id as threshold_id',
+                    't.value as threshold_value',
+                    't.level as threshold_level',
+                    't.lam_version_id',
+                    't.indicator_id',
+                    'ti.key as indicator_key',
+                    'ti.name as indicator_name',
+                    'ti.unit as indicator_unit',
+                    'ti.operator as indicator_operator',
+                    'ti.dynamic_param_unit',
+                    'ti.is_system_calculated',
+                    'tc.param_value',
+                )
+                ->orderBy('t.indicator_id')
+                ->orderBy('t.level')
                 ->get();
 
             // Group per lam_id, lalu per indicator_id
@@ -92,8 +118,7 @@ class LamRepository
                     $first      = collect($levels)->first();
                     $paramValue = $first->param_value ?? null;
 
-                    // Sama seperti ThresholdService::interpolateName() — vw_thresholds_complete
-                    // sudah bawa param_value, tapi belum ada yang memakainya di jalur GET /lams ini.
+                    // Sama seperti ThresholdService::interpolateName().
                     $name = $first->indicator_name;
                     if ($paramValue !== null && str_contains($name, '{value}')) {
                         $formatted = rtrim(rtrim(number_format((float) $paramValue, 2, '.', ''), '0'), '.');

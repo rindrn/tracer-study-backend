@@ -72,6 +72,36 @@ class AuthService
     {
         $user->currentAccessToken()->delete();
     }
+
+    /**
+     * Ganti password staff.
+     *
+     * Seluruh token lain dicabut setelah password berganti — kalau ada sesi
+     * yang bocor, mengganti password harus benar-benar memutusnya, bukan
+     * membiarkannya tetap hidup dengan token lama. Token yang sedang dipakai
+     * sengaja dipertahankan supaya pengguna tidak terlempar keluar sendiri.
+     */
+    public function changePassword(User $user, string $currentPassword, string $newPassword): void
+    {
+        if (! Hash::check($currentPassword, $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Password saat ini salah.'],
+            ]);
+        }
+
+        if (Hash::check($newPassword, $user->password)) {
+            throw ValidationException::withMessages([
+                'new_password' => ['Password baru harus berbeda dari password saat ini.'],
+            ]);
+        }
+
+        // Cast 'hashed' di model User yang melakukan hashing.
+        $user->password = $newPassword;
+        $user->save();
+
+        $currentTokenId = $user->currentAccessToken()?->id;
+        $user->tokens()->when($currentTokenId, fn ($q) => $q->where('id', '!=', $currentTokenId))->delete();
+    }
  
     public function me(User $user): array
     {

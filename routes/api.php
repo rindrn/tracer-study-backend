@@ -80,6 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth
     Route::post('auth/logout', [AuthController::class, 'logout']);
     Route::get('auth/me', [AuthController::class, 'me']);
+    Route::post('auth/change-password', [AuthController::class, 'changePassword']);
 
     // Questionnaires — index (semua role bisa lihat list)
     Route::get('questionnaires', [QuestionnaireController::class, 'index']);

@@ -53,6 +53,26 @@ class AuthController extends Controller
         ]);
     }
  
+    // POST /api/auth/change-password
+    public function changePassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password'     => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $this->service->changePassword(
+            user:            $request->user(),
+            currentPassword: $request->input('current_password'),
+            newPassword:     $request->input('new_password'),
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password berhasil diubah.',
+        ]);
+    }
+
     // GET /api/auth/me
     public function me(Request $request): JsonResponse
     {

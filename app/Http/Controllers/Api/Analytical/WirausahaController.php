@@ -61,7 +61,11 @@ class WirausahaController extends Controller
     public function drillDown(Request $request): JsonResponse
     {
         $request->validate([
-            'jabatan'         => 'nullable|string|in:Staff,Co-Founder,Owner,Founder,CEO,Manager,Direktur',
+            // Jangan di-whitelist. Label jabatan berasal dari questionnaire_options
+            // dan bisa berubah tiap periode kuesioner — whitelist hardcoded lama
+            // ('Owner', 'CEO', 'Manager', 'Direktur') tidak pernah ada di data,
+            // sementara opsi asli 'Freelance / Kerja Lepas' justru ditolak 422.
+            'jabatan'         => 'nullable|string|max:100',
             'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',

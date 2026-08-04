@@ -166,8 +166,13 @@ class PembiayaanRepository extends BaseAnalyticalRepository
         ]);
     }
 
+    /**
+     * @param string|array<string>|null $sumberBiaya satu label, atau daftar label
+     *        mentah untuk bucket gabungan seperti "Lainnya" di pie (label bucket
+     *        itu sendiri tidak pernah ada di gudang data).
+     */
     public function getDetailAlumni(
-        ?string $sumberBiaya    = null,
+        string|array|null $sumberBiaya = null,
         ?string $jenjang        = null,
         ?string $jurusan        = null,
         ?string $namaProdi      = null,
@@ -185,11 +190,16 @@ class PembiayaanRepository extends BaseAnalyticalRepository
             mingguSnapshot: $mingguSnapshot,
         );
 
-        if ($sumberBiaya !== null && $sumberBiaya !== '') {
+        // Cube.js: 'equals' dengan banyak nilai berperilaku seperti IN.
+        $sumberValues = array_values(array_filter(
+            array_map('strval', (array) ($sumberBiaya ?? [])),
+            fn ($v) => $v !== '',
+        ));
+        if (! empty($sumberValues)) {
             $filters[] = [
                 'member'   => 'DimAlumni.label_sumber_biaya_dipolban',
                 'operator' => 'equals',
-                'values'   => [$sumberBiaya],
+                'values'   => $sumberValues,
             ];
         }
 
