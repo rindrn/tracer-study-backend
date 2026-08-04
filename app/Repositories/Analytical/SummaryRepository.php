@@ -40,25 +40,36 @@ class SummaryRepository
         ?string $namaProdi      = null,
         ?string $graduationYear = null,
     ): array {
-        $query = DB::table('alumni_profiles as ap')
+        // Satuan seluruh angka di sini adalah ALUMNI, bukan baris responses.
+        // Satu alumni bisa punya beberapa baris (kuesioner global + prodi),
+        // dan menghitungnya langsung dari hasil join membuat kartu "Total
+        // Kuesioner" menunjukkan 583 untuk 505 alumni — penyebut response rate
+        // ikut menggelembung. Diringkas per alumni dulu di subquery.
+        $inner = DB::table('alumni_profiles as ap')
             ->join('programs as p', 'ap.program_id', '=', 'p.id')
             ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
             ->select([
-                DB::raw('COUNT(ap.id) as total'),
-                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_submitted"),
-                DB::raw("SUM(CASE WHEN r.status = 'started' OR r.status IS NULL THEN 1 ELSE 0 END) as count_not_submitted"),
-                // Rata-rata durasi pengisian dalam jam — tetap pakai started_at & submitted_at
-                // karena ini kolom timestamp, bukan status
-                DB::raw("AVG(CASE WHEN r.started_at IS NOT NULL AND r.submitted_at IS NOT NULL
+                'ap.id as alumni_id',
+                DB::raw("SUM(CASE WHEN r.status IN ('submitted','verified') THEN 1 ELSE 0 END) as n_selesai"),
+                // Durasi diambil dari rentang seluruh pengisian alumni ini:
+                // mulai paling awal sampai kirim paling akhir.
+                DB::raw('MIN(r.started_at) as started_at'),
+                DB::raw('MAX(r.submitted_at) as submitted_at'),
+            ])
+            ->groupBy('ap.id');
+
+        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $graduationYear);
+
+        $r = DB::query()->fromSub($inner, 't')
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(CASE WHEN n_selesai > 0 THEN 1 ELSE 0 END) as count_submitted')
+            ->selectRaw('SUM(CASE WHEN n_selesai = 0 THEN 1 ELSE 0 END) as count_not_submitted')
+            ->selectRaw('AVG(CASE WHEN started_at IS NOT NULL AND submitted_at IS NOT NULL
                             THEN EXTRACT(EPOCH FROM (submitted_at - started_at)) / 3600.0
-                            ELSE NULL END) as avg_fill_hours"),
-                DB::raw("SUM(CASE WHEN r.started_at IS NOT NULL AND r.submitted_at IS NOT NULL
-                            THEN 1 ELSE 0 END) as count_with_duration"),
-            ]);
-
-        $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
-
-        $r = $query->first();
+                            ELSE NULL END) as avg_fill_hours')
+            ->selectRaw('SUM(CASE WHEN started_at IS NOT NULL AND submitted_at IS NOT NULL
+                            THEN 1 ELSE 0 END) as count_with_duration')
+            ->first();
 
         return [
             'total'               => (int) ($r->total                ?? 0),
@@ -84,19 +95,28 @@ class SummaryRepository
         ?string $namaProdi      = null,
         ?string $graduationYear = null,
     ): array {
-        $query = DB::table('alumni_profiles as ap')
+        // Per alumni, sama seperti getAggregate() — kalau tidak, tahun dengan
+        // banyak alumni ber-kuesioner-prodi terlihat punya lebih banyak
+        // responden daripada jumlah alumninya sendiri.
+        $inner = DB::table('alumni_profiles as ap')
             ->join('programs as p', 'ap.program_id', '=', 'p.id')
             ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
             ->select([
+                'ap.id as alumni_id',
                 'ap.graduation_year as graduation_year',
-                DB::raw('COUNT(ap.id) as total'),
-                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_submitted"),
+                DB::raw("SUM(CASE WHEN r.status IN ('submitted','verified') THEN 1 ELSE 0 END) as n_selesai"),
             ])
-            ->groupBy('ap.graduation_year');
+            ->groupBy('ap.id', 'ap.graduation_year');
 
-        $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
+        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $graduationYear);
 
-        $rows = $query->orderBy('ap.graduation_year', 'asc')->get();
+        $rows = DB::query()->fromSub($inner, 't')
+            ->select('graduation_year')
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(CASE WHEN n_selesai > 0 THEN 1 ELSE 0 END) as count_submitted')
+            ->groupBy('graduation_year')
+            ->orderBy('graduation_year', 'asc')
+            ->get();
 
         return collect($rows)->map(function ($r) {
             $total = (int) $r->total;

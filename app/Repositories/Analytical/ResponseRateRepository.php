@@ -27,6 +27,51 @@ class ResponseRateRepository
     private const SQL_SEDANG  = "r.status = 'started'";
     private const SQL_BELUM   = "r.status IS NULL";
 
+    /**
+     * Hitungan di lapisan luar — dijalankan atas hasil perAlumniQuery(), jadi
+     * satuannya ALUMNI, bukan baris responses.
+     *
+     * Urutan prioritasnya penting: satu alumni bisa punya beberapa baris
+     * responses (kuesioner global + kuesioner prodi), dan bisa saja campur —
+     * mis. global sudah dikirim tapi kuesioner prodi yang baru terbit masih
+     * draf. Alumni seperti itu dihitung sebagai "Selesai" sekali saja, tidak
+     * bocor ke dua bucket, sehingga ketiga angka selalu berjumlah total.
+     */
+    private const OUTER_COUNTS = 'COUNT(*) as total,'
+        . ' SUM(CASE WHEN n_selesai > 0 THEN 1 ELSE 0 END) as count_submitted,'
+        . ' SUM(CASE WHEN n_selesai = 0 AND n_sedang > 0 THEN 1 ELSE 0 END) as count_ongoing,'
+        . ' SUM(CASE WHEN n_selesai = 0 AND n_sedang = 0 THEN 1 ELSE 0 END) as count_started';
+
+    /**
+     * Query dasar: SATU BARIS PER ALUMNI.
+     *
+     * Sebelumnya seluruh angka response rate dihitung langsung dari hasil
+     * LEFT JOIN ke responses, sehingga alumni yang menjawab kuesioner global
+     * DAN kuesioner prodi terhitung dua kali — "Total Kuesioner" menunjukkan
+     * 583 untuk 505 alumni, dan response rate ikut salah di pembilang maupun
+     * penyebutnya. Meringkas per alumni dulu di sini menghilangkan itu.
+     */
+    private function perAlumniQuery(
+        ?string $jenjang,
+        ?string $namaProdi,
+        ?string $graduationYear,
+        array   $extraSelect = [],
+        array   $groupBy     = [],
+    ) {
+        $query = DB::table('alumni_profiles as ap')
+            ->join('programs as p', 'ap.program_id', '=', 'p.id')
+            ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
+            ->select(array_merge(['ap.id as alumni_id'], $extraSelect, [
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SELESAI . ' THEN 1 ELSE 0 END) as n_selesai'),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SEDANG  . ' THEN 1 ELSE 0 END) as n_sedang'),
+            ]))
+            ->groupBy(array_merge(['ap.id'], $groupBy));
+
+        $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
+
+        return $query;
+    }
+
     // ──────────────────────────────────────────────────────────────
     //  1. BAR
     // ──────────────────────────────────────────────────────────────
@@ -36,21 +81,16 @@ class ResponseRateRepository
         ?string $namaProdi      = null,
         ?string $graduationYear = null,
     ): Collection {
-        $query = DB::table('alumni_profiles as ap')
-            ->join('programs as p', 'ap.program_id', '=', 'p.id')
-            ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
-            ->select([
-                'p.id as program_id',
-                'p.name as nama_prodi',
-                'p.degree as jenjang',
-                DB::raw('COUNT(ap.id) as total'),
-                DB::raw('SUM(CASE WHEN ' . self::SQL_SELESAI . ' THEN 1 ELSE 0 END) as count_submitted'),
-                DB::raw('SUM(CASE WHEN ' . self::SQL_SEDANG  . ' THEN 1 ELSE 0 END) as count_ongoing'),
-                DB::raw('SUM(CASE WHEN ' . self::SQL_BELUM   . ' THEN 1 ELSE 0 END) as count_started'),
-            ])
-            ->groupBy('p.id', 'p.name', 'p.degree');
+        $inner = $this->perAlumniQuery(
+            $jenjang, $namaProdi, $graduationYear,
+            extraSelect: ['p.id as program_id', 'p.name as nama_prodi', 'p.degree as jenjang'],
+            groupBy:     ['p.id', 'p.name', 'p.degree'],
+        );
 
-        $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
+        $query = DB::query()->fromSub($inner, 't')
+            ->select(['nama_prodi', 'jenjang'])
+            ->selectRaw(self::OUTER_COUNTS)
+            ->groupBy('program_id', 'nama_prodi', 'jenjang');
 
         return collect($query->get())->map(fn($r) => [
             'nama_prodi'     => $r->nama_prodi,
@@ -71,19 +111,9 @@ class ResponseRateRepository
         ?string $namaProdi      = null,
         ?string $graduationYear = null,
     ): array {
-        $query = DB::table('alumni_profiles as ap')
-            ->join('programs as p', 'ap.program_id', '=', 'p.id')
-            ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
-            ->select([
-                DB::raw('COUNT(ap.id) as total'),
-                DB::raw('SUM(CASE WHEN ' . self::SQL_SELESAI . ' THEN 1 ELSE 0 END) as count_submitted'),
-                DB::raw('SUM(CASE WHEN ' . self::SQL_SEDANG  . ' THEN 1 ELSE 0 END) as count_ongoing'),
-                DB::raw('SUM(CASE WHEN ' . self::SQL_BELUM   . ' THEN 1 ELSE 0 END) as count_started'),
-            ]);
+        $inner = $this->perAlumniQuery($jenjang, $namaProdi, $graduationYear);
 
-        $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
-
-        $r = $query->first();
+        $r = DB::query()->fromSub($inner, 't')->selectRaw(self::OUTER_COUNTS)->first();
 
         return [
             'total'           => (int) ($r->total            ?? 0),
@@ -102,21 +132,18 @@ class ResponseRateRepository
         ?string $namaProdi      = null,
         ?string $graduationYear = null,
     ): Collection {
-        $query = DB::table('alumni_profiles as ap')
-            ->join('programs as p', 'ap.program_id', '=', 'p.id')
-            ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
-            ->select([
-                'ap.graduation_year',
-                DB::raw('COUNT(ap.id) as total'),
-                DB::raw('SUM(CASE WHEN ' . self::SQL_SELESAI . ' THEN 1 ELSE 0 END) as count_submitted'),
-                DB::raw('SUM(CASE WHEN ' . self::SQL_SEDANG  . ' THEN 1 ELSE 0 END) as count_ongoing'),
-                DB::raw('SUM(CASE WHEN ' . self::SQL_BELUM   . ' THEN 1 ELSE 0 END) as count_started'),
-            ])
-            ->groupBy('ap.graduation_year');
+        $inner = $this->perAlumniQuery(
+            $jenjang, $namaProdi, $graduationYear,
+            extraSelect: ['ap.graduation_year'],
+            groupBy:     ['ap.graduation_year'],
+        );
 
-        $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
+        $query = DB::query()->fromSub($inner, 't')
+            ->select(['graduation_year'])
+            ->selectRaw(self::OUTER_COUNTS)
+            ->groupBy('graduation_year');
 
-        return collect($query->orderBy('ap.graduation_year', 'asc')->get())->map(fn($r) => [
+        return collect($query->orderBy('graduation_year', 'asc')->get())->map(fn($r) => [
             'graduation_year' => $r->graduation_year,
             'total'           => (int) $r->total,
             'count_submitted' => (int) $r->count_submitted,
@@ -138,7 +165,11 @@ class ResponseRateRepository
         int     $page           = 1,
         int     $perPage        = 15,
     ): array {
-        $query = DB::table('alumni_profiles as ap')
+        // SATU BARIS PER ALUMNI. Sebelumnya daftar ini menampilkan hasil join
+        // apa adanya, sehingga alumni yang punya kuesioner global + prodi
+        // muncul dua kali dengan isi identik — dan total_count-nya pun
+        // menghitung baris, bukan orang.
+        $inner = DB::table('alumni_profiles as ap')
             ->join('programs as p', 'ap.program_id', '=', 'p.id')
             ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
             ->select([
@@ -148,33 +179,37 @@ class ResponseRateRepository
                 'ap.graduation_year as graduation_year',
                 'p.name as nama_prodi',
                 'p.degree as jenjang',
-                'r.status as raw_status',
-                'r.started_at as started_at',
-                'r.submitted_at as submitted_at',
-            ]);
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SELESAI . ' THEN 1 ELSE 0 END) as n_selesai'),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SEDANG  . ' THEN 1 ELSE 0 END) as n_sedang'),
+                // Waktu paling relevan dari seluruh kuesioner milik alumni ini.
+                DB::raw('MIN(r.started_at) as started_at'),
+                DB::raw('MAX(r.submitted_at) as submitted_at'),
+            ])
+            ->groupBy('ap.id', 'ap.name', 'ap.nim', 'ap.graduation_year', 'p.name', 'p.degree');
 
-        // Bucket yang sama persis dengan bar/pie/tren — lihat konstanta di atas.
-        // Ingat: 'started' di sini berarti BELUM mulai (tidak ada baris response),
-        // sedangkan draf yang sedang berjalan ada di 'ongoing'.
-        match ($status) {
-            'submitted' => $query->whereRaw(self::SQL_SELESAI),
-            'ongoing'   => $query->whereRaw(self::SQL_SEDANG),
-            'started'   => $query->whereRaw(self::SQL_BELUM),
-        };
-
-        $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
+        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $graduationYear);
 
         if ($search !== null && $search !== '') {
-            $query->where(function ($q) use ($search) {
+            $inner->where(function ($q) use ($search) {
                 $q->where('ap.name', 'like', "%{$search}%")
                   ->orWhere('ap.nim', 'like', "%{$search}%");
             });
         }
 
+        // Bucket yang sama persis dengan bar/pie/tren, dengan prioritas yang
+        // sama pula (lihat OUTER_COUNTS): Selesai menang atas Sedang Mengisi.
+        // Ingat: 'started' di API berarti BELUM mulai, draf ada di 'ongoing'.
+        $query = DB::query()->fromSub($inner, 't');
+        match ($status) {
+            'submitted' => $query->whereRaw('n_selesai > 0'),
+            'ongoing'   => $query->whereRaw('n_selesai = 0 AND n_sedang > 0'),
+            'started'   => $query->whereRaw('n_selesai = 0 AND n_sedang = 0'),
+        };
+
         $totalCount = $query->clone()->count();
 
         $rows = $query
-            ->orderBy('ap.name', 'asc')
+            ->orderBy('nama', 'asc')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
@@ -185,7 +220,11 @@ class ResponseRateRepository
             'nama_prodi'      => $r->nama_prodi,
             'jenjang'         => $r->jenjang,
             'graduation_year' => $r->graduation_year,
-            'status'          => $this->resolveStatusLabel($r->raw_status),
+            'status'          => match (true) {
+                $r->n_selesai > 0 => 'Selesai',
+                $r->n_sedang  > 0 => 'Sedang Mengisi',
+                default           => 'Belum Mengisi',
+            },
             'started_at'      => $r->started_at,
             'submitted_at'    => $r->submitted_at,
         ])->toArray();
@@ -220,17 +259,4 @@ class ResponseRateRepository
         }
     }
 
-    /**
-     * Label kolom Status di tabel drill-down. Membaca responses.status mentah,
-     * jadi 'started' di sini adalah nilai DB (draf berjalan) — bukan kosakata
-     * parameter API yang artinya belum mulai.
-     */
-    private function resolveStatusLabel(?string $rawStatus): string
-    {
-        return match ($rawStatus) {
-            'submitted', 'verified' => 'Selesai',
-            'started'               => 'Sedang Mengisi',
-            default                 => 'Belum Mengisi', // NULL — tidak ada baris response
-        };
-    }
 }
