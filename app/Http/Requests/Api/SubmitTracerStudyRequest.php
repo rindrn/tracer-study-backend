@@ -121,6 +121,97 @@ class SubmitTracerStudyRequest extends FormRequest
     }
 
     /**
+     * Pesan galat berbahasa Indonesia.
+     *
+     * Sejak frontend menampilkan galat dari server apa adanya di bawah tiap
+     * pertanyaan dan di dalam toast, pesan bawaan Laravel yang berbahasa
+     * Inggris dan menyebut kode mentah ("The selected f5c is invalid") tidak
+     * layak dibaca alumni. Kode pertanyaan diganti label yang bermakna lewat
+     * attributes().
+     */
+    public function messages(): array
+    {
+        return [
+            'required' => 'Pertanyaan :attribute wajib diisi.',
+            'numeric'  => 'Jawaban :attribute harus berupa angka, tanpa titik atau koma.',
+            'in'       => 'Pilihan pada :attribute tidak dikenali. Silakan pilih salah satu opsi yang tersedia.',
+            'date'     => 'Tanggal pada :attribute tidak valid.',
+            'email'    => 'Format email tidak valid. Contoh: nama@email.com',
+            'max'      => 'Jawaban :attribute terlalu panjang.',
+            'between'  => 'Nilai :attribute harus berada di antara :min sampai :max.',
+        ];
+    }
+
+    /**
+     * Ganti kode pertanyaan dengan teks pertanyaannya, supaya pesan galat
+     * menyebut hal yang dikenali alumni alih-alih kode internal seperti f505.
+     */
+    public function attributes(): array
+    {
+        $qIds = $this->input('questionnaire_ids', []);
+        if (empty($qIds)) {
+            return [];
+        }
+
+        return DB::connection('oltp')->table('questionnaire_questions')
+            ->whereIn('questionnaire_id', $qIds)
+            ->pluck('question_text', 'code')
+            ->map(fn ($teks) => \Illuminate\Support\Str::limit(strip_tags((string) $teks), 70))
+            ->all();
+    }
+
+    /**
+     * Validasi silang antar-pertanyaan — tidak bisa dinyatakan lewat rules()
+     * biasa karena membandingkan beberapa jawaban sekaligus.
+     *
+     * Corong pencarian kerja secara logis harus mengecil:
+     *   f6  = jumlah perusahaan yang dilamar
+     *   f7  = jumlah yang merespons        (tidak mungkin > f6)
+     *   f7a = jumlah yang mengundang wawancara (tidak mungkin > f7)
+     *
+     * Ketidakkonsistenan semacam ini lolos dari aturan `numeric`, padahal
+     * merusak analisis efektivitas pencarian kerja di lapisan analitik.
+     * Perbandingan hanya dilakukan bila kedua nilainya benar-benar diisi.
+     */
+    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    {
+        $validator->after(function (\Illuminate\Validation\Validator $v) {
+            $angka = function (string $kode): ?float {
+                $nilai = $this->input($kode);
+                return ($nilai === null || $nilai === '' || !is_numeric($nilai))
+                    ? null
+                    : (float) $nilai;
+            };
+
+            $dilamar   = $angka('f6');
+            $merespons = $angka('f7');
+            $wawancara = $angka('f7a');
+
+            if ($dilamar !== null && $merespons !== null && $merespons > $dilamar) {
+                $v->errors()->add('f7', sprintf(
+                    'Jumlah perusahaan yang merespons (%s) tidak boleh lebih banyak daripada jumlah lamaran yang dikirim (%s).',
+                    (int) $merespons, (int) $dilamar,
+                ));
+            }
+
+            if ($merespons !== null && $wawancara !== null && $wawancara > $merespons) {
+                $v->errors()->add('f7a', sprintf(
+                    'Jumlah undangan wawancara (%s) tidak boleh lebih banyak daripada jumlah perusahaan yang merespons (%s).',
+                    (int) $wawancara, (int) $merespons,
+                ));
+            }
+
+            // Tetap diperiksa walau f7 kosong, supaya f7a tidak bisa melebihi f6.
+            if ($merespons === null && $dilamar !== null && $wawancara !== null && $wawancara > $dilamar) {
+                $v->errors()->add('f7a', sprintf(
+                    'Jumlah undangan wawancara (%s) tidak boleh lebih banyak daripada jumlah lamaran yang dikirim (%s).',
+                    (int) $wawancara, (int) $dilamar,
+                ));
+            }
+        });
+    }
+
+    /**
      * Return all input so dynamic question codes pass through to the service.
      */
     public function validated($key = null, $default = null)

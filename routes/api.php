@@ -85,6 +85,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // Roles — read (semua role)
     Route::get('roles', [RoleController::class, 'index']);
 
+    // Ringkasan per tahun lulusan — dipakai halaman kartu tahun di FE
+    // (alumni-data, student-management, questionnaire-results,
+    // form-management). Cakupan datanya menyesuaikan jabatan pemanggil,
+    // jadi tidak perlu gate role tambahan di sini.
+    Route::get('meta/ringkasan-tahun', [\App\Http\Controllers\Api\Transactional\RingkasanTahunController::class, 'index']);
+
     // LAMs — semua role bisa GET
     Route::get('lams',          [LamController::class, 'index']);
     Route::get('lams/{id}',     [LamController::class, 'show']);
