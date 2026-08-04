@@ -36,7 +36,7 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration
 {
     /** Urutan menentukan arti kode — jangan diubah tanpa memigrasi data lama. */
-    private const OPSI = [
+    private const POSITIONS = [
         1 => ['Founder', 'Pendiri utama usaha'],
         2 => ['Co-Founder', 'Salah satu pendiri bersama rekan lain'],
         3 => ['Staff', 'Pekerja atau karyawan di usaha tersebut'],
@@ -47,11 +47,11 @@ return new class extends Migration
     {
         $conn = DB::connection('oltp');
 
-        $pertanyaan = $conn->table('questionnaire_questions')
+        $questions = $conn->table('questionnaire_questions')
             ->where('code', 'f5c')
             ->get(['id', 'metadata']);
 
-        foreach ($pertanyaan as $q) {
+        foreach ($questions as $q) {
             $conn->table('questionnaire_questions')
                 ->where('id', $q->id)
                 ->update([
@@ -65,8 +65,8 @@ return new class extends Migration
                             'option_hints' => array_map(
                                 fn (array $o) => $o[1],
                                 array_combine(
-                                    array_map('strval', array_keys(self::OPSI)),
-                                    array_values(self::OPSI),
+                                    array_map('strval', array_keys(self::POSITIONS)),
+                                    array_values(self::POSITIONS),
                                 ),
                             ),
                         ],
@@ -74,14 +74,14 @@ return new class extends Migration
                     'updated_at'    => now(),
                 ]);
 
-            foreach (self::OPSI as $kode => [$label]) {
+            foreach (self::POSITIONS as $code => [$label]) {
                 // updateOrInsert supaya migrasi aman dijalankan ulang.
                 $conn->table('questionnaire_options')->updateOrInsert(
-                    ['question_id' => $q->id, 'option_code' => (string) $kode],
+                    ['question_id' => $q->id, 'option_code' => (string) $code],
                     [
                         'option_label' => $label,
                         'option_value' => null,
-                        'order_no'     => $kode,
+                        'order_no'     => $code,
                         'is_active'    => true,
                         'is_hidden'    => false,
                         'created_at'   => now(),
@@ -100,7 +100,7 @@ return new class extends Migration
 
         $conn->table('questionnaire_options')
             ->whereIn('question_id', $ids)
-            ->whereIn('option_code', array_map('strval', array_keys(self::OPSI)))
+            ->whereIn('option_code', array_map('strval', array_keys(self::POSITIONS)))
             ->delete();
 
         foreach ($ids as $id) {

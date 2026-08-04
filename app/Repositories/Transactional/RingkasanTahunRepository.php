@@ -37,13 +37,13 @@ class RingkasanTahunRepository
      * @param array{program_id?: int|null, jurusan?: string|null} $scope
      * @return array<int, array{tahun:int, alumni:int, sudah_mengisi:int, belum_mengisi:int, response_rate:float, kuesioner:int, periode:array<int,int>}>
      */
-    public function perTahunLulusan(array $scope = []): array
+    public function byGraduationYear(array $scope = []): array
     {
         $programId = $scope['program_id'] ?? null;
         $jurusan   = $scope['jurusan'] ?? null;
 
         // ── 1. Sisi alumni: total & yang sudah mengisi, per tahun lulus ──
-        $alumni = DB::connection(self::CONN)
+        $alumniQuery = DB::connection(self::CONN)
             ->table('alumni_profiles as ap')
             ->join('programs as p', 'ap.program_id', '=', 'p.id')
             ->leftJoin('responses as r', function ($join) {
@@ -58,12 +58,12 @@ class RingkasanTahunRepository
             ->groupBy('ap.graduation_year');
 
         if ($programId !== null) {
-            $alumni->where('ap.program_id', $programId);
+            $alumniQuery->where('ap.program_id', $programId);
         } elseif ($jurusan !== null) {
-            $alumni->where('p.jurusan', $jurusan);
+            $alumniQuery->where('p.jurusan', $jurusan);
         }
 
-        $barisAlumni = $alumni->get()->keyBy('tahun');
+        $alumniRows = $alumniQuery->get()->keyBy('tahun');
 
         // ── 2. Sisi kuesioner: jumlah kuesioner yang menyasar tiap tahun ──
         //
@@ -75,7 +75,7 @@ class RingkasanTahunRepository
         // Bentuk "FROM a, fungsi(a.kolom) AS t(...)" adalah LATERAL implisit
         // di PostgreSQL -- cara paling ringkas membongkar jsonb array tanpa
         // perlu join builder yang berbelit.
-        $kuesioner = DB::connection(self::CONN)
+        $questionnaireQuery = DB::connection(self::CONN)
             ->table(DB::raw('questionnaires as q, jsonb_array_elements_text(q.target_graduation_years) as t(tahun)'))
             ->select([
                 DB::raw('t.tahun::int as tahun'),
@@ -90,11 +90,11 @@ class RingkasanTahunRepository
         if ($programId !== null) {
             // Kuesioner nasional (program_id NULL) berlaku untuk semua prodi,
             // jadi tetap ikut dihitung bagi Kaprodi.
-            $kuesioner->where(function ($w) use ($programId) {
+            $questionnaireQuery->where(function ($w) use ($programId) {
                 $w->whereNull('q.program_id')->orWhere('q.program_id', $programId);
             });
         } elseif ($jurusan !== null) {
-            $kuesioner->where(function ($w) use ($jurusan) {
+            $questionnaireQuery->where(function ($w) use ($jurusan) {
                 $w->whereNull('q.program_id')
                   ->orWhereIn('q.program_id', function ($sub) use ($jurusan) {
                       $sub->from('programs')->select('id')->where('jurusan', $jurusan);
@@ -102,40 +102,40 @@ class RingkasanTahunRepository
             });
         }
 
-        $barisKuesioner = $kuesioner->get()->keyBy('tahun');
+        $questionnaireRows = $questionnaireQuery->get()->keyBy('tahun');
 
         // ── 3. Gabungkan. Union tahun dari kedua sisi supaya tahun yang
         //       hanya punya alumni (mis. 2020, 2021 yang belum disasar
         //       kuesioner apa pun) tetap muncul sebagai kartu redup.
-        $semuaTahun = collect($barisAlumni->keys())
-            ->merge($barisKuesioner->keys())
+        $allYears = collect($alumniRows->keys())
+            ->merge($questionnaireRows->keys())
             ->map(fn ($t) => (int) $t)
             ->unique()
             ->sortDesc()
             ->values();
 
-        return $semuaTahun->map(function (int $tahun) use ($barisAlumni, $barisKuesioner) {
-            $a = $barisAlumni->get($tahun);
-            $k = $barisKuesioner->get($tahun);
+        return $allYears->map(function (int $year) use ($alumniRows, $questionnaireRows) {
+            $a = $alumniRows->get($year);
+            $k = $questionnaireRows->get($year);
 
             $total  = (int) ($a->alumni ?? 0);
-            $mengisi = (int) ($a->sudah_mengisi ?? 0);
+            $responded = (int) ($a->sudah_mengisi ?? 0);
 
-            $periode = [];
+            $periods = [];
             if ($k) {
-                $periode = $k->periode_min === $k->periode_max
+                $periods = $k->periode_min === $k->periode_max
                     ? [(int) $k->periode_min]
                     : [(int) $k->periode_min, (int) $k->periode_max];
             }
 
             return [
-                'tahun'         => $tahun,
+                'tahun'         => $year,
                 'alumni'        => $total,
-                'sudah_mengisi' => $mengisi,
-                'belum_mengisi' => $total - $mengisi,
-                'response_rate' => $total > 0 ? round($mengisi / $total * 100, 1) : 0.0,
+                'sudah_mengisi' => $responded,
+                'belum_mengisi' => $total - $responded,
+                'response_rate' => $total > 0 ? round($responded / $total * 100, 1) : 0.0,
                 'kuesioner'     => (int) ($k->kuesioner ?? 0),
-                'periode'       => $periode,
+                'periode'       => $periods,
             ];
         })->all();
     }

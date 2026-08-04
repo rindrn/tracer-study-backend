@@ -156,7 +156,7 @@ class SubmitTracerStudyRequest extends FormRequest
         return DB::connection('oltp')->table('questionnaire_questions')
             ->whereIn('questionnaire_id', $qIds)
             ->pluck('question_text', 'code')
-            ->map(fn ($teks) => \Illuminate\Support\Str::limit(strip_tags((string) $teks), 70))
+            ->map(fn ($text) => \Illuminate\Support\Str::limit(strip_tags((string) $text), 70))
             ->all();
     }
 
@@ -176,36 +176,36 @@ class SubmitTracerStudyRequest extends FormRequest
     public function withValidator(\Illuminate\Validation\Validator $validator): void
     {
         $validator->after(function (\Illuminate\Validation\Validator $v) {
-            $angka = function (string $kode): ?float {
-                $nilai = $this->input($kode);
-                return ($nilai === null || $nilai === '' || !is_numeric($nilai))
+            $numeric = function (string $code): ?float {
+                $value = $this->input($code);
+                return ($value === null || $value === '' || !is_numeric($value))
                     ? null
-                    : (float) $nilai;
+                    : (float) $value;
             };
 
-            $dilamar   = $angka('f6');
-            $merespons = $angka('f7');
-            $wawancara = $angka('f7a');
+            $applied   = $numeric('f6');
+            $responded = $numeric('f7');
+            $interviewed = $numeric('f7a');
 
-            if ($dilamar !== null && $merespons !== null && $merespons > $dilamar) {
+            if ($applied !== null && $responded !== null && $responded > $applied) {
                 $v->errors()->add('f7', sprintf(
                     'Jumlah perusahaan yang merespons (%s) tidak boleh lebih banyak daripada jumlah lamaran yang dikirim (%s).',
-                    (int) $merespons, (int) $dilamar,
+                    (int) $responded, (int) $applied,
                 ));
             }
 
-            if ($merespons !== null && $wawancara !== null && $wawancara > $merespons) {
+            if ($responded !== null && $interviewed !== null && $interviewed > $responded) {
                 $v->errors()->add('f7a', sprintf(
                     'Jumlah undangan wawancara (%s) tidak boleh lebih banyak daripada jumlah perusahaan yang merespons (%s).',
-                    (int) $wawancara, (int) $merespons,
+                    (int) $interviewed, (int) $responded,
                 ));
             }
 
             // Tetap diperiksa walau f7 kosong, supaya f7a tidak bisa melebihi f6.
-            if ($merespons === null && $dilamar !== null && $wawancara !== null && $wawancara > $dilamar) {
+            if ($responded === null && $applied !== null && $interviewed !== null && $interviewed > $applied) {
                 $v->errors()->add('f7a', sprintf(
                     'Jumlah undangan wawancara (%s) tidak boleh lebih banyak daripada jumlah lamaran yang dikirim (%s).',
-                    (int) $wawancara, (int) $dilamar,
+                    (int) $interviewed, (int) $applied,
                 ));
             }
         });

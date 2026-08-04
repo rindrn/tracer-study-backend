@@ -39,7 +39,7 @@ class RingkasanTahunController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => $this->repo->perTahunLulusan($scope),
+            'data'    => $this->repo->byGraduationYear($scope),
         ]);
     }
 }

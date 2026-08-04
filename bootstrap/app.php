@@ -20,6 +20,22 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // CORS — izinkan frontend Vite dev server (lihat config/cors.php)
         $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
+
+        // Permintaan tak terautentikasi harus dijawab 401, bukan 500.
+        //
+        // Bawaannya, middleware Authenticate mencoba mengalihkan pengguna ke
+        // route bernama 'login'. Aplikasi ini API-only dan tidak punya route
+        // itu, sehingga penyusunan respons penolakan justru melempar
+        // RouteNotFoundException dan berakhir sebagai 500.
+        //
+        // Akibatnya interceptor 401 di frontend (src/lib/api.ts) tidak pernah
+        // kena: pengguna yang tokennya sudah tidak berlaku -- misalnya setelah
+        // db:seed menghapus isi personal_access_tokens -- melihat "kesalahan
+        // server" dan tetap terjebak, alih-alih diarahkan untuk masuk ulang.
+        // Log pun terisi 500 palsu yang menenggelamkan galat sungguhan.
+        //
+        // Mengembalikan null membuat Laravel memakai jalur 401 yang benar.
+        $middleware->redirectGuestsTo(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 
