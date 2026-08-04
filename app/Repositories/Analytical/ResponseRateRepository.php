@@ -7,6 +7,26 @@ use Illuminate\Support\Facades\DB;
 
 class ResponseRateRepository
 {
+    /**
+     * Definisi tiga bucket status pengisian — dipakai bar, pie, tren, dan
+     * drill-down supaya tidak bisa lepas sinkron satu sama lain.
+     *
+     * Sebelumnya "Sedang Mengisi" dihitung dari r.status = 'ongoing', nilai
+     * yang TIDAK PERNAH ada: enum kolomnya hanya started/submitted/verified.
+     * Akibatnya irisan itu selamanya 0, dan pengisian yang belum selesai
+     * (status 'started') ikut terhitung sebagai "Belum Mengisi".
+     *
+     * Kosakata parameter API sengaja dipertahankan supaya frontend tidak perlu
+     * ikut berubah — perhatikan bahwa 'started' di API berarti BELUM mulai:
+     *
+     *   API 'submitted' → Selesai        → status submitted/verified
+     *   API 'ongoing'   → Sedang Mengisi → status 'started' (draf berjalan)
+     *   API 'started'   → Belum Mengisi  → tidak punya baris responses sama sekali
+     */
+    private const SQL_SELESAI = "r.status IN ('submitted','verified')";
+    private const SQL_SEDANG  = "r.status = 'started'";
+    private const SQL_BELUM   = "r.status IS NULL";
+
     // ──────────────────────────────────────────────────────────────
     //  1. BAR
     // ──────────────────────────────────────────────────────────────
@@ -24,9 +44,9 @@ class ResponseRateRepository
                 'p.name as nama_prodi',
                 'p.degree as jenjang',
                 DB::raw('COUNT(ap.id) as total'),
-                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_submitted"),
-                DB::raw("SUM(CASE WHEN r.status = 'ongoing'   THEN 1 ELSE 0 END) as count_ongoing"),
-                DB::raw("SUM(CASE WHEN r.status = 'started' OR r.status IS NULL THEN 1 ELSE 0 END) as count_started"),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SELESAI . ' THEN 1 ELSE 0 END) as count_submitted'),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SEDANG  . ' THEN 1 ELSE 0 END) as count_ongoing'),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_BELUM   . ' THEN 1 ELSE 0 END) as count_started'),
             ])
             ->groupBy('p.id', 'p.name', 'p.degree');
 
@@ -56,9 +76,9 @@ class ResponseRateRepository
             ->leftJoin('responses as r', 'r.alumni_id', '=', 'ap.id')
             ->select([
                 DB::raw('COUNT(ap.id) as total'),
-                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_submitted"),
-                DB::raw("SUM(CASE WHEN r.status = 'ongoing'   THEN 1 ELSE 0 END) as count_ongoing"),
-                DB::raw("SUM(CASE WHEN r.status = 'started' OR r.status IS NULL THEN 1 ELSE 0 END) as count_started"),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SELESAI . ' THEN 1 ELSE 0 END) as count_submitted'),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SEDANG  . ' THEN 1 ELSE 0 END) as count_ongoing'),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_BELUM   . ' THEN 1 ELSE 0 END) as count_started'),
             ]);
 
         $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
@@ -88,9 +108,9 @@ class ResponseRateRepository
             ->select([
                 'ap.graduation_year',
                 DB::raw('COUNT(ap.id) as total'),
-                DB::raw("SUM(CASE WHEN r.status = 'submitted' THEN 1 ELSE 0 END) as count_submitted"),
-                DB::raw("SUM(CASE WHEN r.status = 'ongoing'   THEN 1 ELSE 0 END) as count_ongoing"),
-                DB::raw("SUM(CASE WHEN r.status = 'started' OR r.status IS NULL THEN 1 ELSE 0 END) as count_started"),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SELESAI . ' THEN 1 ELSE 0 END) as count_submitted'),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_SEDANG  . ' THEN 1 ELSE 0 END) as count_ongoing'),
+                DB::raw('SUM(CASE WHEN ' . self::SQL_BELUM   . ' THEN 1 ELSE 0 END) as count_started'),
             ])
             ->groupBy('ap.graduation_year');
 
@@ -133,15 +153,13 @@ class ResponseRateRepository
                 'r.submitted_at as submitted_at',
             ]);
 
-        // Status params = nilai DB langsung, tidak perlu mapping lagi
-        // kecuali 'started' yang juga mencakup alumni tanpa row responses (NULL)
+        // Bucket yang sama persis dengan bar/pie/tren — lihat konstanta di atas.
+        // Ingat: 'started' di sini berarti BELUM mulai (tidak ada baris response),
+        // sedangkan draf yang sedang berjalan ada di 'ongoing'.
         match ($status) {
-            'submitted' => $query->where('r.status', 'submitted'),
-            'ongoing'   => $query->where('r.status', 'ongoing'),
-            'started'   => $query->where(function ($q) {
-                               $q->where('r.status', 'started')
-                                 ->orWhereNull('r.status');
-                           }),
+            'submitted' => $query->whereRaw(self::SQL_SELESAI),
+            'ongoing'   => $query->whereRaw(self::SQL_SEDANG),
+            'started'   => $query->whereRaw(self::SQL_BELUM),
         };
 
         $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
@@ -202,12 +220,17 @@ class ResponseRateRepository
         }
     }
 
+    /**
+     * Label kolom Status di tabel drill-down. Membaca responses.status mentah,
+     * jadi 'started' di sini adalah nilai DB (draf berjalan) — bukan kosakata
+     * parameter API yang artinya belum mulai.
+     */
     private function resolveStatusLabel(?string $rawStatus): string
     {
         return match ($rawStatus) {
-            'submitted' => 'Selesai',
-            'ongoing'   => 'Sedang Mengisi',
-            default     => 'Belum Mengisi', // 'started' atau NULL
+            'submitted', 'verified' => 'Selesai',
+            'started'               => 'Sedang Mengisi',
+            default                 => 'Belum Mengisi', // NULL — tidak ada baris response
         };
     }
 }
