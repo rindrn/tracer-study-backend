@@ -80,14 +80,31 @@ class ResponseRepository
         return true;
     }
 
+    /**
+     * Buat baris responses baru.
+     *
+     * submitted_at hanya diisi untuk status yang memang berarti "sudah dikirim".
+     * Sebelumnya kolom itu selalu diisi now() apa pun statusnya — untuk baris
+     * berstatus 'started' (pengisian belum selesai) itu keliru, dan metrik
+     * durasi pengisian di SummaryRepository (started_at → submitted_at) akan
+     * menghasilkan angka yang tampak sahih padahal karangan.
+     *
+     * started_at sengaja TIDAK diisi untuk submit sekali jalan: waktu alumni
+     * benar-benar mulai mengisi tidak diketahui di titik ini, dan menuliskan
+     * now() akan membuat durasi setiap orang jadi ~0 detik. NULL lebih jujur
+     * daripada nol palsu (lihat catatan di migration restore_started_at).
+     */
     public function createResponse(int $questionnaireId, int $alumniId, string $status = 'submitted'): int
     {
-        $now = Carbon::now();
+        $now      = Carbon::now();
+        $isDone   = in_array($status, ['submitted', 'verified'], strict: true);
+
         return DB::connection(self::CONN)->table('responses')->insertGetId([
             'questionnaire_id' => $questionnaireId,
             'alumni_id'        => $alumniId,
             'status'           => $status,
-            'submitted_at'     => $now,
+            'started_at'       => $isDone ? null : $now,
+            'submitted_at'     => $isDone ? $now  : null,
             'created_at'       => $now,
             'updated_at'       => $now,
         ]);

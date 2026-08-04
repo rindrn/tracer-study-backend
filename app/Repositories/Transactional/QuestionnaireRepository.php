@@ -22,6 +22,9 @@ class QuestionnaireRepository
 {
     private const CONN = 'oltp';
 
+    /** Status responses yang dianggap "sudah mengisi" — 'started' tidak termasuk. */
+    private const COMPLETED_STATUSES = ['submitted', 'verified'];
+
     // ═══════════════════════════════════════════════════════════
     // READ — header kuesioner
     // ═══════════════════════════════════════════════════════════
@@ -293,15 +296,24 @@ class QuestionnaireRepository
         return $latest ? ((int) $latest + 1) : 1;
     }
 
+    /**
+     * Jumlah responden yang BENAR-BENAR sudah mengisi.
+     *
+     * Baris berstatus 'started' (pengisian belum selesai) sengaja tidak dihitung
+     * — angka ini tampil sebagai "jumlah responden" di Form Management, dan
+     * pengisian yang belum rampung bukan responden.
+     */
     public function countResponses(int $questionnaireId): int
     {
         return DB::connection(self::CONN)->table('responses')
             ->where('questionnaire_id', $questionnaireId)
+            ->whereIn('status', self::COMPLETED_STATUSES)
             ->count();
     }
 
     /**
      * Count responses per questionnaire. Kalau $programId ada, filter per prodi.
+     * Hanya menghitung yang sudah selesai — lihat countResponses().
      * Return: collection of [questionnaire_id => count].
      */
     public function countResponsesGroupedAll(?int $programId = null, ?string $jurusan = null): Collection
@@ -311,6 +323,7 @@ class QuestionnaireRepository
         $query = $conn->table('responses')
             ->join('alumni_profiles', 'responses.alumni_id', '=', 'alumni_profiles.id')
             ->join('questionnaires', 'responses.questionnaire_id', '=', 'questionnaires.id')
+            ->whereIn('responses.status', self::COMPLETED_STATUSES)
             ->whereRaw("alumni_profiles.graduation_year::text = ANY(SELECT jsonb_array_elements_text(questionnaires.target_graduation_years))");
 
         if ($programId !== null) {

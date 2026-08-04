@@ -141,6 +141,12 @@ class QuestionnaireFetchService
 
     /**
      * Cek apakah alumni (by NIM) sudah pernah submit response ke salah satu kuesioner aktif.
+     *
+     * "Sudah mengisi" = status submitted/verified, BUKAN sekadar ada barisnya.
+     * Baris berstatus 'started' adalah pengisian yang belum selesai — kalau ikut
+     * dihitung di sini, FE menutup formulir dan alumni melihat "Anda sudah
+     * mengisi" padahal belum, tanpa cara keluar dari keadaan itu (lihat
+     * useTracerForm.ts, flag has_responded juga mematikan autosave draf).
      */
     public function hasAlumniResponded(string $nim, array $questionnaires): bool
     {
@@ -156,6 +162,7 @@ class QuestionnaireFetchService
         return DB::connection('oltp')->table('responses')
             ->where('alumni_id', $alumniId)
             ->whereIn('questionnaire_id', $questionnaireIds)
+            ->whereIn('status', ['submitted', 'verified'])
             ->exists();
     }
 }
