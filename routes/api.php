@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Analytical\EtlAnomalyLogController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireController;
 use App\Http\Controllers\Api\Transactional\ApprovalController;
 use App\Http\Controllers\Api\Transactional\TracerStudySubmitController;
+use App\Http\Controllers\Api\Transactional\TracerStudyDraftController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
 use App\Http\Controllers\Api\Transactional\RoleController;
 use App\Http\Controllers\Api\Transactional\UserController;
@@ -70,6 +71,12 @@ Route::middleware('auth:alumni')->group(function () {
     // nama NIM mana pun tanpa login. Sekarang NIM pada payload wajib cocok
     // dengan alumni pemegang token (dicek di controller).
     Route::post('tracer-study/submit', [TracerStudySubmitController::class, 'store']);
+
+    // Draf pengisian (autosave lintas perangkat). Identitas diambil dari token,
+    // bukan dari body — lihat TracerStudyDraftService.
+    Route::get('tracer-study/draft',    [TracerStudyDraftController::class, 'show']);
+    Route::post('tracer-study/draft',   [TracerStudyDraftController::class, 'store']);
+    Route::delete('tracer-study/draft', [TracerStudyDraftController::class, 'destroy']);
 });
 
 // ═══════════════════════════════════════════════════════════

@@ -111,6 +111,111 @@ class ResponseRepository
     }
 
     /**
+     * Upsert draf: satu baris responses per (kuesioner, alumni), DIPERTAHANKAN
+     * lintas autosave.
+     *
+     * Bedanya dengan jalur submit yang delete-lalu-insert: autosave berjalan
+     * ratusan kali selama satu pengisian. Kalau barisnya dibuang dan dibuat
+     * ulang tiap kali, primary key-nya berganti terus sehingga tidak ada yang
+     * bisa merujuk draf itu, dan sequence-nya membengkak percuma. Tabel
+     * responses sudah punya UNIQUE(questionnaire_id, alumni_id) — aturan itu
+     * seharusnya dipatuhi dengan memperbarui, bukan menghapus.
+     *
+     * Jawaban tetap ditulis ulang seluruhnya tiap simpan (~100 baris). Itu
+     * disengaja: menghitung selisih per pertanyaan menambah rumit tanpa
+     * kebutuhan yang terbukti. Yang mahal dan berbahaya adalah churn baris
+     * induknya, dan itu yang dihilangkan di sini.
+     *
+     * @return int|null response_id, atau null kalau barisnya sudah submitted/
+     *         verified — draf tidak boleh menimpa pengisian yang sudah selesai.
+     */
+    public function upsertDraft(int $questionnaireId, int $alumniId, array $records): ?int
+    {
+        $now      = Carbon::now();
+        $existing = $this->findByQuestionnaireAndAlumni($questionnaireId, $alumniId);
+
+        if ($existing !== null && in_array($existing->status, ['submitted', 'verified'], strict: true)) {
+            return null;
+        }
+
+        if ($existing !== null) {
+            DB::connection(self::CONN)->table('responses')
+                ->where('id', $existing->id)
+                ->update([
+                    // started_at hanya diisi kalau belum ada — nilainya adalah
+                    // kapan alumni MULAI, bukan kapan terakhir menyimpan.
+                    'started_at' => $existing->started_at ?? $now,
+                    'updated_at' => $now,
+                ]);
+            $responseId = $existing->id;
+        } else {
+            $responseId = $this->createResponse($questionnaireId, $alumniId, 'started');
+        }
+
+        DB::connection(self::CONN)->table('response_answers')
+            ->where('response_id', $responseId)
+            ->delete();
+        $this->bulkInsertAnswers($responseId, $records);
+
+        return $responseId;
+    }
+
+    /**
+     * Ambil draf (status 'started') milik alumni untuk sekumpulan kuesioner.
+     * Baris yang sudah submitted/verified sengaja diabaikan — itu bukan draf.
+     *
+     * @return array{answers: array<string,string>, saved_at: ?string}
+     */
+    public function getDraft(array $questionnaireIds, int $alumniId): array
+    {
+        if (empty($questionnaireIds)) {
+            return ['answers' => [], 'saved_at' => null];
+        }
+
+        $rows = DB::connection(self::CONN)->table('responses')
+            ->whereIn('questionnaire_id', $questionnaireIds)
+            ->where('alumni_id', $alumniId)
+            ->where('status', 'started')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return ['answers' => [], 'saved_at' => null];
+        }
+
+        $answers = DB::connection(self::CONN)->table('response_answers')
+            ->whereIn('response_id', $rows->pluck('id')->toArray())
+            ->get()
+            ->pluck('answer_text', 'question_code')
+            ->toArray();
+
+        return [
+            'answers' => $answers,
+            // ISO8601 supaya FE bisa membandingkannya dengan waktu draf lokal
+            // tanpa menebak zona waktu.
+            'saved_at' => Carbon::parse($rows->max('updated_at'))->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Hapus draf milik alumni ("mulai ulang"). Hanya menyentuh status 'started'
+     * — pengisian yang sudah dikirim tidak boleh ikut terhapus dari sini.
+     *
+     * @return int jumlah draf yang terhapus
+     */
+    public function deleteDraft(array $questionnaireIds, int $alumniId): int
+    {
+        if (empty($questionnaireIds)) {
+            return 0;
+        }
+
+        return DB::connection(self::CONN)->table('responses')
+            ->whereIn('questionnaire_id', $questionnaireIds)
+            ->where('alumni_id', $alumniId)
+            ->where('status', 'started')
+            ->delete();   // response_answers ikut terhapus lewat cascade FK
+    }
+
+    /**
      * Bulk insert ke response_answers.
      * $records: list of ['question_code' => ..., 'answer_text' => ...] (response_id akan di-inject).
      */
