@@ -30,6 +30,7 @@ class ResponseRateService
             $raw = $this->repo->getBarData(
                 jenjang:        $params['jenjang']         ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
+                jurusan:        $params['jurusan']         ?? null,
                 graduationYear: $params['graduation_year'] ?? null,
             );
 
@@ -72,6 +73,7 @@ class ResponseRateService
             $raw   = $this->repo->getPieData(
                 jenjang:        $params['jenjang']         ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
+                jurusan:        $params['jurusan']         ?? null,
                 graduationYear: $params['graduation_year'] ?? null,
             );
             $total = $raw['total'];
@@ -103,6 +105,7 @@ class ResponseRateService
             $raw = $this->repo->getTrendData(
                 jenjang:        $params['jenjang']         ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
+                jurusan:        $params['jurusan']         ?? null,
                 graduationYear: $params['graduation_year'] ?? null,
             );
 
@@ -141,6 +144,7 @@ class ResponseRateService
             status:         $status,
             jenjang:        $params['jenjang']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
+                jurusan:        $params['jurusan']         ?? null,
             graduationYear: $params['graduation_year'] ?? null,
             search:         $params['search']          ?? null,
             page:           $page,
@@ -154,7 +158,7 @@ class ResponseRateService
             perPage:     $perPage,
             totalOnPage: $result['total_on_page'],
             totalCount:  $result['total_count'],
-            filters:     $this->activeFilters($params, ['jenjang', 'nama_prodi', 'graduation_year']),
+            filters:     $this->activeFilters($params, ['jenjang', 'nama_prodi', 'jurusan', 'graduation_year']),
         );
     }
 
@@ -178,7 +182,9 @@ class ResponseRateService
 
     private function activeFilters(array $params, array $keys = []): array
     {
-        $allKeys = ['jenjang', 'nama_prodi', 'graduation_year'];
+        // 'jurusan' ikut dilaporkan supaya kajur melihat cakupan yang
+        // sedang berlaku pada dirinya, bukan mengira dasbornya se-institusi.
+        $allKeys = ['jenjang', 'nama_prodi', 'jurusan', 'graduation_year'];
         $keys    = empty($keys) ? $allKeys : $keys;
         return array_filter(
             array_intersect_key($params, array_flip($keys)),

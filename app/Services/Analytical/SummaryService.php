@@ -51,17 +51,20 @@ class SummaryService
         $cached = $this->remember($key, function () use ($params) {
             $jenjang   = $params['jenjang']         ?? null;
             $namaProdi = $params['nama_prodi']      ?? null;
+            $jurusan   = $params['jurusan']         ?? null;
             $gradYear  = $params['graduation_year'] ?? null;
 
             $agg = $this->repo->getAggregate(
                 jenjang:        $jenjang,
                 namaProdi:      $namaProdi,
+                jurusan:        $jurusan,
                 graduationYear: $gradYear,
             );
 
             $ratePerYear = $this->repo->getRatePerYear(
                 jenjang:        $jenjang,
                 namaProdi:      $namaProdi,
+                jurusan:        $jurusan,
                 graduationYear: $gradYear,
             );
 
@@ -146,7 +149,7 @@ class SummaryService
 
     private function activeFilters(array $params): array
     {
-        $keys = ['jenjang', 'nama_prodi', 'graduation_year'];
+        $keys = ['jenjang', 'nama_prodi', 'jurusan', 'graduation_year'];
         return array_filter(
             array_intersect_key($params, array_flip($keys)),
             fn($v) => $v !== null && $v !== '' && $v !== [],

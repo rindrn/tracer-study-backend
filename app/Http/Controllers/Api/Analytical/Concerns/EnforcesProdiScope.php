@@ -56,18 +56,49 @@ trait EnforcesProdiScope
         $params = $request->query();
 
         if ($user->isKaprodi()) {
-            // Kaprodi hanya boleh lihat prodinya sendiri.
-            // Paksa override nama_prodi — abaikan apapun yang dikirim FE.
-            $prodiName = $user->program?->name;
+            $program = $user->program;
 
-            if ($prodiName !== null) {
-                $params['nama_prodi'] = $prodiName;
+            // Kaprodi tanpa prodi yang bisa ditelusuri TIDAK boleh diteruskan.
+            // Sebelumnya nama_prodi sekadar tidak di-set, dan akibatnya query
+            // berjalan tanpa pembatasan sama sekali — kaprodi melihat data
+            // seluruh institusi. Gagal terang-terangan lebih baik daripada
+            // membocorkan data diam-diam.
+            if ($program === null) {
+                abort(403, 'Akun kaprodi ini belum tertaut ke program studi mana pun. Hubungi pengelola.');
             }
 
-            // Juga paksa jenjang dan jurusan agar konsisten dengan prodinya,
-            // mencegah query "lintas jenjang" yang tidak relevan untuk kaprodi.
-            $params['jenjang'] = $user->program?->jenjang ?? ($params['jenjang'] ?? null);
-            $params['jurusan'] = $user->program?->jurusan ?? ($params['jurusan'] ?? null);
+            // Nama prodi TIDAK unik: tujuh nama dipakai dua prodi sekaligus
+            // pada jenjang berbeda (Teknik Informatika D3 dan D4, Akuntansi
+            // D3 dan D4, dan seterusnya). Menyaring dengan nama saja membuat
+            // kaprodi D3 ikut melihat angka D4 — bukan sekadar salah hitung,
+            // tapi data prodi lain.
+            //
+            // Pasangan (nama, jenjang) unik untuk seluruh 36 prodi, jadi
+            // keduanya WAJIB dipasang bersama. Jenjang di sini diambil dari
+            // kolom `degree`; baris sebelumnya membaca `$program->jenjang`
+            // yang tidak pernah ada di tabel programs maupun model Program,
+            // sehingga selalu null dan penyaring jenjang tidak pernah
+            // terpasang sama sekali.
+            $params['nama_prodi'] = $program->name;
+            $params['jenjang']    = $program->degree;
+            $params['jurusan']    = $program->jurusan;
+        } elseif ($user->isKajur()) {
+            // Kajur dibatasi ke jurusannya, sejalan dengan lapisan
+            // transaksional yang sudah melakukannya sejak awal — lihat
+            // RingkasanTahunController dan AdminAlumniService. Lapisan
+            // analitik satu-satunya yang tertinggal: sebelum ini kajur
+            // melihat angka seluruh institusi (505 alumni) padahal
+            // jurusannya hanya 29.
+            //
+            // Nama prodi dan jenjang TIDAK dipaksa: kajur memang berhak
+            // menyaring antar prodi di dalam jurusannya. Penyaring jurusan
+            // tetap terpasang, jadi permintaan ke prodi luar jurusan
+            // menghasilkan irisan kosong, bukan data prodi lain.
+            if ($user->jurusan === null || $user->jurusan === '') {
+                abort(403, 'Akun kajur ini belum tertaut ke jurusan mana pun. Hubungi pengelola.');
+            }
+
+            $params['jurusan'] = $user->jurusan;
         }
 
         return $params;
@@ -88,6 +119,13 @@ trait EnforcesProdiScope
      *
      * Dipakai di endpoint drill-down yang menerima nama_prodi
      * sebagai path/query param eksplisit (bukan dari global filter).
+     *
+     * Pemeriksaan hanya bisa membandingkan nama, karena itulah yang dikirim
+     * pemanggil. Dengan tujuh nama yang dipakai dua jenjang, lolosnya
+     * pemeriksaan ini belum menjamin datanya menyempit ke satu prodi —
+     * penyempitannya dikerjakan scopedParams() yang memasang nama DAN jenjang.
+     * Jadi endpoint drill-down tetap wajib memakai keduanya, bukan hanya
+     * memanggil pemeriksaan ini lalu meneruskan nama mentah ke repository.
      */
     protected function assertProdiAccess(Request $request, string $requestedProdi): void
     {

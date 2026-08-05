@@ -38,6 +38,7 @@ class SummaryRepository
     public function getAggregate(
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
+        ?string $jurusan        = null,
         ?string $graduationYear = null,
     ): array {
         // Satuan seluruh angka di sini adalah ALUMNI, bukan baris responses.
@@ -58,7 +59,7 @@ class SummaryRepository
             ])
             ->groupBy('ap.id');
 
-        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $graduationYear);
+        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $jurusan, $graduationYear);
 
         $r = DB::query()->fromSub($inner, 't')
             ->selectRaw('COUNT(*) as total')
@@ -93,6 +94,7 @@ class SummaryRepository
     public function getRatePerYear(
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
+        ?string $jurusan        = null,
         ?string $graduationYear = null,
     ): array {
         // Per alumni, sama seperti getAggregate() — kalau tidak, tahun dengan
@@ -108,7 +110,7 @@ class SummaryRepository
             ])
             ->groupBy('ap.id', 'ap.graduation_year');
 
-        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $graduationYear);
+        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $jurusan, $graduationYear);
 
         $rows = DB::query()->fromSub($inner, 't')
             ->select('graduation_year')
@@ -139,6 +141,7 @@ class SummaryRepository
         $query,
         ?string $jenjang,
         ?string $namaProdi,
+        ?string $jurusan,
         ?string $graduationYear,
     ): void {
         if ($jenjang !== null && $jenjang !== '') {
@@ -147,6 +150,11 @@ class SummaryRepository
 
         if ($namaProdi !== null && $namaProdi !== '') {
             $query->where('p.name', $namaProdi);
+        }
+        // Sama seperti ResponseRateRepository: tanpa penyaring ini, kajur
+        // melihat angka seluruh institusi di kartu Overview.
+        if ($jurusan !== null && $jurusan !== '') {
+            $query->where('p.jurusan', $jurusan);
         }
 
         if ($graduationYear !== null && $graduationYear !== '') {

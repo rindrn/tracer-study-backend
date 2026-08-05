@@ -54,6 +54,7 @@ class ResponseRateRepository
     private function perAlumniQuery(
         ?string $jenjang,
         ?string $namaProdi,
+        ?string $jurusan,
         ?string $graduationYear,
         array   $extraSelect = [],
         array   $groupBy     = [],
@@ -67,7 +68,7 @@ class ResponseRateRepository
             ]))
             ->groupBy(array_merge(['ap.id'], $groupBy));
 
-        $this->applyCommonFilters($query, $jenjang, $namaProdi, $graduationYear);
+        $this->applyCommonFilters($query, $jenjang, $namaProdi, $jurusan, $graduationYear);
 
         return $query;
     }
@@ -79,10 +80,11 @@ class ResponseRateRepository
     public function getBarData(
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
+        ?string $jurusan        = null,
         ?string $graduationYear = null,
     ): Collection {
         $inner = $this->perAlumniQuery(
-            $jenjang, $namaProdi, $graduationYear,
+            $jenjang, $namaProdi, $jurusan, $graduationYear,
             extraSelect: ['p.id as program_id', 'p.name as nama_prodi', 'p.degree as jenjang'],
             groupBy:     ['p.id', 'p.name', 'p.degree'],
         );
@@ -109,9 +111,10 @@ class ResponseRateRepository
     public function getPieData(
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
+        ?string $jurusan        = null,
         ?string $graduationYear = null,
     ): array {
-        $inner = $this->perAlumniQuery($jenjang, $namaProdi, $graduationYear);
+        $inner = $this->perAlumniQuery($jenjang, $namaProdi, $jurusan, $graduationYear);
 
         $r = DB::query()->fromSub($inner, 't')->selectRaw(self::OUTER_COUNTS)->first();
 
@@ -130,10 +133,11 @@ class ResponseRateRepository
     public function getTrendData(
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
+        ?string $jurusan        = null,
         ?string $graduationYear = null,
     ): Collection {
         $inner = $this->perAlumniQuery(
-            $jenjang, $namaProdi, $graduationYear,
+            $jenjang, $namaProdi, $jurusan, $graduationYear,
             extraSelect: ['ap.graduation_year'],
             groupBy:     ['ap.graduation_year'],
         );
@@ -160,6 +164,7 @@ class ResponseRateRepository
         string  $status,
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
+        ?string $jurusan        = null,
         ?string $graduationYear = null,
         ?string $search         = null,
         int     $page           = 1,
@@ -187,7 +192,7 @@ class ResponseRateRepository
             ])
             ->groupBy('ap.id', 'ap.name', 'ap.nim', 'ap.graduation_year', 'p.name', 'p.degree');
 
-        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $graduationYear);
+        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $jurusan, $graduationYear);
 
         if ($search !== null && $search !== '') {
             $inner->where(function ($q) use ($search) {
@@ -246,6 +251,7 @@ class ResponseRateRepository
         $query,
         ?string $jenjang,
         ?string $namaProdi,
+        ?string $jurusan,
         ?string $graduationYear,
     ): void {
         if ($jenjang !== null && $jenjang !== '') {
@@ -253,6 +259,14 @@ class ResponseRateRepository
         }
         if ($namaProdi !== null && $namaProdi !== '') {
             $query->where('p.name', $namaProdi);
+        }
+        // Penyaring jurusan dulu tidak ada di sini sama sekali, padahal
+        // repository Cube.js sudah punya (DimProdi.jurusan). Akibatnya kajur
+        // yang dibatasi ke jurusannya tetap melihat angka seluruh institusi
+        // di kartu dan donut Overview — dua-duanya dilayani query OLTP ini,
+        // bukan Cube.js.
+        if ($jurusan !== null && $jurusan !== '') {
+            $query->where('p.jurusan', $jurusan);
         }
         if ($graduationYear !== null && $graduationYear !== '') {
             $query->where('ap.graduation_year', $graduationYear);
