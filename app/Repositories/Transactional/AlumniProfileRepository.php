@@ -124,11 +124,28 @@ class AlumniProfileRepository
 
     /**
      * Sama seperti paginateForAdmin tapi ditambah kolom `response_status`:
-     *   - 'finish'        → responses.status IN ('submitted','verified')
-     *   - 'ongoing'       → responses.status = 'started'
-     *   - 'belum_mengisi' → no response row
+     *   - 'finished'    → punya response berstatus submitted/verified
+     *   - 'ongoing'     → punya response berstatus started, belum ada yang selesai
+     *   - 'not_started' → tidak punya response sama sekali
      *
      * Dipakai di halaman Data Alumni Prodi (kaprodi).
+     *
+     * Kosakata ketiga nilai itu SENGAJA sama dengan yang dipakai
+     * paginateRespondentsByQuestionnaire() dan dibaca dua halaman frontend.
+     * Sebelumnya method ini mengirim 'finish' dan 'belum_mengisi', sementara
+     * frontend memeriksa 'finished' dan 'not_started' — dua dari tiga nilai
+     * tidak pernah cocok, sehingga alumni yang sudah mengisi pun tampil
+     * "Not Started". Kartu ringkasan di halaman yang sama benar karena
+     * sumbernya endpoint lain, jadi angkanya saling bertentangan di satu layar.
+     *
+     * Status dihitung lewat subquery berkorelasi, BUKAN leftJoin. Dengan
+     * leftJoin, satu alumni yang mengisi lebih dari satu kuesioner global
+     * menghasilkan lebih dari satu baris: namanya muncul berulang di tabel,
+     * hitungan "Daftar Alumni (n)" menggelembung, dan paginate() memotong
+     * berdasarkan jumlah baris hasil join alih-alih jumlah alumni. Saat ini
+     * tiap kuesioner global menyasar tahun lulus yang berbeda sehingga
+     * belum ada yang ganda, tapi itu kebetulan bentuk data — bukan jaminan
+     * dari query-nya.
      *
      * @param array{program_id?: int, search?: string, jurusan?: string, graduation_year?: int} $filters
      */
@@ -140,25 +157,42 @@ class AlumniProfileRepository
         $globalQnrIds = $conn->table('questionnaires')
             ->whereNull('program_id')
             ->where('status', 'published')
-            ->pluck('id');
+            ->pluck('id')
+            ->all();
+
+        // Placeholder yang aman untuk daftar kosong — tidak ada id 0.
+        $globalQnrIds = $globalQnrIds ?: [0];
+        $inList       = implode(',', array_fill(0, count($globalQnrIds), '?'));
+
+        // Selesai menang atas sedang mengisi: alumni yang sudah mengirim satu
+        // kuesioner tapi masih mendraf kuesioner global lain tetap dihitung
+        // sekali sebagai "finished", tidak bocor ke dua status. Urutan ini
+        // sama dengan yang dipakai ResponseRateRepository.
+        $statusSql = "CASE
+            WHEN EXISTS (
+                SELECT 1 FROM responses rf
+                WHERE rf.alumni_id = alumni_profiles.id
+                  AND rf.questionnaire_id IN ({$inList})
+                  AND rf.status IN ('submitted','verified')
+            ) THEN 'finished'
+            WHEN EXISTS (
+                SELECT 1 FROM responses ro
+                WHERE ro.alumni_id = alumni_profiles.id
+                  AND ro.questionnaire_id IN ({$inList})
+                  AND ro.status = 'started'
+            ) THEN 'ongoing'
+            ELSE 'not_started'
+        END as response_status";
 
         $query = $conn->table('alumni_profiles')
             ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-            ->leftJoin('responses', function ($join) use ($globalQnrIds) {
-                $join->on('responses.alumni_id', '=', 'alumni_profiles.id')
-                     ->whereIn('responses.questionnaire_id', $globalQnrIds->isEmpty() ? [0] : $globalQnrIds->toArray());
-            })
             ->select(
                 'alumni_profiles.*',
                 'programs.name as program_name',
                 'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
-                DB::raw("CASE
-                    WHEN responses.status IN ('submitted','verified') THEN 'finish'
-                    WHEN responses.status = 'started' THEN 'ongoing'
-                    ELSE 'belum_mengisi'
-                END as response_status"),
-            );
+            )
+            ->selectRaw($statusSql, array_merge($globalQnrIds, $globalQnrIds));
 
         if (!empty($filters['program_id'])) {
             $query->where('alumni_profiles.program_id', $filters['program_id']);
@@ -187,9 +221,22 @@ class AlumniProfileRepository
      * List semua alumni yang ditargetkan oleh kuesioner tertentu,
      * termasuk yang belum mengisi (LEFT JOIN responses).
      *
-     * Status hanya 2:
-     *   - 'ongoing'  → belum ada response ATAU status = 'started'
-     *   - 'finished' → status IN ('submitted','verified')
+     * Status ada 3, sama dengan paginateForAdminWithResponseStatus():
+     *   - 'finished'    → status IN ('submitted','verified')
+     *   - 'ongoing'     → status = 'started' (draf berjalan)
+     *   - 'not_started' → tidak ada baris response sama sekali
+     *
+     * Sebelumnya hanya 2: cabang ELSE menyapu 'started' DAN "tidak ada baris"
+     * menjadi 'ongoing' yang sama, sehingga alumni yang belum menyentuh
+     * kuesioner tampil "Ongoing". Frontend halaman ini sudah menyediakan tiga
+     * kartu, tiga pilihan filter, dan tiga lencana — kartu "Not Started" dan
+     * opsi filternya karena itu selalu nol, apa pun keadaan datanya.
+     *
+     * Duplikasi baris tidak jadi soal di sini, berbeda dengan
+     * paginateForAdminWithResponseStatus(): join-nya dipatok ke SATU
+     * questionnaire_id, dan pasangan (questionnaire_id, alumni_id) sudah
+     * dijamin unik oleh indeks. Jadi leftJoin tetap dipakai — kolom
+     * response_id dan submitted_at memang perlu ditampilkan.
      *
      * @param array{program_id?: int, search?: string, questionnaire_id: int} $filters
      */
@@ -221,7 +268,11 @@ class AlumniProfileRepository
                 'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
                 'responses.id as response_id',
-                DB::raw("CASE WHEN responses.status IN ('submitted','verified') THEN 'finished' ELSE 'ongoing' END as response_status"),
+                DB::raw("CASE
+                    WHEN responses.status IN ('submitted','verified') THEN 'finished'
+                    WHEN responses.status = 'started' THEN 'ongoing'
+                    ELSE 'not_started'
+                END as response_status"),
                 'responses.submitted_at as response_submitted_at',
                 'responses.created_at as response_created_at',
                 'responses.updated_at as response_updated_at',
@@ -264,7 +315,14 @@ class AlumniProfileRepository
     /**
      * Hitung stats alumni per prodi (atau semua kalau $programId null).
      *
-     * Return: ['total' => int, 'finish' => int, 'ongoing' => int, 'belum_mengisi' => int, 'answered' => int, 'unanswered' => int]
+     * Return: ['total', 'finished', 'ongoing', 'not_started', 'answered', 'unanswered']
+     *
+     * Kunci 'finished' dan 'not_started' dulu bernama 'finish' dan
+     * 'belum_mengisi' — dialek keempat untuk tiga keadaan yang sama.
+     * KaprodiAlumniStats di frontend sudah mendeklarasikan trio kanonik, jadi
+     * kedua kunci lama tidak pernah terbaca siapa pun: yang dipakai halaman
+     * hanya 'answered' dan 'unanswered'. Nama diseragamkan supaya dialeknya
+     * tinggal satu dan medan yang sudah dideklarasikan FE benar-benar terisi.
      */
     public function countStatsByProgram(?int $programId, ?string $jurusan = null, ?int $graduationYear = null): array
     {
@@ -290,7 +348,7 @@ class AlumniProfileRepository
             ->pluck('id');
 
         if ($globalQnrIds->isEmpty()) {
-            return ['total' => $total, 'finish' => 0, 'ongoing' => 0, 'belum_mengisi' => $total, 'answered' => 0, 'unanswered' => $total];
+            return ['total' => $total, 'finished' => 0, 'ongoing' => 0, 'not_started' => $total, 'answered' => 0, 'unanswered' => $total];
         }
 
         // Finish: submitted or verified
@@ -325,15 +383,15 @@ class AlumniProfileRepository
         }
         $ongoing = $ongoingQuery->distinct('alumni_profiles.id')->count('alumni_profiles.id');
 
-        $belumMengisi = max($total - $finish - $ongoing, 0);
+        $notStarted = max($total - $finish - $ongoing, 0);
 
         return [
-            'total'         => $total,
-            'finish'        => $finish,
-            'ongoing'       => $ongoing,
-            'belum_mengisi' => $belumMengisi,
-            'answered'      => $finish,
-            'unanswered'    => $total - $finish,
+            'total'       => $total,
+            'finished'    => $finish,
+            'ongoing'     => $ongoing,
+            'not_started' => $notStarted,
+            'answered'    => $finish,
+            'unanswered'  => $total - $finish,
         ];
     }
 
