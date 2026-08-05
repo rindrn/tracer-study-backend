@@ -103,11 +103,15 @@ class QuestionnaireSeeder extends Seeder
 
 
         // SECTION 0: IDENTITAS
+        // Kolom keempat = metadata tambahan. Kode Prodi memakai lookup ke
+        // tabel programs, dan yang disimpan kolom `code` (bukan id) karena
+        // nilai itulah yang dipakai ekspor Kemdikbud — lihat
+        // MinistrySheetExport yang membaca program_code.
         $identityFields = [
             ['nimhsmsmh',  'NIM',                true],
             ['kdptimsmh',  'Kode PT',            true],
             ['tahun_lulus','Tahun Lulus',         true],
-            ['kdpstmsmh',  'Kode Prodi',         true],
+            ['kdpstmsmh',  'Kode Prodi',         true,  ['lookup' => 'program', 'lookup_value' => 'code']],
             ['nmmhsmsmh',  'Nama',               true],
             ['telpomsmh',  'Nomor Telepon/HP',   true],
             ['emailmsmh',  'Alamat Email',       true],
@@ -115,7 +119,7 @@ class QuestionnaireSeeder extends Seeder
             ['npwp',       'NPWP',               false],
         ];
         foreach ($identityFields as $idf) {
-            $insertQuestion(0, $idf[0], $idf[1], 'short_text', $idf[2]);
+            $insertQuestion(0, $idf[0], $idf[1], 'short_text', $idf[2], $idf[3] ?? null);
         }
 
         // SECTION 1: STATUS & PEKERJAAN
@@ -131,9 +135,21 @@ class QuestionnaireSeeder extends Seeder
 
         $insertQuestion(1, 'f505', 'Berapa rata-rata pendapatan Anda per bulan? (take home pay)', 'number', false, ['show_if' => ['f8' => [1, 3]]]);
 
-        $insertQuestion(1, 'f5a1', 'Dimana lokasi tempat Anda bekerja? (Provinsi)', 'short_text', false, ['show_if' => ['f8' => [1, 3]]]);
+        // f5a1/f5a2 bertipe short_text di skema, tapi isinya BUKAN teks bebas:
+        // yang disimpan adalah provinces.id / cities.id. Penanda 'lookup' di
+        // metadata memberi tahu perender borang untuk menampilkan daftar
+        // referensi, bukan kotak ketik. 'depends_on' membuat pilihan kab/kota
+        // tersaring mengikuti provinsi yang sudah dipilih.
+        $insertQuestion(1, 'f5a1', 'Dimana lokasi tempat Anda bekerja? (Provinsi)', 'short_text', false, [
+            'show_if' => ['f8' => [1, 3]],
+            'lookup'  => 'province',
+        ]);
 
-        $insertQuestion(1, 'f5a2', 'Dimana lokasi tempat Anda bekerja? (Kota/Kabupaten)', 'short_text', false, ['show_if' => ['f8' => [1, 3]]]);
+        $insertQuestion(1, 'f5a2', 'Dimana lokasi tempat Anda bekerja? (Kota/Kabupaten)', 'short_text', false, [
+            'show_if'    => ['f8' => [1, 3]],
+            'lookup'     => 'city',
+            'depends_on' => 'f5a1',
+        ]);
 
         $insertQuestion(1, 'f1101', 'Apa jenis perusahaan/instansi/institusi tempat Anda bekerja sekarang?', 'single_choice', false, ['show_if' => ['f8' => [1]]], [
             ['1', 'Instansi pemerintah'],

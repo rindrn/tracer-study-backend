@@ -134,8 +134,12 @@ class AnswerResolverService
      */
     private function resolveProvinceName(?string $rawId): ?string
     {
-        if ($rawId === null || $rawId === '' || !ctype_digit($rawId)) {
-            return $rawId; // bukan angka sama sekali -> kemungkinan sudah teks, teruskan apa adanya
+        if ($rawId === null || $rawId === '') {
+            return $rawId;
+        }
+
+        if (!ctype_digit($rawId)) {
+            return $this->canonicalRegionName($this->getProvinces(), $rawId);
         }
 
         $provinces = $this->getProvinces();
@@ -147,7 +151,23 @@ class AnswerResolverService
     /** Lookup nama kota dari ID mentah (f5a2), pola sama dengan resolveProvinceName(). */
     private function resolveCityName(?string $rawId): ?string
     {
-        if ($rawId === null || $rawId === '' || !ctype_digit($rawId)) {
+        if ($rawId === null || $rawId === '') {
+            return $rawId;
+        }
+
+        // Nama kota lama SENGAJA diteruskan apa adanya, tidak dikanonikkan
+        // seperti provinsi. Dua alasan, keduanya terbukti saat dicoba:
+        //
+        //   1. Ambigu. "Bandung" cocok ke "Kota Bandung" MAUPUN "Kab.
+        //      Bandung"; menebak salah satunya memalsukan data alumni.
+        //   2. Nama kota ikut membentuk kunci bisnis dim_perusahaan
+        //      ("{perusahaan}|{kota}"). Mengubah ejaannya memunculkan baris
+        //      dimensi baru sementara baris lama tetap berbendera aktif,
+        //      sehingga satu perusahaan terhitung dua kali di Sebaran Instansi.
+        //
+        // Provinsi tidak punya dua masalah itu: penamaannya tunggal dan tidak
+        // masuk kunci bisnis, jadi SCD2 cukup menutup versi lama.
+        if (!ctype_digit($rawId)) {
             return $rawId;
         }
 
@@ -155,6 +175,47 @@ class AnswerResolverService
         $match = $cities->firstWhere('id', (int) $rawId);
 
         return $match?->name ?? $rawId;
+    }
+
+    /**
+     * Pemulihan untuk jawaban PROVINSI lama yang telanjur berupa nama.
+     *
+     * Sejak isian wilayah memakai dropdown, f5a1 selalu menyimpan
+     * provinces.id. Tapi jawaban yang sudah masuk sebelum itu berisi nama
+     * tanpa prefiks ("Jawa Barat"), sedangkan tabel referensi dan
+     * dim_ump.nama_provinsi memakai bentuk berprefiks ("Prov. Jawa Barat").
+     * Selisih satu prefiks itu membuat pencocokan UMP gagal total -- seluruh
+     * baris fakta berakhir dengan ump_sk NULL dan measure
+     * count_above_ump/count_below_ump ikut nol.
+     *
+     * Nama bebas dicocokkan ke bentuk kanonik tabel referensi dengan
+     * mengabaikan prefiks dan beda huruf besar-kecil. Yang dikembalikan selalu
+     * ejaan versi tabel referensi, sehingga join UMP konsisten dari jalur mana
+     * pun datangnya. Nama yang benar-benar tidak dikenal diteruskan apa adanya,
+     * mengikuti prinsip fallback method di atas: lebih baik terlihat janggal
+     * daripada hilang diam-diam.
+     *
+     * Hanya untuk provinsi -- lihat catatan di resolveCityName().
+     */
+    private function canonicalRegionName(Collection $reference, string $rawName): string
+    {
+        $needle = $this->stripRegionPrefix($rawName);
+
+        $match = $reference->first(
+            fn ($row) => $this->stripRegionPrefix($row->name) === $needle,
+        );
+
+        return $match?->name ?? $rawName;
+    }
+
+    /** "Prov. Jawa Barat" -> "jawa barat". */
+    private function stripRegionPrefix(string $name): string
+    {
+        return mb_strtolower(trim(preg_replace(
+            '/^(prov\.|provinsi)\s+/iu',
+            '',
+            trim($name),
+        )));
     }
 
     private function getProvinces(): Collection

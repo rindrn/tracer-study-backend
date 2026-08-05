@@ -21,7 +21,11 @@ class SubmitTracerStudyRequest extends FormRequest
             'email' => ['required', 'email', 'max:150'],
             'phone' => ['nullable', 'string', 'max:30'],
             'tahun_lulus' => ['required'],
-            'kdpstmsmh' => ['required', 'string'],
+            // Kode Prodi dikirim lewat dropdown referensi, jadi nilainya wajib
+            // ada di tabel programs. Ini juga menutup celah lama: kode ketikan
+            // yang tidak dikenal dulu lolos dan baru ketahuan saat ekspor
+            // Kemdikbud.
+            'kdpstmsmh' => ['required', 'string', 'exists:programs,code'],
             'kode_pt' => ['nullable', 'string', 'max:10'],
             'nik' => ['nullable', 'string', 'max:20'],
             'npwp' => ['nullable', 'string', 'max:25'],
@@ -68,6 +72,17 @@ class SubmitTracerStudyRequest extends FormRequest
             $seen[$q->code] = true;
 
             $rule = $q->is_required ? ['required'] : ['nullable'];
+
+            // Isian lookup (f5a1/f5a2/kdpstmsmh) tetap bertipe short_text di
+            // skema, tapi isinya kunci baris tabel referensi — bukan teks
+            // bebas. Divalidasi dengan exists supaya kiriman yang tidak lewat
+            // dropdown tidak menyelipkan wilayah karangan yang nanti gagal
+            // dicocokkan ETL.
+            $lookupRule = $this->lookupRule($q->metadata);
+            if ($lookupRule !== null) {
+                $rules[$q->code] = array_merge($rule, $lookupRule);
+                continue;
+            }
 
             switch ($q->question_type) {
                 case 'single_choice':
@@ -120,6 +135,39 @@ class SubmitTracerStudyRequest extends FormRequest
         return $rules;
     }
 
+    /** Tabel referensi yang boleh dirujuk metadata `lookup`. */
+    private const LOOKUP_TABLES = [
+        'province' => 'provinces',
+        'city'     => 'cities',
+        'program'  => 'programs',
+    ];
+
+    /**
+     * Aturan validasi untuk isian lookup, atau null bila pertanyaan ini bukan
+     * lookup. Kolom yang dirujuk mengikuti `lookup_value` — default `id`
+     * (dipakai wilayah), sedangkan Kode Prodi menyimpan `code`.
+     */
+    private function lookupRule(?string $rawMetadata): ?array
+    {
+        $meta   = $rawMetadata ? json_decode($rawMetadata, true) : null;
+        $source = $meta['lookup'] ?? null;
+
+        if (!is_string($source) || !isset(self::LOOKUP_TABLES[$source])) {
+            return null;
+        }
+
+        $column = ($meta['lookup_value'] ?? 'id') === 'code' ? 'code' : 'id';
+        $table  = self::LOOKUP_TABLES[$source];
+
+        // `bail` + pemeriksaan bentuk WAJIB mendahului `exists`. Kolom id
+        // bertipe bigint di PostgreSQL: membandingkannya dengan teks bebas
+        // ("Jawa Barat") membuat query exists gagal di tingkat basis data dan
+        // permintaan berakhir 500, bukan 422 yang bisa dibaca alumni.
+        return $column === 'code'
+            ? ['bail', 'string', 'exists:' . $table . ',code']
+            : ['bail', 'integer', 'exists:' . $table . ',id'];
+    }
+
     /**
      * Pesan galat berbahasa Indonesia.
      *
@@ -139,6 +187,8 @@ class SubmitTracerStudyRequest extends FormRequest
             'email'    => 'Format email tidak valid. Contoh: nama@email.com',
             'max'      => 'Jawaban :attribute terlalu panjang.',
             'between'  => 'Nilai :attribute harus berada di antara :min sampai :max.',
+            'exists'   => 'Pilihan pada :attribute tidak ada dalam daftar referensi. Silakan pilih dari daftar.',
+            'integer'  => 'Jawaban :attribute harus dipilih dari daftar yang tersedia.',
         ];
     }
 

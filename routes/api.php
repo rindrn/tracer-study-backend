@@ -59,6 +59,28 @@ Route::prefix('auth')->group(function () {
 Route::get('tracer-study/forms', [QuestionnaireFetchController::class, 'getActiveForms']);
 Route::apiResource('questionnaires', QuestionnaireController::class)->only(['show']);
 
+// Unduhan CSV referensi kode (provinsi, kab/kota, prodi). Publik karena dibuka
+// lewat window.open() dari halaman pengisian — tab baru tidak membawa header
+// Authorization, sehingga versi ber-guard selalu 401 untuk siapa pun, staff
+// maupun alumni. Isinya daftar kode wilayah dan prodi yang memang publik.
+Route::get('provinces/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadProvinces']);
+Route::get('cities/download',    [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadCities']);
+Route::get('programs/download',  [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadPrograms']);
+
+// ═══════════════════════════════════════════════════════════
+// REFERENSI — boleh dibaca staff MAUPUN alumni
+// ═══════════════════════════════════════════════════════════
+// Data master untuk isian bertipe lookup di borang (Kode Prodi, Provinsi,
+// Kab/Kota). Alumni memakai guard 'alumni' yang tidak berlaku di
+// 'auth:sanctum', jadi rutenya tidak bisa ikut grup PROTECTED di bawah —
+// tanpa ini dropdown referensi di halaman pengisian selalu kosong 401.
+Route::middleware('auth:sanctum,alumni')->group(function () {
+    Route::get('programs',      [ProgramController::class, 'index']);
+    Route::get('programs/{id}', [ProgramController::class, 'show']);
+    Route::get('provinces',     [\App\Http\Controllers\Api\Transactional\RegionController::class, 'provinces']);
+    Route::get('cities',        [\App\Http\Controllers\Api\Transactional\RegionController::class, 'cities']);
+});
+
 // ═══════════════════════════════════════════════════════════
 // ALUMNI — wajib login alumni (Sanctum, guard 'alumni')
 // ═══════════════════════════════════════════════════════════
@@ -92,16 +114,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Questionnaires — index (semua role bisa lihat list)
     Route::get('questionnaires', [QuestionnaireController::class, 'index']);
 
-    // Programs — read (semua role)
-    Route::get('programs/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadPrograms']);
-    Route::get('programs', [ProgramController::class, 'index']);
-    Route::get('programs/{id}', [ProgramController::class, 'show']);
-
-    // Regions — read (semua role)
-    Route::get('provinces/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadProvinces']);
-    Route::get('provinces', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'provinces']);
-    Route::get('cities/download', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'downloadCities']);
-    Route::get('cities', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'cities']);
+    // Programs & Regions — read: pindah ke grup REFERENSI di atas supaya
+    // alumni ikut bisa membacanya. Unduhan CSV-nya kini publik.
 
     // Roles — read (semua role)
     Route::get('roles', [RoleController::class, 'index']);

@@ -291,6 +291,10 @@ class QuestionnaireService
             'multiple_choice' => 'single_choice',
             'checkbox'        => 'multiple_choice',
             'dropdown'        => 'single_choice',
+            // Isian referensi tetap short_text: nilainya kunci baris tabel
+            // master, bukan option_code, jadi tidak punya questionnaire_options
+            // untuk disandarkan single_choice.
+            'lookup'          => 'short_text',
             'linear_scale'    => 'number',
             'rating'          => 'number',
             'boolean'         => 'boolean',
@@ -341,6 +345,22 @@ class QuestionnaireService
         foreach (['gridRows', 'gridColumns'] as $key) {
             if (!empty($questionData[$key])) {
                 $metadata[$key] = array_values($questionData[$key]);
+            }
+        }
+
+        // Isian referensi: sumber tabelnya, kolom mana yang disimpan, dan
+        // pertanyaan induk yang menyaring pilihan (kab/kota mengikuti
+        // provinsi). Perender borang membaca ketiganya untuk memutuskan
+        // menampilkan daftar referensi alih-alih kotak ketik.
+        if (($questionData['type'] ?? '') === 'lookup' && !empty($questionData['lookup'])) {
+            $metadata['lookup'] = $questionData['lookup'];
+
+            // Default 'id' mengikuti kebutuhan AnswerResolverService untuk
+            // wilayah; Kode Prodi memakai 'code' demi ekspor Kemdikbud.
+            $metadata['lookup_value'] = ($questionData['lookupValue'] ?? 'id') === 'code' ? 'code' : 'id';
+
+            if (!empty($questionData['dependsOn'])) {
+                $metadata['depends_on'] = $questionData['dependsOn'];
             }
         }
 
@@ -437,7 +457,13 @@ class QuestionnaireService
             'code'          => $question->code,
             'question'      => $question->question_text,
             'question_text' => $question->question_text,
-            'type'          => $metadata['original_type'] ?? $this->mapQuestionTypeToFrontend($question->question_type, $metadata),
+            // Pertanyaan lookup bawaan seeder/migrasi tidak punya
+            // original_type — penanda 'lookup' di metadata yang menentukan,
+            // supaya Form Builder membukanya sebagai isian referensi, bukan
+            // kotak teks yang lalu menimpa metadata-nya saat disimpan ulang.
+            'type'          => isset($metadata['lookup'])
+                ? 'lookup'
+                : ($metadata['original_type'] ?? $this->mapQuestionTypeToFrontend($question->question_type, $metadata)),
             'description'   => null,
             'options'       => ($optionsGrouped->get($question->id, collect()))->map(fn ($o) => [
                 'id'       => $o->id,
@@ -454,6 +480,9 @@ class QuestionnaireService
             'scaleLabels' => $metadata['scale_labels'] ?? [],
             'gridRows'    => $metadata['gridRows']   ?? [],
             'gridColumns' => $metadata['gridColumns'] ?? [],
+            'lookup'      => $metadata['lookup'] ?? null,
+            'lookupValue' => $metadata['lookup_value'] ?? null,
+            'dependsOn'   => $metadata['depends_on'] ?? null,
             'metadata'    => $metadata, // includes show_if for conditional logic
         ];
     }
