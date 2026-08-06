@@ -46,24 +46,27 @@ class PublicReportRepository
     }
 
     /**
-     * Laporan terbit saja, dibatasi rentang tahun kalau diberikan.
+     * Laporan terbit saja. Satu-satunya penentu tampil/tidaknya adalah
+     * is_published.
      *
-     * @param array{start?: int, end?: int} $yearRange
+     * SENGAJA TIDAK menerima filter rentang tahun. Sempat ada, dan itu keliru:
+     * rentang pengarsipan publik adalah rentang TAHUN LULUSAN (untuk
+     * menyembunyikan angkatan lama dari statistik), sedangkan report_year
+     * adalah TAHUN PELAKSANAAN laporan -- dua sumbu yang berbeda. Akibatnya
+     * laporan pelaksanaan 2026 hilang dari halaman publik hanya karena rentang
+     * angkatan yang ditampilkan berakhir di 2025. Parameternya dihapus, bukan
+     * sekadar tidak dipakai, supaya keliru itu tidak bisa terulang.
      */
-    public function listPublished(array $yearRange = []): Collection
+    public function listPublished(): Collection
     {
-        $query = DB::connection(self::CONN)->table(self::TABLE)
-            ->select(self::PUBLIC_COLUMNS)
-            ->where('is_published', true);
-
-        if (isset($yearRange['start'])) {
-            $query->where('report_year', '>=', $yearRange['start']);
-        }
-        if (isset($yearRange['end'])) {
-            $query->where('report_year', '<=', $yearRange['end']);
-        }
-
-        return collect($query->orderByDesc('report_year')->orderByDesc('id')->get());
+        return collect(
+            DB::connection(self::CONN)->table(self::TABLE)
+                ->select(self::PUBLIC_COLUMNS)
+                ->where('is_published', true)
+                ->orderByDesc('report_year')
+                ->orderByDesc('id')
+                ->get()
+        );
     }
 
     public function findById(int $id): ?object

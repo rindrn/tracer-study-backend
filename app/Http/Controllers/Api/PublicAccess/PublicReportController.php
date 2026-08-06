@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\PublicAccess;
 
 use App\Http\Controllers\Controller;
-use App\Services\Transactional\PublicDisplaySettingService;
 use App\Services\Transactional\PublicReportService;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -14,25 +13,30 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  * Namespace PublicAccess (bukan "Public") karena `public` kata kunci PHP dan
  * tidak sah sebagai bagian namespace.
  *
- * Dua penjaga yang tidak boleh dilepas dari sini:
- *   - Hanya laporan is_published yang terlihat maupun terunduh; service
- *     memakai findPublishedById(), bukan findById().
- *   - Rentang tahun pengarsipan diterapkan di sisi server. Kalau hanya
- *     disaring di frontend, siapa pun bisa melewatinya lewat query string.
+ * Penjaga yang tidak boleh dilepas: hanya laporan is_published yang terlihat
+ * maupun terunduh -- service memakai findPublishedById(), bukan findById().
+ * Itu satu-satunya syarat; rentang tahun pengarsipan tidak berlaku untuk
+ * laporan (lihat index()).
  */
 class PublicReportController extends Controller
 {
     public function __construct(
         private readonly PublicReportService $reports,
-        private readonly PublicDisplaySettingService $settings,
     ) {}
 
-    /** GET /api/public/reports */
+    /**
+     * GET /api/public/reports
+     *
+     * Rentang pengarsipan TIDAK diterapkan di sini: rentang itu soal tahun
+     * LULUSAN yang ditampilkan di statistik, sedangkan laporan diberi tahun
+     * PELAKSANAAN. Menyaring laporan dengannya membuat laporan pelaksanaan
+     * terbaru hilang begitu rentang angkatan berakhir di tahun sebelumnya.
+     */
     public function index(): JsonResponse
     {
         return response()->json([
             'success' => true,
-            'data'    => $this->reports->listForPublic($this->settings->getRangeFilter()),
+            'data'    => $this->reports->listForPublic(),
         ]);
     }
 

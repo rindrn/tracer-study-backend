@@ -36,10 +36,14 @@ class PublicReportService
         return $this->repo->listAll()->map(fn ($row) => $this->toAdminArray($row))->all();
     }
 
-    /** @param array{start?: int, end?: int} $yearRange */
-    public function listForPublic(array $yearRange = []): array
+    /**
+     * Laporan yang tampil di halaman publik. Hanya status terbit yang
+     * menentukan -- rentang tahun pengarsipan TIDAK berlaku di sini, lihat
+     * PublicReportRepository::listPublished().
+     */
+    public function listForPublic(): array
     {
-        return $this->repo->listPublished($yearRange)
+        return $this->repo->listPublished()
             ->map(fn ($row) => $this->toPublicArray($row))
             ->all();
     }
