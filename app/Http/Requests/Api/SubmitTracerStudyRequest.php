@@ -113,6 +113,12 @@ class SubmitTracerStudyRequest extends FormRequest
                 case 'short_text':
                     $rule[] = 'string';
                     $rule[] = 'max:500';
+                    // Isian bertanda format email (surel penilai) tetap
+                    // bertipe short_text di skema — penandanya ada di
+                    // metadata, sama pola dengan `lookup` di atas.
+                    if ($this->hasFormat($q->metadata, 'email')) {
+                        $rule[] = 'email';
+                    }
                     break;
 
                 case 'long_text':
@@ -133,6 +139,15 @@ class SubmitTracerStudyRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /** Apakah metadata pertanyaan menandai format tertentu (mis. email). */
+    private function hasFormat(?string $metadata, string $format): bool
+    {
+        if (!$metadata) return false;
+        $meta = json_decode($metadata, true);
+
+        return is_array($meta) && ($meta['format'] ?? null) === $format;
     }
 
     /** Tabel referensi yang boleh dirujuk metadata `lookup`. */
@@ -257,6 +272,21 @@ class SubmitTracerStudyRequest extends FormRequest
                     'Jumlah undangan wawancara (%s) tidak boleh lebih banyak daripada jumlah lamaran yang dikirim (%s).',
                     (int) $interviewed, (int) $applied,
                 ));
+            }
+
+            // Kontak penilai selalu berpasangan nama + surel. Separuh pasangan
+            // akan dilewati TracerStudySubmitService saat menyimpan ke
+            // stakeholder_contacts, jadi tanpa pemeriksaan ini isian alumni
+            // hilang tanpa satu pun pemberitahuan.
+            foreach ([1, 2, 3] as $no) {
+                $name  = trim((string) $this->input("stk{$no}_nama", ''));
+                $email = trim((string) $this->input("stk{$no}_email", ''));
+
+                if ($name !== '' && $email === '') {
+                    $v->errors()->add("stk{$no}_email", 'Surel penilai wajib diisi bila namanya sudah dituliskan.');
+                } elseif ($email !== '' && $name === '') {
+                    $v->errors()->add("stk{$no}_nama", 'Nama penilai wajib diisi bila surelnya sudah dituliskan.');
+                }
             }
         });
     }

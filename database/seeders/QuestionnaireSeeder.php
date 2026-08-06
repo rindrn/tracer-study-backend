@@ -54,6 +54,13 @@ class QuestionnaireSeeder extends Seeder
             ['title' => 'Pencarian Kerja',                     'order_no' => 7],
             ['title' => 'Statistik Lamaran',                   'order_no' => 8],
             ['title' => 'Aktivitas & Alasan',                  'order_no' => 9],
+            [
+                'title'       => 'Kontak Penilai',
+                'order_no'    => 10,
+                'description' => 'Tracer study juga meminta penilaian dari orang-orang yang mengenal kinerja Anda. '
+                    . 'Tuliskan tiga nama beserta alamat surel yang bisa kami hubungi. '
+                    . 'Mereka hanya akan menerima satu kuesioner singkat mengenai kompetensi Anda.',
+            ],
         ];
 
         $sectionIds = [];
@@ -61,6 +68,7 @@ class QuestionnaireSeeder extends Seeder
             $sectionIds[$s['order_no']] = $conn->table('questionnaire_sections')->insertGetId([
                 'questionnaire_id' => $qGlobalId,
                 'title'            => $s['title'],
+                'description'      => $s['description'] ?? null,
                 'order_no'         => $s['order_no'],
                 'is_active'        => true,
                 'created_at'       => $now,
@@ -349,6 +357,35 @@ class QuestionnaireSeeder extends Seeder
         }
 
         $insertQuestion(9, 'f1614', 'Sebutkan alasan lainnya mengambil pekerjaan yang tidak sesuai pendidikan', 'short_text', false, ['show_if' => ['f1613' => [1]]]);
+
+        // SECTION 10: KONTAK PENILAI
+        //
+        // Tiga pasang nama + surel yang jawabannya diproyeksikan ke tabel
+        // stakeholder_contacts saat submit. Muncul hanya bagi alumni yang
+        // punya penilai — f8 = 1 (bekerja), 3 (wiraswasta), 4 (lanjut studi);
+        // opsi 2 dan 5 tidak, sepadan dengan tiga nilai yang dikenal kolom
+        // alumni_status di tabel tujuan.
+        //
+        // Seluruhnya is_required = false. SubmitTracerStudyRequest menyusun
+        // aturan dari kolom is_required tanpa membaca show_if, jadi menandainya
+        // wajib akan menolak submisi alumni yang tidak melihat pertanyaan ini.
+        $stakeholderQuestions = [
+            ['stk1_nama',  'Tuliskan nama atasan Anda (bekerja) / rekan bisnis (wiraswasta) / dosen pembimbing (lanjut studi)',           'Penilai 1', 'Orang yang menilai hasil kerja Anda secara langsung.',              null],
+            ['stk1_email', 'Tuliskan alamat surel Penilai 1',                                                                              null,        'Sesuai nama yang Anda tulis di atas.',                             'email'],
+            ['stk2_nama',  'Tuliskan nama senior terdekat Anda (bekerja) / rekan kerja (wiraswasta) / mahasiswa senior (lanjut studi)',    'Penilai 2', 'Orang yang sehari-hari bekerja atau belajar berdampingan dengan Anda.', null],
+            ['stk2_email', 'Tuliskan alamat surel Penilai 2',                                                                              null,        'Sesuai nama yang Anda tulis di atas.',                             'email'],
+            ['stk3_nama',  'Tuliskan nama HRD Anda (bekerja) / rekan kerja lainnya (wiraswasta) / mahasiswa seangkatan (lanjut studi)',    'Penilai 3', 'Orang ketiga yang dapat memberi gambaran berbeda tentang Anda.',   null],
+            ['stk3_email', 'Tuliskan alamat surel Penilai 3',                                                                              null,        'Sesuai nama yang Anda tulis di atas.',                             'email'],
+        ];
+
+        foreach ($stakeholderQuestions as [$code, $text, $divider, $hint, $format]) {
+            $meta = ['show_if' => ['f8' => [1, 3, 4]]];
+            if ($divider) $meta['divider_label'] = $divider;
+            if ($hint)    $meta['description']   = $hint;
+            if ($format)  $meta['format']        = $format;
+
+            $insertQuestion(10, $code, $text, 'short_text', false, $meta);
+        }
     }
 
 

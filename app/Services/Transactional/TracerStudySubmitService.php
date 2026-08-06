@@ -10,6 +10,7 @@ use App\Repositories\Transactional\EmploymentRecordRepository;
 use App\Repositories\Transactional\ProgramRepository;
 use App\Repositories\Transactional\QuestionnaireRepository;
 use App\Repositories\Transactional\ResponseRepository;
+use App\Repositories\Transactional\StakeholderContactRepository;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\DB;
  *   3. Replace response + response_answers ke kuesioner global (nasional)
  *   4. Replace response + response_answers ke kuesioner prodi (kalau ada)
  *   5. Replace employment_records (kalau bekerja) atau education_records (kalau lanjut studi)
+ *   6. Replace stakeholder_contacts (kalau bekerja, wiraswasta, atau lanjut studi)
  *
  * Semua operasi dibungkus DB transaction di level service. Kalau salah satu
  * gagal, seluruh perubahan di-rollback.
@@ -52,6 +54,7 @@ class TracerStudySubmitService
         private readonly ResponseRepository         $responseRepo,
         private readonly EmploymentRecordRepository $employmentRepo,
         private readonly EducationRecordRepository  $educationRepo,
+        private readonly StakeholderContactRepository $stakeholderRepo,
     ) {}
 
     /**
@@ -226,5 +229,72 @@ class TracerStudySubmitService
                 'major'            => $validated['f18c'] ?? null,
             ]);
         }
+
+        $this->persistStakeholderContacts($validated, $alumniId, $questionnaireId, $status);
+    }
+
+    /** Nilai f8 → kolom alumni_status di stakeholder_contacts. */
+    private const STAKEHOLDER_STATUS = [
+        1 => 'bekerja',
+        3 => 'wiraswasta',
+        4 => 'lanjut_studi',
+    ];
+
+    /** Urutan pasangan isian → contact_type. Kunci array = nomor penilai. */
+    private const STAKEHOLDER_TYPES = [
+        1 => 'atasan',
+        2 => 'senior',
+        3 => 'rekan',
+    ];
+
+    /**
+     * Menyimpan kontak penilai yang alumni tuliskan di bagian "Kontak Penilai".
+     *
+     * Hanya untuk f8 = 1, 3, atau 4 — sama dengan syarat show_if pertanyaannya
+     * di kuesioner. Pemeriksaan diulang di sini, bukan sekadar mengandalkan
+     * antarmuka, supaya kiriman yang tidak lewat formulir tetap tunduk aturan
+     * yang sama.
+     *
+     * Pasangan yang tidak lengkap (nama ada tapi surel kosong, atau
+     * sebaliknya) dilewati: tabel tujuan menuntut keduanya terisi, dan
+     * separuh kontak tidak berguna bagi Tim Tracer yang perlu mengirim
+     * kuesioner penilaian.
+     *
+     * Status di luar ketiganya TIDAK sekadar dilewati, melainkan menghapus
+     * kontak yang sudah ada. Alumni yang sebelumnya mengisi "Bekerja" lalu
+     * mengisi ulang dengan "sedang mencari kerja" tidak lagi punya atasan
+     * untuk dinilai — meninggalkan kontak lamanya berarti Tim Tracer
+     * mengirim kuesioner penilaian ke orang yang sudah tidak relevan.
+     */
+    private function persistStakeholderContacts(
+        array $validated,
+        int $alumniId,
+        int $questionnaireId,
+        int $status,
+    ): void {
+        $alumniStatus = self::STAKEHOLDER_STATUS[$status] ?? null;
+
+        $contacts = [];
+        foreach ($alumniStatus === null ? [] : self::STAKEHOLDER_TYPES as $no => $type) {
+            $name  = trim((string) ($validated["stk{$no}_nama"]  ?? ''));
+            $email = trim((string) ($validated["stk{$no}_email"] ?? ''));
+
+            if ($name === '' || $email === '') {
+                continue;
+            }
+
+            $contacts[] = [
+                'contact_type'  => $type,
+                'contact_name'  => $name,
+                'contact_email' => $email,
+                'alumni_status' => $alumniStatus,
+            ];
+        }
+
+        // Dipanggil juga saat $contacts kosong: bulkUpsert() menghapus kontak
+        // lama lebih dulu, sehingga pengisian ulang yang mengosongkan ketiga
+        // pasangan — atau yang berganti ke status tanpa penilai — benar-benar
+        // menghapus, bukan menyisakan data usang.
+        $this->stakeholderRepo->bulkUpsert($alumniId, $questionnaireId, $contacts);
     }
 }
