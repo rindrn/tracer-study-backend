@@ -60,6 +60,7 @@ class QuestionnaireValidator
             'sections.*.questions.*.options.*.label' => ['nullable', 'string', 'max:255'],
             'sections.*.questions.*.options.*.value' => ['nullable', 'string', 'max:255'],
             'sections.*.questions.*.options.*.code' => ['nullable', 'string', 'max:80'],
+            'sections.*.questions.*.options.*.is_hidden' => ['nullable', 'boolean'],
             'sections.*.questions.*.logic' => ['nullable', 'array'],
             'sections.*.questions.*.logic.type' => ['nullable', 'string', 'in:always,in_array'],
             'sections.*.questions.*.logic.dependsOn' => ['nullable', 'string', 'max:100'],

@@ -130,12 +130,21 @@ class QuestionnaireFetchService
             'is_required'      => $q->is_required,
             'order_no'         => $q->order_no,
             'metadata'         => $metadata,
-            'options'          => $rawOptions->map(fn ($o) => [
-                'id'    => $o->id,
-                'code'  => $o->option_code,
-                'label' => $o->option_label,
-                'value' => $o->option_code, // FE pakai option_code sebagai value
-            ])->values(),
+            // Opsi ber-is_hidden disaring DI SINI SAJA -- ini satu-satunya
+            // jalur alumni. Barisnya tetap hidup di questionnaire_options
+            // supaya option_code-nya masih bisa di-resolve saat export
+            // kementerian membaca jawaban lama yang menunjuk ke opsi itu.
+            // Panel admin memakai QuestionnaireService::mapQuestionFull()
+            // yang sengaja TIDAK menyaring -- tim tracer harus tetap melihat
+            // opsi tersembunyi untuk bisa menyalakannya kembali.
+            'options'          => $rawOptions
+                ->reject(fn ($o) => (bool) ($o->is_hidden ?? false))
+                ->map(fn ($o) => [
+                    'id'    => $o->id,
+                    'code'  => $o->option_code,
+                    'label' => $o->option_label,
+                    'value' => $o->option_code, // FE pakai option_code sebagai value
+                ])->values(),
         ];
     }
 
