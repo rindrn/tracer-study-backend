@@ -23,7 +23,7 @@ class QuestionnaireValidator
         // (programs/provinces/cities), bukan diketik pembuat borang. Di
         // database tetap tersimpan sebagai short_text; pembedanya ada di
         // metadata — lihat QuestionnaireService::buildQuestionMetadata().
-        $questionTypes = ['short', 'paragraph', 'multiple_choice', 'checkbox', 'dropdown', 'lookup', 'file_upload', 'linear_scale', 'rating', 'multiple_choice_grid', 'checkbox_grid', 'date', 'time'];
+        $questionTypes = ['short', 'paragraph', 'number', 'multiple_choice', 'checkbox', 'dropdown', 'lookup', 'file_upload', 'linear_scale', 'rating', 'multiple_choice_grid', 'checkbox_grid', 'date', 'time'];
 
         $validator = Validator::make($data, [
             'title' => ['required', 'string', 'max:200'],
@@ -45,13 +45,37 @@ class QuestionnaireValidator
             'sections.*.order_no' => ['nullable', 'integer', 'min:1'],
             'sections.*.questions' => ['required', 'array', 'min:1'],
             'sections.*.questions.*.code' => ['nullable', 'string', 'max:80'],
+            'sections.*.questions.*.order_no' => ['nullable', 'integer', 'min:1'],
             'sections.*.questions.*.question' => ['required', 'string'],
             'sections.*.questions.*.type' => ['required', 'string', 'in:' . implode(',', $questionTypes)],
-            'sections.*.questions.*.description' => ['nullable', 'string'],
+            'sections.*.questions.*.description' => ['nullable', 'string', 'max:300'],
+            // Medan bantu pengisian. Disimpan di metadata pertanyaan dan
+            // dibaca perender formulir maupun pratinjau — lihat
+            // QuestionnaireService::EDITABLE_METADATA_KEYS.
+            'sections.*.questions.*.hint' => ['nullable', 'string', 'max:300'],
+            'sections.*.questions.*.format' => ['nullable', 'string', 'in:email,phone,url,currency'],
+            'sections.*.questions.*.divider_label' => ['nullable', 'string', 'max:300'],
+            // Metadata semantik untuk ETL, dibawa apa adanya lintas salinan.
+            'sections.*.questions.*.competency' => ['nullable', 'string', 'max:100'],
+            'sections.*.questions.*.dimension' => ['nullable', 'string', 'max:100'],
+            'sections.*.questions.*.method' => ['nullable', 'string', 'max:100'],
+            // Batas kewajaran isian angka. PERINGATAN, bukan penolakan —
+            // alumni tetap boleh mengirim nilai di luar rentang ini.
+            'sections.*.questions.*.warn_min' => ['nullable', 'numeric'],
+            'sections.*.questions.*.warn_max' => ['nullable', 'numeric'],
+            'sections.*.questions.*.option_hints' => ['nullable', 'array'],
+            'sections.*.questions.*.option_hints.*' => ['nullable', 'string', 'max:300'],
             'sections.*.questions.*.required' => ['sometimes', 'boolean'],
             'sections.*.questions.*.allowOther' => ['sometimes', 'boolean'],
             'sections.*.questions.*.scaleMin' => ['nullable', 'integer'],
             'sections.*.questions.*.scaleMax' => ['nullable', 'integer'],
+            // Keterangan ujung skala. WAJIB punya aturan: validated() hanya
+            // mengembalikan kunci yang tervalidasi, jadi medan tanpa aturan
+            // ikut terbuang diam-diam. Itulah sebabnya salinan kuesioner
+            // kehilangan label "Sangat Rendah / Sangat Tinggi" pada seluruh
+            // pertanyaan kompetensi.
+            'sections.*.questions.*.scaleLabels' => ['nullable', 'array'],
+            'sections.*.questions.*.scaleLabels.*' => ['nullable', 'string', 'max:255'],
             'sections.*.questions.*.gridRows' => ['nullable', 'array'],
             'sections.*.questions.*.gridRows.*' => ['nullable', 'string'],
             'sections.*.questions.*.gridColumns' => ['nullable', 'array'],

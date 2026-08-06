@@ -163,8 +163,16 @@ class QuestionnaireService
                     : $existing->published_at,
             ]);
 
+            // Metadata lama dipungut SEBELUM pertanyaannya dihapus. Penyuntingan
+            // memang menghapus lalu menyisipkan ulang seluruh pertanyaan, dan
+            // tanpa langkah ini setiap penyimpanan membuang kunci metadata yang
+            // tidak dikenal borang penyunting -- option_hints, divider_label,
+            // hint, dan seterusnya. Dicocokkan lewat kode pertanyaan, satu-
+            // satunya penanda yang bertahan melewati hapus-buat-ulang.
+            $preserved = $this->collectExistingMetadata($id);
+
             $this->questionnaireRepo->deleteSectionsAndQuestions($id);
-            $this->syncSections($id, $validated['sections'], $now);
+            $this->syncSections($id, $validated['sections'], $now, $preserved);
         });
 
         return $this->loadQuestionnaire($id);
@@ -232,9 +240,64 @@ class QuestionnaireService
         return empty($clean) ? null : json_encode($clean);
     }
 
-    /** Insert semua section + question + option untuk 1 kuesioner. */
-    private function syncSections(int $questionnaireId, array $sections, Carbon $now): void
+    /**
+     * Metadata pertanyaan yang tersimpan sekarang, berkunci kode pertanyaan.
+     *
+     * @return array<string,array<string,mixed>>
+     */
+    private function collectExistingMetadata(int $questionnaireId): array
     {
+        return $this->questionnaireRepo
+            ->getQuestionsByQuestionnaireId($questionnaireId)
+            ->reduce(function (array $carry, object $q): array {
+                $meta = $q->metadata ? json_decode($q->metadata, true) : null;
+                if (is_array($meta) && $meta !== []) {
+                    $carry[$q->code] = $meta;
+                }
+
+                return $carry;
+            }, []);
+    }
+
+    /**
+     * Insert semua section + question + option untuk 1 kuesioner.
+     *
+     * @param array<string,array<string,mixed>> $preservedMetadata metadata lama
+     *        berkunci kode pertanyaan; kosong saat membuat kuesioner baru.
+     */
+    private function syncSections(int $questionnaireId, array $sections, Carbon $now, array $preservedMetadata = []): void
+    {
+        // Peta label -> kode opsi per pertanyaan, dipakai menormalkan syarat
+        // tampil. Disusun lebih dulu karena pertanyaan pemicu bisa berada di
+        // bagian mana pun, termasuk sesudah pertanyaan yang merujuknya.
+        $optionCodeByLabel = [];
+        // Peta label -> kode pertanyaan untuk deret boolean yang di borang
+        // penyunting tampil sebagai SATU daftar centang. Pertanyaan yang
+        // merujuknya menyimpan kode kelompok (mis. q16_cara_cari_kerja),
+        // padahal yang ada di basis data adalah pertanyaan individualnya
+        // (f415). Tanpa terjemahan ini, "Sebutkan cara lainnya" tidak akan
+        // pernah muncul betapa pun alumni mencentang "Lainnya".
+        $groupLabelToCode = [];
+        foreach ($sections as $sectionData) {
+            foreach ($sectionData['questions'] ?? [] as $questionData) {
+                $questionCode = $questionData['code'] ?? null;
+                if (!$questionCode) continue;
+
+                foreach ($questionData['options'] ?? [] as $optionIndex => $optionData) {
+                    if (!is_array($optionData)) continue;
+                    $label = trim((string) ($optionData['label'] ?? ''));
+                    $optionCode = $optionData['code'] ?: 'opt_' . ($optionIndex + 1);
+                    if ($label !== '') $optionCodeByLabel[$questionCode][$label] = $optionCode;
+                }
+
+                $groupCode  = $questionData['group_code'] ?? null;
+                $groupLabel = trim((string) ($questionData['group_label'] ?? ''));
+                if ($groupCode && $groupLabel !== '') {
+                    $groupLabelToCode[$groupCode][$groupLabel] = $questionCode;
+                }
+            }
+        }
+
         foreach (array_values($sections) as $sectionIndex => $sectionData) {
             $sectionId = $this->questionnaireRepo->insertSection([
                 'questionnaire_id' => $questionnaireId,
@@ -251,15 +314,22 @@ class QuestionnaireService
                     $dbType = 'boolean';
                 }
 
+                $code = $questionData['code'] ?: Str::slug($questionData['question']) . '-' . ($questionIndex + 1);
+
                 $questionId = $this->questionnaireRepo->insertQuestion([
                     'questionnaire_id' => $questionnaireId,
                     'section_id'       => $sectionId,
-                    'code'             => $questionData['code'] ?: Str::slug($questionData['question']) . '-' . ($questionIndex + 1),
+                    'code'             => $code,
                     'question_text'    => $questionData['question'],
                     'question_type'    => $dbType,
                     'is_required'      => (bool) ($questionData['required'] ?? false),
                     'order_no'         => (int) ($questionData['order_no'] ?? ($questionIndex + 1)),
-                    'metadata'         => json_encode($this->buildQuestionMetadata($questionData)),
+                    'metadata'         => json_encode($this->buildQuestionMetadata(
+                        $questionData,
+                        $preservedMetadata[$code] ?? [],
+                        $optionCodeByLabel,
+                        $groupLabelToCode,
+                    )),
                 ]);
 
                 foreach (array_values($questionData['options'] ?? []) as $optionIndex => $optionData) {
@@ -295,6 +365,7 @@ class QuestionnaireService
             // master, bukan option_code, jadi tidak punya questionnaire_options
             // untuk disandarkan single_choice.
             'lookup'          => 'short_text',
+            'number'          => 'number',
             'linear_scale'    => 'number',
             'rating'          => 'number',
             'boolean'         => 'boolean',
@@ -316,30 +387,154 @@ class QuestionnaireService
             'long_text'       => 'paragraph',
             'single_choice'   => 'multiple_choice',
             'multiple_choice' => 'checkbox',
-            'number'          => 'short',
+            // Isian angka punya jenisnya sendiri di borang penyunting. Dulu
+            // dipetakan ke 'short', sehingga pertanyaan angka bawaan seperti
+            // f502 dan f505 terbuka sebagai isian teks biasa — dan kuesioner
+            // baru tidak punya cara membuat isian angka sama sekali.
+            'number'          => 'number',
             'date'            => 'date',
             'boolean'         => 'multiple_choice',
             default           => 'short',
         };
     }
 
-    private function buildQuestionMetadata(array $questionData): array
-    {
-        $metadata = [
-            'original_type' => $questionData['type'],
-            'allowOther'    => $questionData['allowOther'] ?? false,
-        ];
+    /**
+     * Kunci metadata yang boleh disunting Tim Tracer lewat borang penyunting.
+     *
+     * Bertindak sebagai daftar-boleh, bukan sekadar dokumentasi: metadata yang
+     * datang dari peramban hanya diterima kalau kuncinya tersebut di sini.
+     * Menerima JSON apa adanya berarti siapa pun yang bisa membuka penyunting
+     * dapat menyelipkan show_if atau kunci lain yang tidak pernah ditampilkan
+     * di layar.
+     *
+     * option_hints ikut karena dipakai salinan-dari-template: keterangan per
+     * opsi harus terbawa walau borang penyunting belum bisa menyuntingnya.
+     */
+    private const EDITABLE_METADATA_KEYS = [
+        'hint', 'description', 'format', 'divider_label', 'option_hints',
+        'warn_min', 'warn_max',
+        // Metadata semantik ETL. Tidak tampil di layar mana pun, tapi
+        // IndikatorEvaluasiDimService memakainya untuk memberi nama indikator
+        // kompetensi dan metode pembelajaran di dashboard. Ikut daftar ini
+        // supaya salinan-dari-template tidak memutus sambungan itu — pada
+        // kuesioner baru tidak ada baris lama yang bisa melestarikannya.
+        'competency', 'dimension', 'method',
+    ];
 
-        // Scale metadata — store as snake_case for consistency with seeder
-        if (isset($questionData['scaleMin'])) {
-            $metadata['scale_min'] = $questionData['scaleMin'];
-        }
-        if (isset($questionData['scaleMax'])) {
-            $metadata['scale_max'] = $questionData['scaleMax'];
+    /** Nilai yang sah untuk metadata `format`. */
+    private const ALLOWED_FORMATS = ['email', 'phone', 'url', 'currency'];
+
+    /**
+     * Kunci yang selalu disusun ulang dari data borang penyunting.
+     *
+     * Dibedakan dari kunci lain karena keberadaannya bermakna: pertanyaan yang
+     * tidak lagi berjenis skala harus KEHILANGAN scale_min, bukan mewarisinya
+     * dari metadata lama. Kunci di luar daftar ini dan daftar sunting di atas
+     * dibiarkan lewat apa adanya -- itulah yang menyelamatkan metadata yang
+     * belum dikenal borang penyunting.
+     */
+    private const MANAGED_METADATA_KEYS = [
+        'original_type', 'allowOther',
+        'scale_min', 'scale_max', 'scale_labels',
+        'gridRows', 'gridColumns',
+        'lookup', 'lookup_value', 'depends_on',
+        'group_code',
+        'show_if',
+    ];
+
+    /**
+     * Susun metadata pertanyaan dari tiga sumber.
+     *
+     * 1. Metadata lama di basis data ($existing) — lewat apa adanya, kecuali
+     *    kunci terkelola yang disusun ulang di bawah. Inilah yang menjaga
+     *    option_hints dan kunci masa depan tetap hidup melewati penyimpanan.
+     * 2. Kunci yang boleh disunting, dari borang penyunting — dipakai juga
+     *    saat membuat kuesioner baru dari template, ketika $existing kosong
+     *    karena barisnya memang belum ada.
+     * 3. Kunci terkelola, selalu dihitung ulang dari bentuk pertanyaannya.
+     *
+     * @param array<string,mixed> $existing metadata pertanyaan berkode sama
+     */
+    private function buildQuestionMetadata(
+        array $questionData,
+        array $existing = [],
+        array $optionCodeByLabel = [],
+        array $groupLabelToCode = [],
+    ): array {
+        // Mulai dari yang lama, lalu buang seluruh kunci terkelola. Yang
+        // tersisa adalah metadata yang tidak diurus borang penyunting.
+        $metadata = $existing;
+        foreach (self::MANAGED_METADATA_KEYS as $key) {
+            unset($metadata[$key]);
         }
 
-        if (!empty($questionData['scaleLabels'])) {
-            $metadata['scale_labels'] = $questionData['scaleLabels'];
+        foreach (self::EDITABLE_METADATA_KEYS as $key) {
+            if (!array_key_exists($key, $questionData)) {
+                continue;
+            }
+
+            $value = $questionData[$key];
+
+            // Dikosongkan pengguna berarti dibuang, bukan disimpan sebagai
+            // string kosong yang lalu dirender sebagai keterangan hampa.
+            if ($value === null || $value === '' || $value === []) {
+                unset($metadata[$key]);
+                continue;
+            }
+
+            if ($key === 'format') {
+                $value = is_string($value) ? strtolower(trim($value)) : '';
+                if (!in_array($value, self::ALLOWED_FORMATS, true)) {
+                    unset($metadata[$key]);
+                    continue;
+                }
+            } elseif ($key === 'warn_min' || $key === 'warn_max') {
+                if (!is_numeric($value)) {
+                    unset($metadata[$key]);
+                    continue;
+                }
+                $value = (float) $value;
+            } elseif ($key === 'option_hints') {
+                if (!is_array($value)) {
+                    unset($metadata[$key]);
+                    continue;
+                }
+                $value = array_map(fn ($v) => mb_substr((string) $v, 0, 300), $value);
+            } else {
+                $value = mb_substr(trim((string) $value), 0, 300);
+                if ($value === '') {
+                    unset($metadata[$key]);
+                    continue;
+                }
+            }
+
+            $metadata[$key] = $value;
+        }
+
+        $metadata['original_type'] = $questionData['type'];
+        $metadata['allowOther']    = $questionData['allowOther'] ?? false;
+
+        // Scale metadata — store as snake_case for consistency with seeder.
+        //
+        // HANYA untuk pertanyaan yang memang berskala. Borang penyunting selalu
+        // mengirim scaleMin/scaleMax (bawaannya 1 dan 5) untuk setiap
+        // pertanyaan, jadi tanpa penjagaan ini menyimpan kuesioner akan
+        // menempelkan skala 1-5 pada isian angka biasa. Akibatnya nyata:
+        // pertanyaan pendapatan f505 akan menolak jawaban di luar 1-5, baik di
+        // peramban (validateAnswer membaca scale_min) maupun di server
+        // (buildDynamicRules menambah aturan between).
+        $isScale = in_array($questionData['type'] ?? '', ['linear_scale', 'rating'], true);
+
+        if ($isScale) {
+            if (isset($questionData['scaleMin'])) {
+                $metadata['scale_min'] = $questionData['scaleMin'];
+            }
+            if (isset($questionData['scaleMax'])) {
+                $metadata['scale_max'] = $questionData['scaleMax'];
+            }
+            if (!empty($questionData['scaleLabels'])) {
+                $metadata['scale_labels'] = $questionData['scaleLabels'];
+            }
         }
 
         foreach (['gridRows', 'gridColumns'] as $key) {
@@ -364,19 +559,76 @@ class QuestionnaireService
             }
         }
 
-        // Preserve group metadata (for grouped boolean questions from template)
-        foreach (['group_code', 'group_label', 'group_title'] as $key) {
-            if (!empty($questionData[$key])) {
-                $metadata[$key] = $questionData[$key];
+        // Metadata pertanyaan berkelompok (deret boolean yang dirender sebagai
+        // satu daftar centang).
+        //
+        // group_code menentukan keanggotaan kelompok, jadi ia yang memutuskan:
+        // tanpa group_code, ketiganya dibuang. Sebaliknya group_label dan
+        // group_title DIPERTAHANKAN kalau pengirimnya tidak menyebutkannya
+        // sama sekali — keduanya tidak punya isian di borang penyunting,
+        // sehingga payload yang tidak menyertakannya berarti "tidak diubah",
+        // bukan "dikosongkan". Tanpa perbedaan itu, satu penyimpanan cukup
+        // untuk mengubah daftar centang menjadi lima belas baris berisi teks
+        // pertanyaan yang berulang.
+        if (!empty($questionData['group_code'])) {
+            $metadata['group_code'] = $questionData['group_code'];
+
+            foreach (['group_label', 'group_title'] as $key) {
+                if (array_key_exists($key, $questionData)) {
+                    if (!empty($questionData[$key])) {
+                        $metadata[$key] = $questionData[$key];
+                    } else {
+                        unset($metadata[$key]);
+                    }
+                }
             }
+        } else {
+            unset($metadata['group_code'], $metadata['group_label'], $metadata['group_title']);
         }
 
         // Simpan pertanyaan bersyarat (logic) sebagai show_if di metadata.
+        //
+        // Nilainya SELALU disimpan sebagai kode opsi, tidak pernah sebagai
+        // label. Borang penyunting bekerja dengan label karena itu yang dibaca
+        // manusia, tapi label bisa disunting kapan saja — begitu redaksinya
+        // diperbaiki, syarat yang menyimpan label berhenti cocok dan
+        // pertanyaan bersyaratnya diam-diam tidak pernah muncul lagi. ETL dan
+        // ekspor Kemdikbud juga membaca kode, bukan label.
         if (!empty($questionData['logic']) && ($questionData['logic']['type'] ?? '') === 'in_array') {
             $depCode = $questionData['logic']['dependsOn'] ?? '';
             $values  = $questionData['logic']['values'] ?? [];
             if ($depCode && !empty($values)) {
-                $metadata['show_if'] = [$depCode => array_values($values)];
+                // Pemicunya sebuah kelompok daftar centang: kode kelompok
+                // tidak pernah ada sebagai pertanyaan, jadi ditukar dengan
+                // kode pertanyaan individual yang labelnya dipilih, dan
+                // nilainya menjadi 1 (tercentang).
+                if (isset($groupLabelToCode[$depCode])) {
+                    $pertama = (string) reset($values);
+                    $kodeIndividual = $groupLabelToCode[$depCode][$pertama] ?? null;
+
+                    if ($kodeIndividual) {
+                        $metadata['show_if'] = [$kodeIndividual => [1]];
+                        return $metadata;
+                    }
+                }
+
+                $kamus = $optionCodeByLabel[$depCode] ?? [];
+                $metadata['show_if'] = [
+                    $depCode => array_values(array_map(
+                        function ($v) use ($kamus) {
+                            $kode = $kamus[(string) $v] ?? $v;
+
+                            // Kode opsi yang berupa angka disimpan sebagai
+                            // angka, seragam dengan seeder. Perbandingannya
+                            // memang berbasis teks di kedua sisi, tapi bentuk
+                            // yang seragam membuat salinan kuesioner benar-
+                            // benar sama dengan sumbernya — dan perbedaan
+                            // yang tersisa jadi berarti.
+                            return is_numeric($kode) ? (int) $kode : $kode;
+                        },
+                        $values,
+                    )),
+                ];
             }
         }
 
@@ -464,7 +716,15 @@ class QuestionnaireService
             'type'          => isset($metadata['lookup'])
                 ? 'lookup'
                 : ($metadata['original_type'] ?? $this->mapQuestionTypeToFrontend($question->question_type, $metadata)),
-            'description'   => null,
+            // Medan sunting bebas. Dulu 'description' dipatok null sehingga
+            // keterangan pertanyaan tidak pernah sampai ke borang penyunting
+            // maupun ke salinan-dari-template, walau nilainya ada di metadata.
+            'description'   => $metadata['description'] ?? null,
+            'hint'          => $metadata['hint'] ?? null,
+            'format'        => $metadata['format'] ?? null,
+            'divider_label' => $metadata['divider_label'] ?? null,
+            'warn_min'      => $metadata['warn_min'] ?? null,
+            'warn_max'      => $metadata['warn_max'] ?? null,
             'options'       => ($optionsGrouped->get($question->id, collect()))->map(fn ($o) => [
                 'id'       => $o->id,
                 'code'     => $o->option_code,
