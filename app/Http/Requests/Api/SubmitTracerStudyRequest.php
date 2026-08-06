@@ -113,12 +113,17 @@ class SubmitTracerStudyRequest extends FormRequest
                 case 'short_text':
                     $rule[] = 'string';
                     $rule[] = 'max:500';
-                    // Isian bertanda format email (surel penilai) tetap
-                    // bertipe short_text di skema — penandanya ada di
-                    // metadata, sama pola dengan `lookup` di atas.
-                    if ($this->hasFormat($q->metadata, 'email')) {
-                        $rule[] = 'email';
-                    }
+                    // Isian bertanda format tetap bertipe short_text di skema —
+                    // penandanya ada di metadata, sama pola dengan `lookup` di
+                    // atas. Disetel Tim Tracer lewat borang penyunting.
+                    match ($this->formatOf($q->metadata)) {
+                        'email' => $rule[] = 'email',
+                        'url'   => $rule[] = 'url',
+                        // Cerminan aturan di peramban: 9-15 angka, pemisah
+                        // apa pun diabaikan.
+                        'phone' => $rule[] = 'regex:/^\D*(\d\D*){9,15}$/',
+                        default => null,
+                    };
                     break;
 
                 case 'long_text':
@@ -141,13 +146,13 @@ class SubmitTracerStudyRequest extends FormRequest
         return $rules;
     }
 
-    /** Apakah metadata pertanyaan menandai format tertentu (mis. email). */
-    private function hasFormat(?string $metadata, string $format): bool
+    /** Format isian yang ditandai metadata pertanyaan (email, phone, url). */
+    private function formatOf(?string $metadata): ?string
     {
-        if (!$metadata) return false;
+        if (!$metadata) return null;
         $meta = json_decode($metadata, true);
 
-        return is_array($meta) && ($meta['format'] ?? null) === $format;
+        return is_array($meta) ? ($meta['format'] ?? null) : null;
     }
 
     /** Tabel referensi yang boleh dirujuk metadata `lookup`. */
