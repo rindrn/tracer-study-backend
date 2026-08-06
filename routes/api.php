@@ -16,6 +16,13 @@ use App\Http\Controllers\Api\Transactional\QuestionSemanticMappingController;
 use App\Http\Controllers\Api\Transactional\EtlRunController;
 use App\Http\Controllers\Api\Analytical\KpiCategoryMappingController;
 use App\Http\Controllers\Api\Analytical\EtlAnomalyLogController;
+// Alias: dua controller bernama PublicReportController (satu sisi admin, satu
+// sisi publik). Yang publik diberi alias supaya keduanya bisa dipakai di file
+// ini tanpa menulis FQCN panjang di setiap baris route.
+use App\Http\Controllers\Api\PublicAccess\PublicReportController as PublicReportViewController;
+use App\Http\Controllers\Api\PublicAccess\PublicStatisticsController;
+use App\Http\Controllers\Api\Admin\PublicReportController;
+use App\Http\Controllers\Api\Admin\PublicDisplaySettingController;
 
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireController;
@@ -58,6 +65,20 @@ Route::prefix('auth')->group(function () {
 
 Route::get('tracer-study/forms', [QuestionnaireFetchController::class, 'getActiveForms']);
 Route::apiResource('questionnaires', QuestionnaireController::class)->only(['show']);
+
+// ── Halaman publik (masyarakat umum, tanpa login) ────────────────────────
+// Semua yang di sini menegakkan sendiri batasnya di server: laporan hanya
+// yang is_published, statistik hanya tahun di dalam rentang pengarsipan yang
+// diatur Ketua Tracer. Menyaring di frontend saja tidak cukup — query string
+// bisa diketik siapa pun.
+Route::prefix('public')->group(function () {
+    Route::get('reports',                [PublicReportViewController::class, 'index']);
+    Route::get('reports/{id}/download',  [PublicReportViewController::class, 'download'])->whereNumber('id');
+    Route::get('reports/{id}/preview',   [PublicReportViewController::class, 'preview'])->whereNumber('id');
+
+    Route::get('statistics/years',    [PublicStatisticsController::class, 'years']);
+    Route::get('statistics/progress', [PublicStatisticsController::class, 'progress']);
+});
 
 // Unduhan CSV referensi kode (provinsi, kab/kota, prodi). Publik karena dibuka
 // lewat window.open() dari halaman pengisian — tab baru tidak membawa header
@@ -226,6 +247,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('etl-anomaly-log', [EtlAnomalyLogController::class, 'index']);
     Route::get('etl-runs/{id}', [EtlRunController::class, 'show']);
+
+    // ── Publikasi (Ketua Tracer) ──────────────────────────────────
+    // Requirement menyebut Ketua Tracer secara spesifik, jadi tidak
+    // menumpang guard admin lain yang juga dipegang tracer_team.
+    Route::middleware('role:head_tracer')->group(function () {
+        Route::get('admin/public-reports',           [PublicReportController::class, 'index']);
+        Route::post('admin/public-reports',          [PublicReportController::class, 'store']);
+        Route::put('admin/public-reports/{id}',      [PublicReportController::class, 'update'])->whereNumber('id');
+        Route::delete('admin/public-reports/{id}',   [PublicReportController::class, 'destroy'])->whereNumber('id');
+
+        Route::get('admin/public-settings',  [PublicDisplaySettingController::class, 'show']);
+        Route::put('admin/public-settings',  [PublicDisplaySettingController::class, 'update']);
+    });
 
     Route::middleware('role:head_tracer')->group(function () {
         Route::post('question-semantic-mappings',              [QuestionSemanticMappingController::class, 'store']);

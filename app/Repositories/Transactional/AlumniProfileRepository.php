@@ -411,6 +411,51 @@ class AlumniProfileRepository
     }
 
     /**
+     * Tahun lulusan yang benar-benar punya alumni, dibatasi rentang.
+     * Dipakai halaman publik: pengunjung tidak boleh ditawari tahun yang
+     * datanya kosong, atau tahun di luar rentang pengarsipan.
+     *
+     * @param array{start?: int, end?: int} $yearRange
+     * @return int[] terbaru dulu
+     */
+    public function getGraduationYearsInRange(array $yearRange = []): array
+    {
+        $query = DB::connection(self::CONN)->table('alumni_profiles')
+            ->whereNotNull('graduation_year');
+
+        if (isset($yearRange['start'])) {
+            $query->where('graduation_year', '>=', $yearRange['start']);
+        }
+        if (isset($yearRange['end'])) {
+            $query->where('graduation_year', '<=', $yearRange['end']);
+        }
+
+        return $query->distinct()
+            ->orderByDesc('graduation_year')
+            ->pluck('graduation_year')
+            ->map(fn ($y) => (int) $y)
+            ->all();
+    }
+
+    /**
+     * Tahun lulusan terkecil dan terbesar yang ada di database. Dipakai form
+     * pengaturan rentang publik supaya admin tahu batas yang masuk akal.
+     *
+     * @return array{min: int|null, max: int|null}
+     */
+    public function getGraduationYearBounds(): array
+    {
+        $row = DB::connection(self::CONN)->table('alumni_profiles')
+            ->selectRaw('MIN(graduation_year) as min_year, MAX(graduation_year) as max_year')
+            ->first();
+
+        return [
+            'min' => $row?->min_year !== null ? (int) $row->min_year : null,
+            'max' => $row?->max_year !== null ? (int) $row->max_year : null,
+        ];
+    }
+
+    /**
      * Ambil semua alumni untuk laporan export (join programs + responses).
      *
      * @param array{program_id?: int, questionnaire_id?: int, graduation_year?: int} $filters
