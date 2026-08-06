@@ -6,7 +6,9 @@ namespace App\DTOs\Analytical\Kpi13;
  * Kpi13ChartDTO
  *
  * Kontrak response untuk KPI 13 — Perbandingan KPI Lintas Program Studi.
- * Threshold TIDAK dimasukkan (belum ada di OLAP, akan ditambah nanti).
+ * Threshold status per metrik per prodi disertakan via ThresholdService
+ * (lihat Kpi13Service::resolveThresholdStatus) — dipakai FE untuk mewarnai
+ * bar hijau/kuning/merah sesuai pencapaian threshold LAM.
  *
  * Taruh di: app/DTOs/Analytical/Kpi13/Kpi13ChartDTO.php
  */
@@ -25,7 +27,9 @@ class Kpi13ChartDTO
          *   masa_tunggu: float,
          *   kesesuaian: float,
          *   wirausaha: float,
-         *   raw: array{bekerja:int, cepat:int, sesuai:int, wirausaha:int}
+         *   pendapatan: float,
+         *   threshold_status: array<string, 'unggul'|'baik'|'kurang'|null>,
+         *   raw: array{bekerja:int, cepat:int, sesuai:int, wirausaha:int, avg_gaji:int, ambang_ump_multiplier:float}
          * }>
          */
         public readonly array $prodiRows,

@@ -351,7 +351,7 @@ class AlumniFactBuilderService
                 'wirausaha_sk'          => $wirausahaSk,
                 'masa_tunggu_bekerja'   => isset($resolvedByRole['masa_tunggu_bekerja']) ? (int) $resolvedByRole['masa_tunggu_bekerja'] : null,
                 'bulan_sebelum_lulus'   => isset($resolvedByRole['bulan_sebelum_lulus']) ? (int) $resolvedByRole['bulan_sebelum_lulus'] : null,
-                'bulan_sesudah_lulus'   => null,
+                'bulan_sesudah_lulus'   => isset($resolvedByRole['bulan_sesudah_lulus']) ? (int) $resolvedByRole['bulan_sesudah_lulus'] : null,
                 'masa_tunggu_wirausaha' => null,
                 'take_home_pay'         => $takeHomePay,
                 'ump_sk'                => $umpSk,

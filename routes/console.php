@@ -15,9 +15,9 @@ Artisan::command('inspire', function () {
 | ETL Scheduling
 |--------------------------------------------------------------------------
 |
-| MODE TESTING (aktif sekarang): jalan setiap 5 menit supaya hasilnya
-| bisa dicek cepat. Setelah verifikasi OK, ganti ke MODE PRODUCTION
-| di bagian bawah (comment yang testing, uncomment yang production).
+| MODE PRODUCTION (aktif sekarang): jalan mingguan setiap Senin jam 01:00.
+| Mode testing (setiap 5 menit) ada di bagian bawah untuk dipakai lagi
+| kalau perlu debug cepat (comment yang production, uncomment yang testing).
 |
 | onSuccess() memicu etl:create-preagg-indexes SETELAH etl:run selesai
 | -- TAPI perhatikan catatan timing di bawah: index baru berguna kalau
@@ -32,28 +32,28 @@ Artisan::command('inspire', function () {
 */
 
 Schedule::command('etl:run')
-    ->everyFiveMinutes()
+    ->weeklyOn(1, '01:00') // setiap Senin jam 01:00
     ->withoutOverlapping()
     ->onSuccess(function () {
-        Log::info('ETL snapshot berhasil');
+        Log::info('ETL snapshot mingguan berhasil');
         Artisan::call('etl:create-preagg-indexes');
     })
-    ->onFailure(fn () => Log::error('ETL snapshot gagal'));
+    ->onFailure(fn () => Log::error('ETL snapshot mingguan gagal'));
 
 Schedule::command('tracer:recalc-response-threshold')->dailyAt('01:00');
 
 /*
 |--------------------------------------------------------------------------
-| MODE PRODUCTION (uncomment setelah testing selesai, comment yang di atas)
+| MODE TESTING (uncomment untuk debug cepat, comment yang production di atas)
 |--------------------------------------------------------------------------
 |
 | Schedule::command('etl:run')
-|     ->weeklyOn(1, '01:00') // setiap Senin jam 01:00
+|     ->everyFiveMinutes()
 |     ->withoutOverlapping()
 |     ->onSuccess(function () {
-|         Log::info('ETL snapshot mingguan berhasil');
+|         Log::info('ETL snapshot berhasil');
 |         Artisan::call('etl:create-preagg-indexes');
 |     })
-|     ->onFailure(fn () => Log::error('ETL snapshot mingguan gagal'));
+|     ->onFailure(fn () => Log::error('ETL snapshot gagal'));
 |
 */
