@@ -116,7 +116,33 @@ class SebaranInstansiController extends Controller
             'per_page'         => 'nullable|integer|min:5|max:100',
         ]);
         $p = $this->scopedParams($request);
- 
+
+        // Frontend mengirim jenis_instansi=[] (bukan tidak mengirimnya sama
+        // sekali) saat user klik irisan "Lainnya" yang kebetulan tidak
+        // punya label mentah tersisa setelah difilter (lihat komentar di
+        // Kpi12WorkplaceDistributionChart.tsx). Itu bukan permintaan yang
+        // salah bentuk -- itu cara sah untuk bilang "tidak ada kandidat
+        // label untuk difilter", jadi balas 200 dengan data kosong, bukan
+        // 422. 422 tetap dipakai untuk kasus permintaan lain yang benar-benar
+        // tidak menyertakan kedua filter sama sekali.
+        if ($request->has('jenis_instansi') && empty($p['jenis_instansi']) && empty($p['tingkat_instansi'])) {
+            $page    = max(1, (int) ($p['page'] ?? 1));
+            $perPage = min(100, max(5, (int) ($p['per_page'] ?? 15)));
+
+            return response()->json(['success' => true, 'data' => [
+                'data'          => [],
+                'page'          => $page,
+                'per_page'      => $perPage,
+                'total_on_page' => 0,
+                'total_count'   => 0,
+                'filters'       => array_filter(
+                    $p,
+                    fn ($v, $k) => in_array($k, ['jenjang', 'nama_prodi', 'tahun_lulus', 'tingkat_instansi'], true) && $v !== null && $v !== '' && $v !== [],
+                    ARRAY_FILTER_USE_BOTH,
+                ),
+            ]]);
+        }
+
         if (empty($p['jenis_instansi']) && empty($p['tingkat_instansi'])) {
             return response()->json([
                 'success' => false,

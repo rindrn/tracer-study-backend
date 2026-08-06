@@ -46,10 +46,14 @@ class ProdiDimService
                 continue;
             }
 
-            $hasChanged = $active->kode_prodi !== $newAttributes['kode_prodi']
-                || $active->nama_prodi !== $newAttributes['nama_prodi']
-                || $active->jurusan !== $newAttributes['jurusan']
-                || $active->jenjang !== $newAttributes['jenjang'];
+            // Perbandingan longgar — lihat WirausahaDimService untuk alasan
+            // lengkap: !== antara kolom DB (selalu string) dan nilai OLTP
+            // (bisa berbeda tipe) salah mendeteksi "berubah" padahal sama,
+            // dan memicu versi SCD duplikat terus-menerus.
+            $hasChanged = self::normalize($active->kode_prodi) !== self::normalize($newAttributes['kode_prodi'])
+                || self::normalize($active->nama_prodi) !== self::normalize($newAttributes['nama_prodi'])
+                || self::normalize($active->jurusan) !== self::normalize($newAttributes['jurusan'])
+                || self::normalize($active->jenjang) !== self::normalize($newAttributes['jenjang']);
 
             if ($hasChanged) {
                 $this->olapRepo->closeProdiVersion($active->prodi_sk, $snapshotDate);
@@ -59,5 +63,11 @@ class ProdiDimService
         }
 
         return ['processed' => $processed, 'inserted' => $inserted, 'updated' => $updated];
+    }
+
+    /** Null dan string kosong dianggap setara; selain itu dibandingkan sebagai string. */
+    private static function normalize(mixed $value): string
+    {
+        return $value === null ? '' : (string) $value;
     }
 }

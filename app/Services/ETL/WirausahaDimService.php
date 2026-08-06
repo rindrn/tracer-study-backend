@@ -70,11 +70,19 @@ class WirausahaDimService
             return $this->olapRepo->insertNewWirausahaVersion($newAttributes, $snapshotDate);
         }
 
-        // Deteksi perubahan atribut wirausaha antar snapshot
-        $hasChanged = $active->jabatan                !== $newAttributes['jabatan']
-            || $active->label_tingkat_instansi !== $newAttributes['label_tingkat_instansi']
-            || $active->nama_provinsi          !== $newAttributes['nama_provinsi']
-            || $active->nama_kota              !== $newAttributes['nama_kota'];
+        // Deteksi perubahan atribut wirausaha antar snapshot.
+        //
+        // Pakai perbandingan longgar (bukan !==) yang menyamakan null dengan
+        // string kosong dan angka dengan representasi string-nya. Kolom DB
+        // selalu kembali sebagai string lewat PDO, sedangkan nilai baru bisa
+        // saja berupa int/null dari pivot EAV — dengan !== keduanya dianggap
+        // "berubah" walau nilainya identik, sehingga versi SCD baru dibuat
+        // terus-menerus tanpa ada perubahan atribut sungguhan (lihat versi
+        // duplikat wirausaha_sk yang menutup dirinya sendiri di produksi).
+        $hasChanged = self::normalize($active->jabatan)                !== self::normalize($newAttributes['jabatan'])
+            || self::normalize($active->label_tingkat_instansi) !== self::normalize($newAttributes['label_tingkat_instansi'])
+            || self::normalize($active->nama_provinsi)          !== self::normalize($newAttributes['nama_provinsi'])
+            || self::normalize($active->nama_kota)               !== self::normalize($newAttributes['nama_kota']);
 
         if ($hasChanged) {
             $this->olapRepo->closeWirausahaVersion($active->wirausaha_sk, $snapshotDate);
@@ -82,5 +90,11 @@ class WirausahaDimService
         }
 
         return $active->wirausaha_sk;
+    }
+
+    /** Null dan string kosong dianggap setara; selain itu dibandingkan sebagai string. */
+    private static function normalize(mixed $value): string
+    {
+        return $value === null ? '' : (string) $value;
     }
 }

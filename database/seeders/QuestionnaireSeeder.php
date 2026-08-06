@@ -165,7 +165,18 @@ class QuestionnaireSeeder extends Seeder
 
         $insertQuestion(1, 'f5b', 'Apa nama perusahaan/kantor tempat Anda bekerja?', 'short_text', false, ['show_if' => ['f8' => [1]]]);
 
-        $insertQuestion(1, 'f5c', 'Bila berwiraswasta, apa posisi/jabatan Anda saat ini?', 'number', false, ['show_if' => ['f8' => [3]]]);
+        // Type 'number' lama SALAH: f5c punya 4 opsi berkode (bukan angka
+        // bebas), sama seperti f1101/f5d di atas — lihat AnswerResolverService
+        // yang mengecek questionnaire_options dulu sebelum type. Tanpa baris
+        // options ini, resolver jatuh ke jalur number dan menyimpan kode
+        // mentah "1"/"2"/"3" alih-alih label, sehingga dim_wirausaha.jabatan
+        // (dan pie "Distribusi Posisi Wirausaha") tidak pernah terbaca benar.
+        $insertQuestion(1, 'f5c', 'Bila berwiraswasta, apa posisi/jabatan Anda saat ini?', 'single_choice', false, ['show_if' => ['f8' => [3]]], [
+            ['1', 'Staff'],
+            ['2', 'Founder'],
+            ['3', 'Freelancer'],
+            ['4', 'Co-Founder'],
+        ]);
 
         $insertQuestion(1, 'f5d', 'Apa tingkat tempat kerja Anda?', 'single_choice', false, ['show_if' => ['f8' => [1, 3]]], [
             ['1', 'Lokal/Wilayah/Wiraswasta tidak berbadan hukum'],
