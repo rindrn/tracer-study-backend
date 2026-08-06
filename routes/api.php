@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Auth\AlumniAuthController;
 use App\Http\Controllers\Api\Transactional\ThresholdController;
 use App\Http\Controllers\Api\Transactional\LamController;
 use App\Http\Controllers\Api\Transactional\LamVersionController;
+use App\Http\Controllers\Api\Transactional\JurusanController;
 use App\Http\Controllers\Api\Transactional\LamProgramController;
 use App\Http\Controllers\Api\Transactional\ProgramController;
 use App\Http\Controllers\Api\Transactional\RefUmpController;
@@ -181,6 +182,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('programs/{id}',    [ProgramController::class, 'update']);
         Route::delete('programs/{id}', [ProgramController::class, 'destroy']);
 
+        // Jurusan CRUD (RBAC-02). Pembacaannya ada di kelompok data viewer
+        // karena dipakai penyaring di banyak halaman.
+        Route::post('jurusans',        [JurusanController::class, 'store']);
+        Route::put('jurusans/{id}',    [JurusanController::class, 'update']);
+        Route::delete('jurusans/{id}', [JurusanController::class, 'destroy']);
+
         // Provinces CRUD
         Route::post('provinces', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'storeProvince']);
         Route::put('provinces/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'updateProvince']);
@@ -321,6 +328,10 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ── Data viewers — semua role bisa akses sesuai scope ────────────────
+    // Daftar jurusan: mengisi penyaring di halaman Responden, Kelola Staff,
+    // dan Kelola Mahasiswa, jadi tidak dibatasi peran admin.
+    Route::get('jurusans', [JurusanController::class, 'index']);
+
     // Alumni management
     Route::get('alumni/stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
     Route::get('alumni/template', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'downloadTemplate']);

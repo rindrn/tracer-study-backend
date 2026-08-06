@@ -43,6 +43,10 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             ProgramSeeder::class,
+            // Setelah ProgramSeeder: daftar induk jurusan diturunkan dari
+            // nilai yang dipakai program studi. Lihat catatan di kelasnya
+            // soal kenapa pengisian di migration saja tidak cukup.
+            JurusanSeeder::class,
             ProvinceSeeder::class,
             CitySeeder::class,
             RoleSeeder::class,
