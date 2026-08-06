@@ -338,10 +338,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('alumni/import', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'importAlumni']);
     Route::apiResource('alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
 
-    // Stakeholder Contacts
-    Route::get('stakeholder-contacts/export', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'export']);
-    Route::get('stakeholder-contacts', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'index']);
-    Route::post('stakeholder-contacts', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'store']);
+    // ── Kontak Penilai (stakeholder) ─────────────────────────────────────
+    // Dibatasi Ketua Tracer dan Tim Tracer. Isinya nama dan surel pihak
+    // ketiga — atasan, rekan kerja, dosen pembimbing — bukan statistik
+    // alumni, dan controller-nya tidak memakai EnforcesProdiScope. Tanpa
+    // gate ini Kaprodi maupun Kajur yang memanggilnya akan menerima kontak
+    // seluruh institusi. Merekalah pula yang mengirim email blast, jadi
+    // pembatasan ini sekaligus mengikuti siapa yang benar-benar memakainya.
+    Route::middleware('role:head_tracer,tracer_team')->group(function () {
+        Route::get('stakeholder-contacts/export', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'export']);
+        Route::get('stakeholder-contacts', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'index']);
+        Route::post('stakeholder-contacts', [\App\Http\Controllers\Api\Admin\StakeholderContactController::class, 'store']);
+    });
 
     // ── Reports (Laporan / Unduhan) ──────────────────
     // Dua path ke handler yang sama: 'admin/reports/...' dipakai FE sisi

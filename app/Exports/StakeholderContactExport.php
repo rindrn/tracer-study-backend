@@ -2,44 +2,32 @@
 
 namespace App\Exports;
 
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\Exportable;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class StakeholderContactExport implements FromCollection, WithHeadings, WithStyles, WithColumnWidths
+/**
+ * Berkas kontak penilai untuk email blast Tim Tracer.
+ *
+ * Dua lembar, dua kegunaan — keduanya berasal dari data yang sama dan
+ * mengikuti penyaring yang sedang aktif di halaman:
+ *
+ *   "Kontak"     satu baris per pasangan penilai-alumni, untuk surel yang
+ *                dipersonalisasi lewat mail merge.
+ *   "Email Unik" satu baris per alamat, untuk kiriman seragam tanpa membuat
+ *                satu orang menerima surel berkali-kali.
+ */
+class StakeholderContactExport implements WithMultipleSheets
 {
+    use Exportable;
+
     public function __construct(private Collection $data) {}
 
-    public function collection()
+    public function sheets(): array
     {
-        return $this->data->map(fn ($r) => [
-            'NIM' => "'" . $r->nim,
-            'Nama Alumni' => $r->alumni_name,
-            'Tahun Lulus' => $r->graduation_year,
-            'Tipe Kontak' => $r->contact_type,
-            'Nama Kontak' => $r->contact_name,
-            'Email Kontak' => $r->contact_email,
-            'Status Alumni' => $r->alumni_status,
-        ]);
-    }
-
-    public function headings(): array
-    {
-        return ['NIM', 'Nama Alumni', 'Tahun Lulus', 'Tipe Kontak', 'Nama Kontak', 'Email Kontak', 'Status Alumni'];
-    }
-
-    public function columnWidths(): array
-    {
-        return ['A' => 20, 'B' => 25, 'C' => 12, 'D' => 15, 'E' => 25, 'F' => 30, 'G' => 15];
-    }
-
-    public function styles(Worksheet $sheet)
-    {
-        $sheet->getStyle('1:1')->getFont()->setBold(true);
-        $sheet->freezePane('A2');
-        return [];
+        return [
+            new Sheets\StakeholderContactSheet($this->data),
+            new Sheets\StakeholderUniqueEmailSheet($this->data),
+        ];
     }
 }
