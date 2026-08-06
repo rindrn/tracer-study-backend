@@ -16,7 +16,20 @@ class ReportController extends Controller
     ) {}
 
     /**
-     * GET /api/admin/reports/export-alumni?tahun_lulus={tahun}&questionnaire_id={id}
+     * GET /api/admin/reports/export-alumni?tahun_lulus={tahun}&questionnaire_id={id}&format={label|code}
+     *
+     * format menentukan tampilan nilai jawaban:
+     *   - label (default) -> teks jawaban ("Bekerja", "Sangat Tinggi", "Ya"),
+     *     untuk dibaca manusia.
+     *   - code            -> option_code/angka mentah ("1", "5", "0"), format
+     *     yang dibutuhkan portal Kementerian.
+     * Sebelumnya pilihan ini ditentukan diam-diam dari role (head_tracer
+     * selalu dapat kode mentah) -- diganti parameter eksplisit karena role
+     * tidak menentukan apakah file mau dibaca atau diunggah.
+     *
+     * questionnaire_id juga menentukan CAKUPAN SHEET: kuesioner Kementerian
+     * menghasilkan sheet "Data Kementrian" saja, kuesioner tambahan prodi
+     * menghasilkan sheet "Data Khusus {PRODI}" saja. Lihat ReportService.
      *
      * tahun_lulus WAJIB diisi -- UI Unduh Data Alumni tidak lagi
      * menyediakan opsi "Semua Tahun". Alasan: tanpa filter tahun,
@@ -35,6 +48,7 @@ class ReportController extends Controller
         $validated = $request->validate([
             'tahun_lulus'      => ['required', 'integer', 'min:2000', 'max:2100'],
             'questionnaire_id' => ['nullable', 'integer'],
+            'format'           => ['nullable', 'in:label,code'],
         ]);
 
         set_time_limit(300);
@@ -44,6 +58,7 @@ class ReportController extends Controller
             user:            $request->user(),
             questionnaireId: $validated['questionnaire_id'] ?? null,
             tahunLulus:      $validated['tahun_lulus'],
+            rawCode:         ($validated['format'] ?? 'label') === 'code',
         );
 
         return Excel::download(

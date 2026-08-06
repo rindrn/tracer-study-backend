@@ -7,41 +7,67 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use Maatwebsite\Excel\DefaultValueBinder;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Illuminate\Support\Collection;
+use App\Exports\Support\AnswerValueResolver;
+use App\Exports\Support\ColumnLetter;
 
-class ProdiSheetExport implements FromCollection, WithHeadings, WithTitle, WithStyles, WithColumnWidths
+/**
+ * Sheet "Data Khusus {KODE_PRODI}" -- jawaban kuesioner tambahan milik
+ * satu prodi.
+ *
+ * Resolve nilai jawaban didelegasikan ke AnswerValueResolver, sama persis
+ * dengan sheet Kementrian. Sebelumnya kelas ini punya resolveLabel()
+ * sendiri, tapi map opsi/metadata yang dibutuhkannya TIDAK PERNAH dioper
+ * oleh TracerStudyMultiSheetExport (dua argumen terakhir constructor
+ * dibiarkan default kosong), sehingga logikanya tidak pernah benar-benar
+ * jalan dan semua jawaban keluar sebagai angka mentah.
+ */
+class ProdiSheetExport extends DefaultValueBinder implements FromCollection, WithHeadings, WithTitle, WithStyles, WithColumnWidths, WithCustomValueBinder
 {
-    protected $data;
-    protected $questions;
-    protected $sheetTitle;
-    protected $optionsMap;
-    protected $questionMeta;
+    /** Kolom identitas alumni sebelum kolom-kolom pertanyaan. */
+    private const IDENTITY_HEADERS = ['NIM', 'Nama', 'Program Studi', 'Tahun Lulus', 'Email', 'Hp'];
 
-    public function __construct(Collection $data, array $questions, string $sheetTitle = 'Data Khusus Prodi', array $optionsMap = [], array $questionMeta = [])
-    {
-        $this->data = $data;
-        $this->questions = $questions;
-        $this->sheetTitle = $sheetTitle;
-        $this->optionsMap = $optionsMap;
-        $this->questionMeta = $questionMeta;
-    }
+    /** Lebar per kolom identitas, urutannya mengikuti IDENTITY_HEADERS. */
+    private const IDENTITY_WIDTHS = [18, 30, 28, 12, 28, 16];
 
-    public function collection()
+    /** NIM dan Hp harus tetap teks -- lihat MinistrySheetExport::TEXT_COLUMNS. */
+    private const TEXT_COLUMNS = ['A', 'F'];
+
+    /**
+     * @param Collection          $data      alumni + properti ->answers (code => answer_text)
+     * @param array               $questions list of ['code' => ..., 'label' => ...]
+     */
+    public function __construct(
+        private readonly Collection $data,
+        private readonly array $questions,
+        private readonly string $sheetTitle = 'Data Khusus Prodi',
+        private readonly ?AnswerValueResolver $valueResolver = null,
+    ) {}
+
+    public function collection(): Collection
     {
+        $resolver = $this->valueResolver ?? AnswerValueResolver::raw();
+
         $exportData = [];
 
         foreach ($this->data as $alumni) {
             $row = [
-                'NIM'           => "'" . ($alumni->nim ?? ''),
+                'NIM'           => $alumni->nim ?: '-',
                 'Nama'          => $alumni->name,
                 'Program Studi' => $alumni->program_name ?? '-',
+                'Tahun Lulus'   => $alumni->graduation_year ?? '-',
+                'Email'         => $alumni->email ?: '-',
+                'Hp'            => $alumni->phone ?: '-',
             ];
 
             foreach ($this->questions as $q) {
-                $code = $q['code'];
-                $raw = $alumni->answers[$code] ?? null;
-                $row[$q['label']] = $this->resolveLabel($code, $raw);
+                $row[$q['label']] = $resolver->resolve($q['code'], $alumni->answers[$q['code']] ?? null);
             }
 
             $exportData[] = $row;
@@ -52,95 +78,58 @@ class ProdiSheetExport implements FromCollection, WithHeadings, WithTitle, WithS
 
     public function headings(): array
     {
-        $headers = ['NIM', 'Nama', 'Program Studi'];
-        foreach ($this->questions as $q) {
-            $headers[] = $q['label'];
-        }
-        return $headers;
+        return array_merge(
+            self::IDENTITY_HEADERS,
+            array_column($this->questions, 'label'),
+        );
     }
 
     public function columnWidths(): array
     {
-        $widths = ['A' => 20, 'B' => 25, 'C' => 25];
-        $startCol = 3; // D = index 3
-        foreach ($this->questions as $i => $_) {
-            $widths[$this->colLetter($startCol + $i)] = 30;
+        $widths = [];
+
+        foreach (self::IDENTITY_WIDTHS as $i => $width) {
+            $widths[ColumnLetter::at($i)] = $width;
         }
+
+        $firstQuestionColumn = count(self::IDENTITY_HEADERS);
+        foreach (array_keys($this->questions) as $i) {
+            $widths[ColumnLetter::at($firstQuestionColumn + $i)] = 32;
+        }
+
         return $widths;
     }
 
     public function styles(Worksheet $sheet)
     {
-        $sheet->getStyle('1:1')->getFont()->setBold(true);
-        $sheet->getStyle('1:1')->getAlignment()->setWrapText(true);
-        $sheet->freezePane('A2');
-        $sheet->getRowDimension(1)->setRowHeight(40);
+        $lastColumn = ColumnLetter::at(count($this->headings()) - 1);
+
+        $header = $sheet->getStyle("A1:{$lastColumn}1");
+        $header->getFont()->setBold(true);
+        $header->getAlignment()
+            ->setWrapText(true)
+            ->setVertical(Alignment::VERTICAL_TOP);
+
+        $sheet->getRowDimension(1)->setRowHeight(75);
+        $sheet->freezePane('C2');
+        $sheet->setAutoFilter("A1:{$lastColumn}1");
+
         return [];
+    }
+
+    public function bindValue(Cell $cell, $value): bool
+    {
+        if ($value !== null && $value !== '' && in_array($cell->getColumn(), self::TEXT_COLUMNS, strict: true)) {
+            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+
+            return true;
+        }
+
+        return parent::bindValue($cell, $value);
     }
 
     public function title(): string
     {
         return mb_substr($this->sheetTitle, 0, 31);
-    }
-
-    private function resolveLabel(string $code, $raw): string
-    {
-        if ($raw === null || $raw === '' || $raw === '-') {
-            return '-';
-        }
-
-        if (in_array($code, ['f301', 'f302', 'f303'], true)) {
-            return (string) $raw;
-        }
-
-        $meta = $this->questionMeta[$code] ?? null;
-        $type = $meta['type'] ?? null;
-        $metadata = $meta['metadata'] ?? null;
-
-        if ($type === 'boolean') {
-            return (string) $raw;
-        }
-
-        if ($type === 'number' && $metadata && isset($metadata['scale_min'])) {
-            if (isset($this->optionsMap[$code][$raw])) {
-                return $this->optionsMap[$code][$raw];
-            }
-            return $this->scaleLabel($code, $raw, $metadata);
-        }
-
-        if ($type === 'number') {
-            return (string) $raw;
-        }
-
-        if (isset($this->optionsMap[$code][$raw])) {
-            return $this->optionsMap[$code][$raw];
-        }
-
-        return (string) $raw;
-    }
-
-    private function scaleLabel(string $code, $value, array $metadata): string
-    {
-        if (isset($metadata['competency']) || isset($metadata['dimension'])) {
-            $labels = ['1' => 'Sangat Rendah', '2' => 'Rendah', '3' => 'Cukup', '4' => 'Tinggi', '5' => 'Sangat Tinggi'];
-            return $labels[(string) $value] ?? (string) $value;
-        }
-        if (isset($metadata['method'])) {
-            $labels = ['1' => 'Sangat Besar', '2' => 'Besar', '3' => 'Cukup Besar', '4' => 'Kurang Besar', '5' => 'Tidak Sama Sekali'];
-            return $labels[(string) $value] ?? (string) $value;
-        }
-        return (string) $value;
-    }
-
-    private function colLetter(int $index): string
-    {
-        $letter = '';
-        $index++;
-        while ($index > 0) {
-            $index--;
-            $letter = chr(ord('A') + ($index % 26)) . $letter;
-            $index = intdiv($index, 26);
-        }
-        return $letter;
     }
 }

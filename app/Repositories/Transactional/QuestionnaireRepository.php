@@ -420,59 +420,73 @@ class QuestionnaireRepository
     /**
      * Ambil semua opsi untuk sekumpulan question_code, di-group by
      * question_code (BUKAN question_id seperti getOptionsGrouped() yang
-     * sudah ada). Dipakai untuk resolve label di export Excel, di mana
-     * lookup dilakukan berdasarkan question_code + option_code SAJA --
-     * TANPA questionnaire_id -- karena filter tahun_lulus yang wajib di
-     * endpoint export menjamin satu batch data berasal dari questionnaire
-     * yang konsisten (keputusan eksplisit user, bukan asumsi business-key
-     * lintas-questionnaire seperti di pipeline ETL).
+     * sudah ada). Dipakai untuk resolve label di export Excel.
      *
-     * PERHATIAN: jika di masa depan satu question_code yang sama punya
-     * option_code yang berarti BERBEDA di questionnaire_id yang berbeda
-     * (skenario yang justru ETL secara hati-hati hindari dengan business
-     * key 3-kolom), method ini akan mengambil label dari SALAH SATU
-     * questionnaire_id secara tidak deterministik (yang manapun match
-     * pertama). Ini diterima sebagai keputusan sadar untuk kasus export,
-     * bukan oversight.
+     * $questionnaireIds SEBAIKNYA selalu diisi. Satu question_code yang
+     * sama BENAR-BENAR ada di beberapa questionnaire di database ini --
+     * mis. f1769 muncul di DIKTI_2026_v1/v2/v3 plus dua salinan buatan
+     * form builder -- dan salinan-salinan itu tidak sama lengkap
+     * opsi/metadata-nya. Tanpa pembatas, baris mana yang menang tidak
+     * ditentukan urutan apa pun.
+     *
+     * Boleh null untuk pemanggil yang memang tidak tahu questionnaire-nya;
+     * hasilnya campuran semua questionnaire.
      */
-    public function getOptionsGroupedByCode(array $questionCodes): Collection
+    public function getOptionsGroupedByCode(array $questionCodes, ?array $questionnaireIds = null): Collection
     {
         if (empty($questionCodes)) {
             return collect();
         }
-    
-        return collect(
-            DB::connection(self::CONN)->table('questionnaire_options as qo')
-                ->join('questionnaire_questions as qq', 'qq.id', '=', 'qo.question_id')
-                ->whereIn('qq.code', $questionCodes)
-                ->select('qq.code as question_code', 'qo.option_code', 'qo.option_label')
-                ->get()
-        )->groupBy('question_code');
+
+        $query = DB::connection(self::CONN)->table('questionnaire_options as qo')
+            ->join('questionnaire_questions as qq', 'qq.id', '=', 'qo.question_id')
+            ->whereIn('qq.code', $questionCodes)
+            ->select('qq.code as question_code', 'qo.option_code', 'qo.option_label');
+
+        if (!empty($questionnaireIds)) {
+            $query->whereIn('qq.questionnaire_id', $questionnaireIds);
+        }
+
+        return collect($query->get())->groupBy('question_code');
     }
 
     /**
-    * Ambil question_text + metadata (JSON mentah, belum di-decode) untuk
-    * sekumpulan question_code. Dipakai khusus untuk resolve header f1601-
-    * f1613 (AlasanKerjaTdkSesuai) di MinistrySheetExport, yang butuh
-    * metadata.group_label sebagai header pendek -- BUKAN question_text
-    * penuh yang punya prefix panjang berulang untuk semua field dalam
-    * grup itu.
+    * Ambil question_text + question_type + metadata (JSON mentah, belum
+    * di-decode) untuk sekumpulan question_code. Dua pemakainya:
     *
-    * Return: array keyed by code => object{question_text, metadata}.
+    *   - MinistrySheetExport: resolve header f1601-f1613 (AlasanKerjaTdkSesuai)
+    *     yang butuh metadata.group_label sebagai header pendek -- BUKAN
+    *     question_text penuh yang punya prefix panjang berulang untuk semua
+    *     field dalam grup itu.
+    *   - AnswerValueResolver: butuh question_type untuk membedakan boolean
+    *     (0/1 -> Ya/Tidak) dari number, dan metadata.scale_labels untuk
+    *     mengubah skala Likert 1-5 jadi teks.
+    *
+    * $questionnaireIds SEBAIKNYA selalu diisi -- alasannya sama dengan
+    * getOptionsGroupedByCode(): code yang sama ada di banyak questionnaire
+    * dengan metadata berbeda, dan keyBy('code') di bawah hanya menyimpan
+    * SATU baris per code. Salinan kuesioner buatan form builder mis. tidak
+    * membawa metadata.scale_labels, sehingga skala Likert gagal jadi teks
+    * kalau baris itu yang kebetulan menang.
+    *
+    * Return: array keyed by code => object{question_text, question_type, metadata}.
     * metadata TIDAK di-decode di sini -- caller yang decode json_decode(),
     * supaya repository tidak perlu tahu struktur internal metadata.
     */
-    public function getQuestionMetaByCode(array $codes): array
+    public function getQuestionMetaByCode(array $codes, ?array $questionnaireIds = null): array
     {
         if (empty($codes)) {
             return [];
         }
-    
-        return DB::connection(self::CONN)->table('questionnaire_questions')
+
+        $query = DB::connection(self::CONN)->table('questionnaire_questions')
             ->whereIn('code', $codes)
-            ->select('code', 'question_text', 'metadata')
-            ->get()
-            ->keyBy('code')
-            ->toArray();
+            ->select('code', 'question_text', 'question_type', 'metadata');
+
+        if (!empty($questionnaireIds)) {
+            $query->whereIn('questionnaire_id', $questionnaireIds);
+        }
+
+        return $query->get()->keyBy('code')->toArray();
     }
 }

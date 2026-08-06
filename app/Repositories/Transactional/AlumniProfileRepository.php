@@ -444,7 +444,13 @@ class AlumniProfileRepository
         if (!empty($filters['graduation_year'])) {
             $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
         }
-    
+        // Scope kajur, sama seperti di getForReportQuery(). Tanpa klausa ini
+        // filter 'jurusan' yang dikirim ReportService diabaikan diam-diam dan
+        // kajur ikut melihat alumni jurusan lain di sheet per-prodi.
+        if (!empty($filters['jurusan'])) {
+            $query->where('programs.jurusan', $filters['jurusan']);
+        }
+
         return collect($query->get());
     }
 

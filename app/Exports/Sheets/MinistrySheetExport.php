@@ -3,38 +3,41 @@
 namespace App\Exports\Sheets;
 
 use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use Maatwebsite\Excel\DefaultValueBinder;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use App\Models\Transactional\User;
+use App\Exports\Support\AnswerValueResolver;
+use App\Exports\Support\ColumnLetter;
 use App\Repositories\Transactional\ResponseRepository;
 use App\Repositories\Transactional\QuestionnaireRepository;
 
 /**
- * Sheet 1 "Data Kementrian" -- berisi SEMUA alumni yang lolos filter.
+ * Sheet "Data Kementrian" -- berisi SEMUA alumni yang lolos filter.
  *
- * ROLE-BASED VALUE FORMAT (requirement baru):
- *   - User::isHeadTracer() true -> nilai field choice (single_choice/
- *     multiple_choice) ditampilkan MENTAH sebagai option_code
- *     (contoh: "1", "2", "3" untuk status f8), TANPA resolve label.
- *   - Role lain (p2mpp, kaprodi, admin, wadir, dst) -> nilai field
- *     choice ditampilkan sebagai LABEL hasil lookup questionnaire_options
- *     (contoh: "Bekerja", "Belum Bekerja").
- *   - Field non-choice (short_text, number, date) SELALU sama untuk
- *     semua role -- tidak ada proses resolve apapun untuk jenis ini,
- *     karena tidak punya option_code untuk di-lookup.
- *   - PENGECUALIAN: f5a1 (provinsi) dan f5a2 (kota) BUKAN field choice
- *     kuesioner (tidak ada di questionnaire_options), melainkan berisi
- *     foreign key NUMERIK ke tabel master tracer_oltp.provinces.id dan
- *     tracer_oltp.cities.id. Untuk role selain head_tracer, kedua field
- *     ini di-resolve ke provinces.name / cities.name. head_tracer tetap
- *     melihat ID mentah, konsisten dengan field choice lainnya.
+ * FORMAT NILAI
+ * ------------
+ * Ditentukan oleh flag $rawCode yang datang dari query param `format` di
+ * endpoint export, BUKAN lagi dari role user:
+ *
+ *   - format=label (default) -> nilai jawaban ditampilkan sebagai teks
+ *     ("Bekerja", "Sangat Tinggi", "Ya"), lihat AnswerValueResolver.
+ *   - format=code            -> nilai ditampilkan mentah apa adanya
+ *     ("1", "5", "0"), format yang dibutuhkan kalau file ini mau diunggah
+ *     ke portal Kementerian.
+ *
+ * Sebelumnya kode mentah dipilih otomatis untuk role head_tracer. Aturan
+ * itu dibuang: role tidak bisa menebak apakah file mau dibaca manusia atau
+ * diunggah ke portal, jadi keputusan format sekarang eksplisit dari UI.
  *
  * Lookup label (questionnaire_options) dilakukan berdasarkan
  * (question_code, option_code) SAJA, TANPA questionnaire_id -- keputusan
@@ -43,9 +46,9 @@ use App\Repositories\Transactional\QuestionnaireRepository;
  * QuestionnaireRepository::getOptionsGroupedByCode() untuk detail
  * trade-off ini).
  */
-class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithStyles, WithChunkReading, WithMapping
+class MinistrySheetExport extends DefaultValueBinder implements FromQuery, WithHeadings, WithTitle, WithStyles, WithColumnWidths, WithChunkReading, WithMapping, WithCustomValueBinder
 {
-    private const MINISTRY_QUESTION_CODES = [
+    public const MINISTRY_QUESTION_CODES = [
         'f8', 'f502', 'f505', 'f5a1', 'f5a2', 'f1101', 'f1102', 'f5b', 'f5c', 'f5d',
         'f18a', 'f18b', 'f18c', 'f18d', 'f1201', 'f1202', 'f14', 'f15',
         'f1761', 'f1762', 'f1763', 'f1764', 'f1765', 'f1766', 'f1767', 'f1768',
@@ -60,11 +63,11 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
         'f1609', 'f1610', 'f1611', 'f1612', 'f1613', 'f1614',
     ];
 
-    /** question_code yang berisi FK numerik ke provinces.id / cities.id,
-     *  BUKAN option_code kuesioner -- ditangani terpisah dari
-     *  resolveDisplayValue() biasa karena sumber lookup-nya beda tabel. */
-    private const PROVINCE_CODE = 'f5a1';
-    private const CITY_CODE = 'f5a2';
+    /** Kolom identitas alumni, selalu di depan dan tidak ikut aturan resolve. */
+    private const IDENTITY_HEADERS = [
+        'Kode PT', 'Kode Prodi', 'Nomor Mhs', 'Nama', 'Hp', 'Email',
+        'Tahun Lulus', 'NIK', 'NPWP',
+    ];
 
     /**
      * f1601-f1613 (AlasanKerjaTdkSesuai) dan f401-f415 (CaraCariKerja)
@@ -94,47 +97,25 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
         'f409', 'f410', 'f411', 'f412', 'f413', 'f414', 'f415',
     ];
 
+    /** Batas panjang teks header. Lebih dari ini dipotong -- kolom jadi
+     *  terlalu tinggi kalau seluruh pertanyaan ditulis penuh. */
+    private const HEADER_MAX_LENGTH = 80;
+
     /** @var array<string,string> code => label header final (sudah
      *  resolve group_label untuk HEADER_FROM_GROUP_LABEL_CODES) */
     private array $questionLabels;
-
-    /**
-     * @var Collection<string, Collection> question_code => Collection
-     *      of {option_code, option_label}. KOSONG jika user adalah
-     *      head_tracer -- tidak perlu di-load sama sekali karena tidak
-     *      akan dipakai (menghindari query yang sia-sia).
-     */
-    private Collection $optionsByCode;
-
-    /** @var array<int,string> provinces.id => provinces.name. KOSONG jika head_tracer. */
-    private array $provinceNamesById;
-
-    /** @var array<int,string> cities.id => cities.name. KOSONG jika head_tracer. */
-    private array $cityNamesById;
-
-    private bool $showRawOptionCode;
 
     public function __construct(
         private readonly Builder $query,
         private readonly ResponseRepository $responseRepo,
         private readonly QuestionnaireRepository $questionnaireRepo,
-        private readonly User $user,
+        private readonly AnswerValueResolver $valueResolver,
+        /** Questionnaire yang jadi sumber teks header. Wajib dibatasi:
+         *  question_code yang sama ada di beberapa questionnaire dengan
+         *  metadata berbeda -- lihat QuestionnaireRepository::getQuestionMetaByCode(). */
+        private readonly array $sourceQuestionnaireIds = [],
     ) {
         $this->questionLabels = $this->buildQuestionLabels();
-
-        $this->showRawOptionCode = $this->user->isHeadTracer();
-
-        // Hanya load options/provinces/cities kalau benar-benar
-        // dibutuhkan (bukan head_tracer) -- hindari query sia-sia.
-        if ($this->showRawOptionCode) {
-            $this->optionsByCode = collect();
-            $this->provinceNamesById = [];
-            $this->cityNamesById = [];
-        } else {
-            $this->optionsByCode = $this->questionnaireRepo->getOptionsGroupedByCode(self::MINISTRY_QUESTION_CODES);
-            $this->provinceNamesById = DB::connection('oltp')->table('provinces')->pluck('name', 'id')->toArray();
-            $this->cityNamesById = DB::connection('oltp')->table('cities')->pluck('name', 'id')->toArray();
-        }
     }
 
     public function query(): Builder
@@ -153,7 +134,10 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
      */
     private function buildQuestionLabels(): array
     {
-        $metaByCode = $this->questionnaireRepo->getQuestionMetaByCode(self::MINISTRY_QUESTION_CODES);
+        $metaByCode = $this->questionnaireRepo->getQuestionMetaByCode(
+            self::MINISTRY_QUESTION_CODES,
+            $this->sourceQuestionnaireIds,
+        );
 
         $labels = [];
         foreach ($metaByCode as $code => $row) {
@@ -184,75 +168,49 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
         $row = [
             $alumni->kode_pt ?? '-',
             $alumni->program_code ?? '-',
-            $alumni->nim,
+            $alumni->nim ?: '-',
             $alumni->name,
-            $alumni->phone,
-            $alumni->email,
+            $alumni->phone ?: '-',
+            $alumni->email ?: '-',
             $alumni->graduation_year,
-            $alumni->nik,
-            $alumni->npwp,
+            $alumni->nik ?: '-',
+            $alumni->npwp ?: '-',
         ];
 
         foreach (self::MINISTRY_QUESTION_CODES as $code) {
-            $row[] = $this->resolveDisplayValue($code, $answers[$code] ?? null);
+            $row[] = $this->valueResolver->resolve($code, $answers[$code] ?? null);
         }
 
         return $row;
     }
 
     /**
-     * Resolve nilai yang ditampilkan di sel, sesuai role:
-     *   - head_tracer: kembalikan apa adanya (ID/option_code mentah,
-     *     atau nilai non-choice yang memang sudah mentah dari awal).
-     *   - role lain, untuk f5a1/f5a2: lookup ke provinces/cities by id.
-     *   - role lain, untuk field choice lain: lookup ke questionnaire_options.
-     *   - role lain, untuk field non-choice: kembalikan apa adanya,
-     *     tidak ada resolve yang dipaksakan.
+     * Kolom yang isinya HARUS diperlakukan sebagai teks: Nomor Mhs, Hp,
+     * NIK, NPWP. Tanpa ini value binder bawaan mengubahnya jadi angka --
+     * NIM 14 digit tampil sebagai 2,019E+13, nol di depan nomor HP hilang,
+     * dan NIK 16 digit bahkan kehilangan presisi karena disimpan float.
      */
-    private function resolveDisplayValue(string $code, ?string $rawValue): string
+    private const TEXT_COLUMNS = ['C', 'E', 'H', 'I'];
+
+    public function bindValue(Cell $cell, $value): bool
     {
-        if ($rawValue === null || $rawValue === '') {
-            return '-';
+        if ($value !== null && $value !== '' && in_array($cell->getColumn(), self::TEXT_COLUMNS, strict: true)) {
+            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+
+            return true;
         }
 
-        if ($this->showRawOptionCode) {
-            return $rawValue;
-        }
-
-        if ($code === self::PROVINCE_CODE) {
-            return $this->provinceNamesById[(int) $rawValue] ?? $rawValue;
-        }
-
-        if ($code === self::CITY_CODE) {
-            return $this->cityNamesById[(int) $rawValue] ?? $rawValue;
-        }
-
-        $optionsForCode = $this->optionsByCode->get($code);
-        if ($optionsForCode === null) {
-            // Tidak ada opsi terdaftar untuk question_code ini -> field
-            // non-choice, kembalikan nilai mentah tanpa resolve.
-            return $rawValue;
-        }
-
-        $match = $optionsForCode->firstWhere('option_code', $rawValue);
-
-        // Jika field choice tapi option_code tidak match apapun (data
-        // kotor / opsi sudah dihapus), fallback ke nilai mentah daripada
-        // menyembunyikan datanya sebagai '-'.
-        return $match?->option_label ?? $rawValue;
+        return parent::bindValue($cell, $value);
     }
 
     public function headings(): array
     {
-        $headers = [
-            'Kode PT', 'Kode Prodi', 'Nomor Mhs', 'Nama', 'Hp', 'Email',
-            'Tahun Lulus', 'NIK', 'NPWP',
-        ];
+        $headers = self::IDENTITY_HEADERS;
 
         foreach (self::MINISTRY_QUESTION_CODES as $code) {
             $text = $this->questionLabels[$code] ?? $code;
-            if (mb_strlen($text) > 80) {
-                $text = mb_substr($text, 0, 77) . '...';
+            if (mb_strlen($text) > self::HEADER_MAX_LENGTH) {
+                $text = mb_substr($text, 0, self::HEADER_MAX_LENGTH - 3) . '...';
             }
             $headers[] = "{$text} ({$code})";
         }
@@ -260,10 +218,45 @@ class MinistrySheetExport implements FromQuery, WithHeadings, WithTitle, WithSty
         return $headers;
     }
 
+    /**
+     * Tanpa ini semua kolom pakai lebar default (~8 karakter), sehingga
+     * header pertanyaan terpotong dan sheet tidak terbaca. Kolom pertanyaan
+     * sengaja dipatok 32 (bukan auto-size): auto-size akan melebarkan kolom
+     * mengikuti header sepanjang 80 karakter, dan 76 kolom selebar itu
+     * justru lebih tidak terbaca.
+     */
+    public function columnWidths(): array
+    {
+        $widths = [
+            'A' => 10, 'B' => 12, 'C' => 18, 'D' => 30, 'E' => 16,
+            'F' => 28, 'G' => 12, 'H' => 20, 'I' => 20,
+        ];
+
+        $firstQuestionColumn = count(self::IDENTITY_HEADERS);
+        foreach (array_keys(self::MINISTRY_QUESTION_CODES) as $i) {
+            $widths[ColumnLetter::at($firstQuestionColumn + $i)] = 32;
+        }
+
+        return $widths;
+    }
+
     public function styles(Worksheet $sheet)
     {
-        $sheet->getStyle('1:1')->getFont()->setBold(true);
-        $sheet->freezePane('A2');
+        $lastColumn = ColumnLetter::at(count($this->headings()) - 1);
+
+        $header = $sheet->getStyle("A1:{$lastColumn}1");
+        $header->getFont()->setBold(true);
+        $header->getAlignment()
+            ->setWrapText(true)
+            ->setVertical(Alignment::VERTICAL_TOP);
+
+        $sheet->getRowDimension(1)->setRowHeight(75);
+
+        // Bekukan header DAN 4 kolom identitas (Kode PT s/d Nama), supaya
+        // saat digulir ke kanan masih terlihat baris ini milik siapa.
+        $sheet->freezePane('E2');
+
+        $sheet->setAutoFilter("A1:{$lastColumn}1");
 
         return [];
     }
