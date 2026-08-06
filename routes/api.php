@@ -198,6 +198,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('approvals/{id}/approve', [ApprovalController::class, 'approve']);
         Route::post('approvals/{id}/reject', [ApprovalController::class, 'reject']);
 
+        // Pembukaan kembali pengisian alumni (Finish → Ongoing).
+        //
+        // Dipindahkan ke sini dari grup 'head_tracer,tracer_team': RBAC-04
+        // menempatkan wewenang ini pada Ketua Tracer, sedangkan Tim Tracer
+        // dan Kaprodi hanya mengajukan lewat approvals/request-reopen.
+        // Sebelumnya Tim Tracer bisa mereset sendiri tanpa persetujuan
+        // siapa pun, dan tanpa jejak.
+        //
+        // Jalur langsung ini tetap ada supaya Ketua Tracer tidak perlu
+        // mengajukan permintaan kepada dirinya sendiri.
+        Route::post('alumni/{alumniId}/reset-response', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'resetResponse']);
+
         // LAMs
         Route::post('lams',        [LamController::class, 'store']);
         Route::put('lams/{id}',    [LamController::class, 'update']);
@@ -285,23 +297,27 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('questionnaires', [QuestionnaireController::class, 'store']);
         Route::put('questionnaires/{questionnaire}', [QuestionnaireController::class, 'update']);
 
-        // Approval list (head_tracer sees all, tracer_team sees own)
-        Route::get('approvals', [ApprovalController::class, 'index']);
-
         // Request delete (tracer_team submits)
         Route::post('approvals/request-delete', [ApprovalController::class, 'requestDelete']);
 
         // Thresholds
         Route::apiResource('thresholds', ThresholdController::class);
-
-        // Reset respondent status from finished to ongoing
-        Route::post('alumni/{alumniId}/reset-response', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'resetResponse']);
     });
 
-    // ── Admin request (tracer_team) — perlu approval ─────────────────────
-    Route::middleware('role:tracer_team')->group(function () {
-        // Route::post('approval-requests', [ApprovalRequestController::class, 'store']);
-        // Route::get('approval-requests/mine', [ApprovalRequestController::class, 'myRequests']);
+    // ── Pemohon persetujuan (tracer_team, kaprodi) ───────────────────────
+    // Mengajukan saja; eksekusinya menunggu persetujuan head_tracer.
+    // RBAC-08 (Tim Tracer) dan RBAC-12 (Kaprodi).
+    Route::middleware('role:tracer_team,kaprodi')->group(function () {
+        Route::post('approvals/request-reopen', [ApprovalController::class, 'requestReopen']);
+    });
+
+    // Daftar permintaan. Satu deklarasi untuk ketiga peran -- kalau rute
+    // dengan method+URI yang sama didaftarkan dua kali, pendaftaran terakhir
+    // menimpa yang sebelumnya, dan peran di grup lain kehilangan aksesnya.
+    // Ketua Tracer melihat seluruh antrean, pemohon hanya miliknya sendiri;
+    // penyaringnya ada di ApprovalController::index().
+    Route::middleware('role:head_tracer,tracer_team,kaprodi')->group(function () {
+        Route::get('approvals', [ApprovalController::class, 'index']);
     });
 
     // ── Data viewers — semua role bisa akses sesuai scope ────────────────

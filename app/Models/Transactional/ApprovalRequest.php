@@ -15,8 +15,17 @@ class ApprovalRequest extends Model
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
 
-    public const TYPE_ADD_QUESTIONNAIRE    = 'add_questionnaire';
+    public const TYPE_ADD_QUESTIONNAIRE     = 'add_questionnaire';
     public const TYPE_DELETE_QUESTIONNAIRE  = 'delete_questionnaire';
+
+    /**
+     * Pembukaan kembali kuesioner alumni dari Finish ke Ongoing (RBAC-04).
+     *
+     * Kolom `type` di basis data adalah varchar polos tanpa CHECK constraint,
+     * jadi jenis baru tidak memerlukan migrasi. payload berisi alumni_id dan
+     * questionnaire_id.
+     */
+    public const TYPE_REOPEN_RESPONSE       = 'reopen_response';
 
     public function requester(): BelongsTo
     {

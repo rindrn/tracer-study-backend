@@ -132,12 +132,15 @@ class AlumniController extends Controller
     /** POST /api/alumni/{alumniId}/reset-response */
     public function resetResponse(Request $request, int $alumniId): JsonResponse
     {
+        // questionnaire_id tetap divalidasi demi kecocokan dengan pemanggil
+        // yang sudah ada, tapi TIDAK menentukan lingkup: pembukaan kembali
+        // selalu mencakup seluruh kuesioner aktif milik alumni tersebut.
+        // Lihat ResponseReopenService.
         $request->validate(['questionnaire_id' => ['required', 'integer']]);
 
-        $repo = app(\App\Repositories\Transactional\ResponseRepository::class);
-        $reset = $repo->resetToOngoing((int) $request->input('questionnaire_id'), $alumniId);
+        $reopened = app(\App\Services\Transactional\ResponseReopenService::class)->reopen($alumniId);
 
-        if (!$reset) {
+        if ($reopened === 0) {
             return response()->json([
                 'success' => false,
                 'message' => 'Responden tidak dalam status finished atau tidak ditemukan.',
@@ -146,7 +149,7 @@ class AlumniController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Status responden berhasil direset ke ongoing.',
+            'message' => "Pengisian alumni dibuka kembali ({$reopened} kuesioner). Jawaban sebelumnya dipertahankan dan akan muncul kembali saat alumni membuka formulir.",
         ]);
     }
 }

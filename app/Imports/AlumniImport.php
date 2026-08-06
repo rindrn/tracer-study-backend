@@ -27,22 +27,38 @@ class AlumniImport implements ToCollection, WithHeadingRow
 
         foreach ($rows as $index => $row) {
             $rowNum = $index + 2; // heading = row 1
+
+            // Judul kolom Email→Surel dan Telepon→No. HP berganti pada
+            // penyeragaman DATA-03, dan WithHeadingRow menurunkan kunci
+            // larik dari judul itu. Nama lama tetap diterima supaya berkas
+            // templat yang sudah beredar tidak mendadak terbaca kosong --
+            // kolom yang tidak dikenal tidak menghasilkan galat, hanya
+            // nilai kosong, sehingga kerusakannya tidak kelihatan.
             $data = [
                 'nim'        => trim($row['nim'] ?? ''),
                 'name'       => trim($row['nama'] ?? ''),
-                'email'      => trim($row['email'] ?? ''),
-                'phone'      => trim($row['telepon'] ?? ''),
+                'email'      => trim($row['surel'] ?? $row['email'] ?? ''),
+                'phone'      => trim($row['no_hp'] ?? $row['telepon'] ?? ''),
                 'graduation_year' => $row['tahun_lulus'] ?? null,
                 'kode_prodi' => trim($row['kode_prodi'] ?? ''),
-                'jurusan'    => trim($row['jurusan'] ?? ''),
-                'status'     => trim($row['status'] ?? ''),
+                'kode_pt'    => trim($row['kode_pt'] ?? ''),
+                'nik'        => trim($row['nik'] ?? ''),
+                'npwp'       => trim($row['npwp'] ?? ''),
             ];
 
+            // Panjang maksimum mengikuti kolom alumni_profiles dan aturan
+            // yang sudah dipakai SubmitTracerStudyRequest. Format NIK/NPWP
+            // sengaja tidak dipaksa 16 digit: 504 baris yang sudah ada
+            // belum tentu patuh, dan menolak impor karenanya akan menahan
+            // pekerjaan yang sah.
             $validator = Validator::make($data, [
                 'nim'        => 'required|string|min:5',
                 'name'       => 'required|string',
                 'kode_prodi' => 'required|string',
                 'email'      => 'nullable|email',
+                'kode_pt'    => 'nullable|string|max:10',
+                'nik'        => 'nullable|string|max:20',
+                'npwp'       => 'nullable|string|max:25',
             ]);
 
             if ($validator->fails()) {
@@ -68,6 +84,11 @@ class AlumniImport implements ToCollection, WithHeadingRow
                 'phone'           => $this->normalizePhone($data['phone']),
                 'graduation_year' => $data['graduation_year'] ? (int) $data['graduation_year'] : null,
                 'program_id'      => $programCodes[$data['kode_prodi']],
+                'kode_pt'         => $data['kode_pt'] ?: null,
+                'nik'             => $data['nik'] ?: null,
+                'npwp'            => $data['npwp'] ?: null,
+                // Kolom Status dihapus dari templat: alumni hasil impor
+                // selalu aktif.
                 'is_active'       => true,
             ];
         }

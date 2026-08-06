@@ -57,27 +57,72 @@ class ResponseRepository
     }
 
     /**
-     * Reset status responden dari finished (submitted/verified) ke ongoing (started).
-     * Menghapus jawaban dan reset status agar alumni bisa mengisi ulang.
+     * Kembalikan status responden dari finished (submitted/verified) ke
+     * ongoing (started), DENGAN MEMPERTAHANKAN seluruh jawabannya.
+     *
+     * Sebelumnya method ini menghapus response_answers lalu menghapus baris
+     * responses-nya, sehingga namanya menyesatkan: tidak ada yang menjadi
+     * ongoing, jawaban alumni hilang permanen, dan alumni harus mengisi
+     * ulang dari kosong. Itu bertentangan dengan ISI-03.
+     *
+     * Sekarang cukup ubah status. Tiga jalur yang sudah ada langsung
+     * bekerja tanpa perubahan:
+     *
+     *   - hasAlumniResponded() tidak menghitung 'started', sehingga borang
+     *     alumni terbuka kembali;
+     *   - GET tracer-study/draft memuat response_answers yang tertinggal
+     *     sebagai draf, sehingga jawaban lama muncul kembali di formulir;
+     *   - ETL hanya memproses 'submitted', sehingga alumni ini tidak ikut
+     *     di snapshot berikutnya. Baris fakta snapshot LAMA sengaja tidak
+     *     disentuh -- isinya pernyataan historis "per tanggal itu keadaan
+     *     alumni ini begini", yang tetap benar meski jawabannya kini
+     *     dibuka kembali.
+     *
+     * submitted_at dikosongkan karena pengirimannya dibatalkan. started_at
+     * dibiarkan apa adanya: kalau baris ini lahir sebelum fitur draf ada,
+     * nilainya memang tidak pernah diketahui, dan mengisinya dengan now()
+     * akan memalsukan durasi pengisian.
      */
     public function resetToOngoing(int $questionnaireId, int $alumniId): bool
     {
-        $response = $this->findByQuestionnaireAndAlumni($questionnaireId, $alumniId);
-        if (!$response || !in_array($response->status, ['submitted', 'verified'])) {
-            return false;
+        return $this->reopenForAlumni($alumniId, [$questionnaireId]) > 0;
+    }
+
+    /**
+     * Buka kembali SELURUH pengisian terkirim milik satu alumni pada
+     * sekumpulan kuesioner sekaligus.
+     *
+     * Membuka satu kuesioner saja tidak cukup, dan diam-diam merusak:
+     * borang alumni menggabungkan seluruh kuesioner aktif (umum + prodi)
+     * menjadi satu formulir, sementara pengirimannya menghasilkan baris
+     * responses terpisah per kuesioner. Kalau hanya satu yang dibuka:
+     *
+     *   - hasAlumniResponded() masih menemukan baris 'submitted' pada
+     *     kuesioner lain, sehingga alumni tetap melihat "Anda Sudah
+     *     Mengisi" dan tidak pernah bisa masuk;
+     *   - seandainya bisa masuk pun, getDraft() hanya membaca baris
+     *     berstatus 'started', jadi jawaban kuesioner yang masih terkirim
+     *     tidak ikut terisi ulang di formulir — alumni melihatnya kosong
+     *     dan berisiko menimpanya dengan jawaban kosong saat mengirim.
+     *
+     * @param  array<int> $questionnaireIds kuesioner yang sedang aktif bagi alumni ini
+     * @return int jumlah pengisian yang berhasil dibuka kembali
+     */
+    public function reopenForAlumni(int $alumniId, array $questionnaireIds): int
+    {
+        if (empty($questionnaireIds)) {
+            return 0;
         }
 
-        // Hapus jawaban
-        DB::connection(self::CONN)->table('response_answers')
-            ->where('response_id', $response->id)
-            ->delete();
-
-        // Hapus response row agar alumni bisa submit ulang dari awal
-        DB::connection(self::CONN)->table('responses')
-            ->where('id', $response->id)
-            ->delete();
-
-        return true;
+        return DB::connection(self::CONN)->table('responses')
+            ->where('alumni_id', $alumniId)
+            ->whereIn('questionnaire_id', $questionnaireIds)
+            ->whereIn('status', ['submitted', 'verified'])
+            ->update([
+                'status'       => 'started',
+                'submitted_at' => null,
+                'updated_at'   => Carbon::now(),
+            ]);
     }
 
     /**
