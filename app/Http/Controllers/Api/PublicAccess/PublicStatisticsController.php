@@ -80,7 +80,7 @@ class PublicStatisticsController extends Controller
             if (!$this->settings->isYearVisible($year)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Data angkatan tersebut tidak ditampilkan untuk publik.',
+                    'message' => 'Data lulusan tersebut tidak ditampilkan untuk publik.',
                 ], 404);
             }
 
@@ -91,7 +91,7 @@ class PublicStatisticsController extends Controller
             if (empty($years)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Belum ada angkatan yang ditampilkan untuk publik.',
+                    'message' => 'Belum ada tahun lulus yang ditampilkan untuk publik.',
                 ], 404);
             }
         }
