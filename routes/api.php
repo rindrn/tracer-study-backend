@@ -58,8 +58,15 @@ use App\Http\Controllers\Api\Analytical\EmploymentSummaryController;
 // ═══════════════════════════════════════════════════════════
 // PUBLIC
 // ═══════════════════════════════════════════════════════════
-Route::prefix('auth')->group(function () {
-    Route::get('demo-accounts', [AuthController::class, 'demoAccounts']);
+// Kedua rute masuk dibatasi lajunya, lihat RateLimiter 'login' di
+// AppServiceProvider::boot(). Tanpa itu seluruh akun bisa disapu skrip dalam
+// hitungan menit: NIM berpola TAHUN+urutan sehingga mudah dienumerasi, dan
+// bagi alumni NIM sekaligus menjadi kata sandinya.
+//
+// Rute GET auth/demo-accounts DIHAPUS. Isinya seluruh akun staf beserta surel,
+// peran, dan `password_hint` yang benar-benar berlaku — terbuka tanpa
+// autentikasi sama sekali. Tidak ada pemakainya di frontend.
+Route::prefix('auth')->middleware('throttle:login')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('alumni-login', [AlumniAuthController::class, 'login']);
 });
