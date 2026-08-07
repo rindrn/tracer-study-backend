@@ -19,19 +19,6 @@ return new class extends Migration
     {
         $db = DB::connection('oltp');
 
-        // semantic_role_registry tidak punya migration sendiri -- ia datang
-        // dari database/dump/oltp_supplement.sql yang diimpor oleh
-        // DatabaseSeeder SETELAH seluruh migration selesai (lihat komentar
-        // di DatabaseSeeder::importOltpSupplement()). Pada instalasi fresh
-        // (`migrate:fresh`), migration ini jalan duluan dan tabelnya belum
-        // ada sama sekali. No-op di kondisi itu: DatabaseSeeder/seeder
-        // kuesioner yang menyusun mapping f303 dari awal, migration ini
-        // hanya relevan sebagai tambalan untuk instalasi yang sudah berjalan
-        // lebih dulu sebelum role "bulan_sesudah_lulus" didaftarkan.
-        if (! $db->getSchemaBuilder()->hasTable('semantic_role_registry')) {
-            return;
-        }
-
         $exists = $db->table('semantic_role_registry')->where('role_key', 'bulan_sesudah_lulus')->exists();
         if (! $exists) {
             $db->table('semantic_role_registry')->insert([

@@ -49,14 +49,10 @@ class PerusahaanDimService
             return $this->olapRepo->insertNewPerusahaanVersion($newAttributes, $snapshotDate);
         }
 
-        // Perbandingan longgar (bukan !==) — lihat WirausahaDimService untuk
-        // alasan lengkap: kolom DB selalu string lewat PDO sedangkan nilai
-        // baru bisa int/null, jadi !== salah mendeteksi "berubah" padahal
-        // nilainya sama dan memicu versi SCD duplikat terus-menerus.
-        $hasChanged = self::normalize($active->label_jenis_perusahaan) !== self::normalize($newAttributes['label_jenis_perusahaan'])
-            || self::normalize($active->label_tingkat_instansi) !== self::normalize($newAttributes['label_tingkat_instansi'])
-            || self::normalize($active->nama_kota) !== self::normalize($newAttributes['nama_kota'])
-            || self::normalize($active->nama_provinsi) !== self::normalize($newAttributes['nama_provinsi']);
+        $hasChanged = $active->label_jenis_perusahaan !== $newAttributes['label_jenis_perusahaan']
+            || $active->label_tingkat_instansi !== $newAttributes['label_tingkat_instansi']
+            || $active->nama_kota !== $newAttributes['nama_kota']
+            || $active->nama_provinsi !== $newAttributes['nama_provinsi'];
 
         if ($hasChanged) {
             $this->olapRepo->closePerusahaanVersion($active->perusahaan_sk, $snapshotDate);
@@ -71,11 +67,5 @@ class PerusahaanDimService
         return mb_strtolower(trim($companyName))
             . '|'
             . mb_strtolower(trim($city));
-    }
-
-    /** Null dan string kosong dianggap setara; selain itu dibandingkan sebagai string. */
-    private static function normalize(mixed $value): string
-    {
-        return $value === null ? '' : (string) $value;
     }
 }
