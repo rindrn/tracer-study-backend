@@ -55,14 +55,25 @@ class AppServiceProvider extends ServiceProvider
      *     sumber — ini yang relevan untuk enumerasi NIM, karena di sana tiap
      *     akun hanya perlu satu percobaan.
      *
-     * Angka 30 sengaja longgar supaya jaringan bersama (kampus, warnet, NAT
-     * kantor) tidak ikut terhalang; penyapuan 505 akun tetap memakan belasan
-     * menit alih-alih beberapa detik, cukup untuk terlihat di log.
-     *
      * Pengenal dinormalkan ke huruf kecil supaya "NIM123" dan "nim123" tidak
      * dihitung sebagai dua ember terpisah — isValidPassword() sendiri menerima
      * NIM huruf kecil, jadi ember yang peka huruf besar-kecil akan
      * melipatgandakan jatah percobaan tanpa disadari.
+     *
+     * EMBER DIPISAH PER RUTE, dan itu bukan sekadar kerapian. Halaman masuk
+     * di frontend mencoba rute staf lebih dulu, lalu jatuh ke rute alumni
+     * kalau gagal (Login.tsx handleSubmit) — jadi SATU penekanan tombol oleh
+     * alumni menghasilkan DUA permintaan. Tanpa nama rute di dalam kunci,
+     * keduanya jatuh ke ember yang sama karena pengenalnya identik, sehingga
+     * jatah 5 percobaan habis hanya dalam 2 kali percobaan sungguhan.
+     *
+     * Batas per alamat dinaikkan ke 60 dengan alasan yang sama: pola dua
+     * permintaan itu membuat kuota alamat terpakai dua kali lipat. 60 berarti
+     * 30 percobaan sungguhan per menit dari satu alamat — cukup longgar untuk
+     * jaringan bersama (kampus, NAT kantor), sementara penyapuan 505 akun
+     * tetap memakan sekitar sembilan menit alih-alih beberapa detik. Penyapu
+     * tidak memakai pola dua permintaan itu, jadi kuota penuhnya berlaku
+     * untuk dia.
      */
     private function configureRateLimiting(): void
     {
@@ -71,9 +82,34 @@ class AppServiceProvider extends ServiceProvider
                 (string) $request->input('email', $request->input('nim_or_email', ''))
             ));
 
+            // Balasan bawaan Laravel untuk 429 adalah {"message":"Too Many
+            // Attempts."} — berbahasa Inggris dan bentuknya berbeda dari
+            // seluruh balasan lain di API ini. Diseragamkan ke {success,
+            // message} berbahasa Indonesia, dengan sisa waktu ikut di BADAN
+            // balasan.
+            //
+            // Sisa waktu WAJIB ada di badan, tidak cukup di header
+            // Retry-After: header itu tidak termasuk daftar aman CORS, dan
+            // config/cors.php tidak mengekspos apa pun, sehingga peramban
+            // TIDAK BISA membacanya. Lewat curl kelihatan, lewat browser
+            // tidak — persis jenis perbedaan yang menyesatkan saat diuji.
+            $tooMany = function (Request $request, array $headers) {
+                $seconds = (int) ($headers['Retry-After'] ?? 60);
+
+                return response()->json([
+                    'success'     => false,
+                    'message'     => "Terlalu banyak percobaan masuk. Silakan coba lagi dalam {$seconds} detik.",
+                    'retry_after' => $seconds,
+                ], 429, $headers);
+            };
+
             return [
-                Limit::perMinute(5)->by($identifier . '|' . $request->ip()),
-                Limit::perMinute(30)->by($request->ip()),
+                Limit::perMinute(5)
+                    ->by($request->path() . '|' . $identifier . '|' . $request->ip())
+                    ->response($tooMany),
+                Limit::perMinute(60)
+                    ->by($request->ip())
+                    ->response($tooMany),
             ];
         });
     }
