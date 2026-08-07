@@ -60,6 +60,15 @@ class StakeholderContactRepository
         if (!empty($filters['contact_type'])) {
             $query->where('sc.contact_type', $filters['contact_type']);
         }
+        // Jurusan dan program studi saling bebas. Memilih jurusan saja berarti
+        // seluruh program studi di bawahnya; memilih keduanya berarti
+        // irisannya. Penyaring jurusan ditambahkan untuk dialog unduhan, yang
+        // memang dipakai mengirim survei per jurusan — sebelumnya satu-satunya
+        // penyaring wilayah adalah kode program studi, sehingga Tim Tracer
+        // harus mengunduh satu per satu per program studi.
+        if (!empty($filters['jurusan'])) {
+            $query->where('p.jurusan', $filters['jurusan']);
+        }
         if (!empty($filters['program_code'])) {
             $query->where('p.code', $filters['program_code']);
         }

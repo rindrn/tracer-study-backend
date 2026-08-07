@@ -24,6 +24,7 @@ class StakeholderContactController extends Controller
             'graduation_year' => $request->query('graduation_year') ? (int) $request->query('graduation_year') : null,
             'alumni_status'   => $request->query('alumni_status'),
             'contact_type'    => $request->query('contact_type'),
+            'jurusan'         => $request->query('jurusan'),
             'program_code'    => $request->query('program_code'),
             'search'          => $request->query('search'),
         ];
@@ -96,6 +97,12 @@ class StakeholderContactController extends Controller
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"kontak_penilai_{$stamp}.csv\"",
+            // Panjang isi disetel EKSPLISIT supaya peramban tahu total bita
+            // yang akan diterimanya. Tanpa itu, unduhan hanya bisa melaporkan
+            // "sudah menerima sekian bita" tanpa penyebut, sehingga tidak ada
+            // persentase yang dapat ditampilkan. Berkasnya dirakit utuh di
+            // memori lebih dahulu, jadi panjangnya memang sudah diketahui.
+            'Content-Length' => (string) strlen($csv),
         ]);
     }
 }
