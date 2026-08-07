@@ -104,6 +104,34 @@ class RingkasanTahunRepository
 
         $questionnaireRows = $questionnaireQuery->get()->keyBy('tahun');
 
+        // ── 2b. Sisi kontak penilai: jumlah kontak per tahun lulus ──
+        //
+        // Dipakai kartu tahun di halaman Kontak Penilai. Halaman itu tidak
+        // berurusan dengan progres pengisian sama sekali, sehingga angka yang
+        // berguna di sana adalah "berapa kontak yang akan saya kerjakan",
+        // bukan "berapa persen alumni sudah mengisi".
+        //
+        // Lingkupnya mengikuti penyaring yang sama dengan sisi alumni supaya
+        // Kaprodi dan Kajur tidak melihat cacah di luar cakupannya.
+        $kontakQuery = DB::connection(self::CONN)
+            ->table('stakeholder_contacts as sc')
+            ->join('alumni_profiles as ap', 'sc.alumni_id', '=', 'ap.id')
+            ->join('programs as p', 'ap.program_id', '=', 'p.id')
+            ->whereNotNull('ap.graduation_year')
+            ->select([
+                'ap.graduation_year as tahun',
+                DB::raw('COUNT(*) as kontak'),
+            ])
+            ->groupBy('ap.graduation_year');
+
+        if ($programId !== null) {
+            $kontakQuery->where('ap.program_id', $programId);
+        } elseif ($jurusan !== null) {
+            $kontakQuery->where('p.jurusan', $jurusan);
+        }
+
+        $kontakRows = $kontakQuery->get()->keyBy('tahun');
+
         // ── 3. Gabungkan. Union tahun dari kedua sisi supaya tahun yang
         //       hanya punya alumni (mis. 2020, 2021 yang belum disasar
         //       kuesioner apa pun) tetap muncul sebagai kartu redup.
@@ -114,7 +142,7 @@ class RingkasanTahunRepository
             ->sortDesc()
             ->values();
 
-        return $allYears->map(function (int $year) use ($alumniRows, $questionnaireRows) {
+        return $allYears->map(function (int $year) use ($alumniRows, $questionnaireRows, $kontakRows) {
             $a = $alumniRows->get($year);
             $k = $questionnaireRows->get($year);
 
@@ -135,6 +163,7 @@ class RingkasanTahunRepository
                 'belum_mengisi' => $total - $responded,
                 'response_rate' => $total > 0 ? round($responded / $total * 100, 1) : 0.0,
                 'kuesioner'     => (int) ($k->kuesioner ?? 0),
+                'kontak'        => (int) ($kontakRows->get($year)->kontak ?? 0),
                 'periode'       => $periods,
             ];
         })->all();
