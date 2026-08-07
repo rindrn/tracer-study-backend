@@ -116,7 +116,6 @@ class RingkasanTahunRepository
         $kontakQuery = DB::connection(self::CONN)
             ->table('stakeholder_contacts as sc')
             ->join('alumni_profiles as ap', 'sc.alumni_id', '=', 'ap.id')
-            ->join('programs as p', 'ap.program_id', '=', 'p.id')
             ->whereNotNull('ap.graduation_year')
             ->select([
                 'ap.graduation_year as tahun',
@@ -124,10 +123,17 @@ class RingkasanTahunRepository
             ])
             ->groupBy('ap.graduation_year');
 
+        // Tabel `programs` HANYA ikut saat penyaringan memang membutuhkannya.
+        // Jurusan tersimpan di sana, tetapi Ketua Tracer dan Tim Tracer tidak
+        // disaring per jurusan — bagi mereka join itu murni beban tambahan
+        // atas seluruh baris kontak. Kaprodi disaring lewat program_id yang
+        // sudah ada di alumni_profiles, jadi juga tidak memerlukannya.
         if ($programId !== null) {
             $kontakQuery->where('ap.program_id', $programId);
         } elseif ($jurusan !== null) {
-            $kontakQuery->where('p.jurusan', $jurusan);
+            $kontakQuery->whereIn('ap.program_id', function ($sub) use ($jurusan) {
+                $sub->from('programs')->select('id')->where('jurusan', $jurusan);
+            });
         }
 
         $kontakRows = $kontakQuery->get()->keyBy('tahun');
