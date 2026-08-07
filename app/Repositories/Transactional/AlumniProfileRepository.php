@@ -189,13 +189,45 @@ class AlumniProfileRepository
             ELSE 'not_started'
         END as response_status";
 
+        // Kolom disebut satu per satu, BUKAN `alumni_profiles.*`.
+        //
+        // Tanda bintang ikut membawa kolom `password` ke antarmuka. Selama
+        // kolom itu masih kosong di seluruh baris, kebocorannya tidak
+        // kelihatan; sejak kredensial alumni benar-benar diterbitkan, setiap
+        // pemuatan daftar alumni mengirimkan cincangan bcrypt milik ratusan
+        // orang ke peramban. Cincangan memang tidak dapat dibalik, tetapi
+        // tetap bahan mentah untuk penebakan luring dan tidak ada satu pun
+        // bagian antarmuka yang membutuhkannya.
+        //
+        // `password_issued_at` sengaja tetap disertakan: nilainya bukan
+        // rahasia dan berguna untuk menandai alumni yang kredensialnya belum
+        // pernah diterbitkan.
         $query = $conn->table('alumni_profiles')
             ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
             ->select(
-                'alumni_profiles.*',
+                'alumni_profiles.id',
+                'alumni_profiles.nim',
+                'alumni_profiles.name',
+                'alumni_profiles.email',
+                'alumni_profiles.phone',
+                'alumni_profiles.program_id',
+                'alumni_profiles.entry_year',
+                'alumni_profiles.graduation_year',
+                'alumni_profiles.gpa',
+                'alumni_profiles.is_active',
+                'alumni_profiles.created_at',
+                'alumni_profiles.updated_at',
+                'alumni_profiles.nik',
+                'alumni_profiles.npwp',
+                'alumni_profiles.kode_pt',
+                'alumni_profiles.password_issued_at',
                 'programs.name as program_name',
                 'programs.degree as program_degree',
                 'programs.jurusan as jurusan_name',
+                // Dibutuhkan ekspor alumni: templat impor memakai Kode Prodi,
+                // bukan nama program studi, sehingga tanpa kolom ini berkas
+                // ekspor tidak akan pernah bisa diunggah kembali.
+                'programs.code as program_code',
             )
             ->selectRaw($statusSql, array_merge($globalQnrIds, $globalQnrIds));
 
