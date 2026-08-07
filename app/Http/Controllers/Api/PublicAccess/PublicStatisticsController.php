@@ -48,53 +48,79 @@ class PublicStatisticsController extends Controller
     }
 
     /**
-     * GET /api/public/statistics/progress?graduation_year=2025
+     * GET /api/public/statistics/progress[?graduation_year=2025]
      *
-     * Satu baris per program studi. Tahun WAJIB: tanpa itu query menyapu
-     * seluruh angkatan yang pernah ada -- persis beban yang mau dihindari
-     * pengarsipan visual.
+     * Balasannya selalu berupa daftar kelompok, satu kelompok per angkatan,
+     * masing-masing berisi barisnya sendiri per program studi.
+     *
+     * Tanpa `graduation_year`, seluruh angkatan yang boleh ditampilkan publik
+     * dikembalikan sekaligus, TETAP TERPISAH per angkatan. Angkanya sengaja
+     * TIDAK dijumlahkan menjadi satu: satu program studi yang sudah rampung
+     * pada satu angkatan tetapi tertinggal pada angkatan lain akan tampak
+     * sedang-sedang saja bila keduanya dilebur, sehingga justru menyembunyikan
+     * keadaan yang perlu dilihat. Situs lama pun menyajikannya bertumpuk per
+     * angkatan.
+     *
+     * Yang dikembalikan hanya angkatan dalam rentang pengarsipan (LAP-04),
+     * bukan seluruh angkatan yang pernah ada. Menyapu seluruh isi tabel akan
+     * melewati pengarsipan itu diam-diam, sekaligus menimbulkan beban yang
+     * justru hendak dihindarinya.
      */
     public function progress(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'graduation_year' => ['required', 'integer', 'min:1990', 'max:2100'],
+            'graduation_year' => ['nullable', 'integer', 'min:1990', 'max:2100'],
         ]);
 
-        $year = (int) $validated['graduation_year'];
+        if (isset($validated['graduation_year'])) {
+            $year = (int) $validated['graduation_year'];
 
-        // Ditolak di server, bukan disaring di frontend saja -- kalau tidak,
-        // pengarsipan bisa dilewati cukup dengan mengetik tahun lain di URL.
-        if (!$this->settings->isYearVisible($year)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data angkatan tersebut tidak ditampilkan untuk publik.',
-            ], 404);
+            // Ditolak di server, bukan disaring di frontend saja -- kalau tidak,
+            // pengarsipan bisa dilewati cukup dengan mengetik tahun lain di URL.
+            if (!$this->settings->isYearVisible($year)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data angkatan tersebut tidak ditampilkan untuk publik.',
+                ], 404);
+            }
+
+            $years = [$year];
+        } else {
+            $years = $this->settings->getAvailableYears();
+
+            if (empty($years)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Belum ada angkatan yang ditampilkan untuk publik.',
+                ], 404);
+            }
         }
 
-        $rows = $this->repo->getBarData(graduationYear: (string) $year);
+        // Angkatan terbaru lebih dahulu, mengikuti urutan yang dipakai situs
+        // lama maupun daftar tahun pada endpoint years().
+        $years = collect($years)->map(fn ($y) => (int) $y)->sortDesc()->values();
 
-        $items = $rows
-            ->map(fn (array $r) => [
-                'prodi'      => $this->prodiLabel($r),
-                'nama_prodi' => $r['nama_prodi'],
-                'jenjang'    => $r['jenjang'],
-                'finish'     => $r['count_submitted'],
-                'ongoing'    => $r['count_ongoing'],
-                'belum'      => $r['count_started'],
-                'jumlah'     => $r['total'],
-                // Persentase dihitung dari yang SELESAI saja, bukan
-                // selesai+sedang -- pengisian yang belum dikirim belum jadi
-                // respons, sama dengan definisi di situs lama.
-                'persentase' => $r['total'] > 0
-                    ? round($r['count_submitted'] / $r['total'] * 100, 2)
-                    : 0.0,
-            ])
-            ->sortBy('prodi', SORT_NATURAL)
-            ->values();
+        $groups = $years->map(function (int $year) {
+            $items = $this->repo->getBarData(graduationYear: (string) $year)
+                ->map(fn (array $r) => [
+                    'prodi'      => $this->prodiLabel($r),
+                    'nama_prodi' => $r['nama_prodi'],
+                    'jenjang'    => $r['jenjang'],
+                    'finish'     => $r['count_submitted'],
+                    'ongoing'    => $r['count_ongoing'],
+                    'belum'      => $r['count_started'],
+                    'jumlah'     => $r['total'],
+                    // Persentase dihitung dari yang SELESAI saja, bukan
+                    // selesai+sedang -- pengisian yang belum dikirim belum jadi
+                    // respons, sama dengan definisi di situs lama.
+                    'persentase' => $r['total'] > 0
+                        ? round($r['count_submitted'] / $r['total'] * 100, 2)
+                        : 0.0,
+                ])
+                ->sortBy('prodi', SORT_NATURAL)
+                ->values();
 
-        return response()->json([
-            'success' => true,
-            'data'    => [
+            return [
                 'graduation_year' => $year,
                 'items'           => $items,
                 'summary'         => [
@@ -103,6 +129,17 @@ class PublicStatisticsController extends Controller
                     'belum'   => $items->sum('belum'),
                     'jumlah'  => $items->sum('jumlah'),
                 ],
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                // Angkatan mana saja yang benar-benar disertakan. Dikirim
+                // supaya pengunjung tidak menyangka "semua angkatan" mencakup
+                // angkatan yang sedang diarsipkan dari tampilan publik.
+                'included_years' => $years->all(),
+                'groups'         => $groups,
             ],
         ]);
     }
