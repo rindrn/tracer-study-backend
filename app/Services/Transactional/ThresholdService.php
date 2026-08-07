@@ -25,6 +25,21 @@ class ThresholdService
 
     private const SLOVIN_MARGIN_ERROR = 0.023;
 
+    // GET /api/lam-versions/{id}/thresholds
+    public function byVersion(int $lamVersionId): array
+    {
+        $key = "thresholds:by_version:{$lamVersionId}";
+
+        return $this->remember($key, function () use ($lamVersionId) {
+            $version = $this->versionRepo->findById($lamVersionId);
+            if (! $version) {
+                throw new BusinessException("LAM Version ID {$lamVersionId} tidak ditemukan.", 404);
+            }
+
+            return $this->formatGroupedResponse($version, $this->repo->byVersion($lamVersionId));
+        }, self::TTL, ['thresholds', 'lams']);
+    }
+
     public function bulkCreate(int $lamVersionId, array $validated): array
     {
         $version = $this->versionRepo->findById($lamVersionId);

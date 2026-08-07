@@ -38,10 +38,29 @@ class ThresholdRepository
     public function byVersion(int $lamVersionId): \Illuminate\Support\Collection
     {
         return DB::connection('oltp')
-            ->table('vw_thresholds_complete')
-            ->where('lam_version_id', $lamVersionId)
-            ->orderBy('indicator_id')
-            ->orderBy('threshold_level')
+            ->table('thresholds as t')
+            ->join('threshold_indicators as ti', 'ti.id', '=', 't.indicator_id')
+            ->leftJoin('threshold_configs as tc', function ($join) {
+                $join->on('tc.lam_version_id', '=', 't.lam_version_id')
+                     ->on('tc.indicator_id', '=', 't.indicator_id');
+            })
+            ->where('t.lam_version_id', $lamVersionId)
+            ->select(
+                't.id as threshold_id',
+                't.value as threshold_value',
+                't.level as threshold_level',
+                't.lam_version_id',
+                't.indicator_id',
+                'ti.key as indicator_key',
+                'ti.name as indicator_name',
+                'ti.unit as indicator_unit',
+                'ti.operator as indicator_operator',
+                'ti.dynamic_param_unit',
+                'ti.is_system_calculated',
+                'tc.param_value',
+            )
+            ->orderBy('t.indicator_id')
+            ->orderBy('t.level')
             ->get();
     }
 
