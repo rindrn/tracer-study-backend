@@ -25,7 +25,17 @@ class AlumniProfile extends Authenticatable
     protected $table      = 'alumni_profiles';
     protected $guarded    = ['id'];
     protected $hidden     = ['password'];
-    protected $casts      = ['is_active' => 'boolean'];
+
+    /**
+     * Cast `hashed` WAJIB ada. Tanpanya, penetapan kata sandi lewat model ini
+     * tersimpan sebagai teks polos — persis yang dilarang NFR-01. Model User
+     * sudah memakai pola yang sama.
+     */
+    protected $casts = [
+        'is_active'          => 'boolean',
+        'password'           => 'hashed',
+        'password_issued_at' => 'datetime',
+    ];
 
     /**
      * alumni_profiles tidak punya kolom remember_token — sama seperti User

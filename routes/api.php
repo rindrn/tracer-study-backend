@@ -224,6 +224,15 @@ Route::middleware('auth:sanctum')->group(function () {
         // mengajukan permintaan kepada dirinya sendiri.
         Route::post('alumni/{alumniId}/reset-response', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'resetResponse']);
 
+        // Penerbitan kredensial alumni (RBAC-16). Membangkitkan kata sandi
+        // acak, menyimpan cincangannya, lalu MENGALIRKAN berkas CSV berisi
+        // teks polosnya dalam balasan yang sama — satu-satunya kesempatan,
+        // karena cincangan bcrypt tidak dapat dibalik.
+        //
+        // Berkasnya setara daftar kata sandi banyak orang sekaligus, jadi
+        // wewenangnya dipegang Ketua Tracer saja, sejalan dengan RBAC-01.
+        Route::post('alumni/credentials/issue', [\App\Http\Controllers\Api\Admin\AlumniCredentialController::class, 'issue']);
+
         // LAMs
         Route::post('lams',        [LamController::class, 'store']);
         Route::put('lams/{id}',    [LamController::class, 'update']);

@@ -70,10 +70,10 @@ class AppServiceProvider extends ServiceProvider
      * Batas per alamat dinaikkan ke 60 dengan alasan yang sama: pola dua
      * permintaan itu membuat kuota alamat terpakai dua kali lipat. 60 berarti
      * 30 percobaan sungguhan per menit dari satu alamat — cukup longgar untuk
-     * jaringan bersama (kampus, NAT kantor), sementara penyapuan 505 akun
-     * tetap memakan sekitar sembilan menit alih-alih beberapa detik. Penyapu
-     * tidak memakai pola dua permintaan itu, jadi kuota penuhnya berlaku
-     * untuk dia.
+     * jaringan bersama (kampus, NAT kantor), sementara penyapuan seluruh
+     * angkatan turun dari hitungan detik menjadi hitungan menit, cukup lama
+     * untuk terlihat di log. Penyapu tidak memakai pola dua permintaan itu,
+     * jadi kuota penuhnya berlaku untuk dia.
      */
     private function configureRateLimiting(): void
     {

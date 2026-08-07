@@ -27,7 +27,18 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // Header yang boleh DIBACA peramban. Daftar aman CORS hanya memuat
+    // segelintir header baku; apa pun di luar itu tidak terlihat oleh kode
+    // frontend meski jelas terkirim — lewat curl tampak, lewat aplikasi tidak.
+    //
+    // Content-Disposition: dibutuhkan agar unduhan bisa memakai nama berkas
+    // yang ditetapkan server, bukan nama tebakan peramban.
+    // X-Issued-Count: jumlah kredensial yang terbit pada unduhan CSV
+    // (AlumniCredentialController), tidak bisa disimpulkan dari isi unduhan.
+    'exposed_headers' => [
+        'Content-Disposition',
+        'X-Issued-Count',
+    ],
 
     'max_age' => 0,
 

@@ -5,17 +5,29 @@ namespace App\Services\Transactional;
 use App\Exceptions\BusinessException;
 use App\Models\Transactional\AlumniProfile;
 use App\Repositories\Transactional\AlumniProfileRepository;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * AlumniAuthService — logic autentikasi alumni (pengisi kuesioner).
  *
- * Alumni tidak menyimpan password di DB; verifikasi memakai NIM atau
- * 6 digit terakhir NIK sebagai "password default".
+ * Pengenalnya NIM atau surel, kata sandinya dicincang di kolom
+ * `alumni_profiles.password` dan diterbitkan AlumniCredentialService.
+ *
+ * DULU: kata sandinya adalah NIM itu sendiri, dengan enam digit terakhir NIK
+ * sebagai cadangan — tidak ada yang tersimpan, tidak ada yang dicincang.
+ * Artinya pengenal dan kata sandi adalah benda yang sama, dan bendanya bukan
+ * rahasia: NIM tercetak di ijazah dan ada di setiap berkas impor, sementara
+ * NIK ikut tertulis di lembar ekspor kementerian sehingga setiap staf yang
+ * berwenang mengekspor memegang kata sandi cadangan seluruh alumni dalam
+ * cakupannya. NIM juga berpola tahun + nomor urut, jadi mudah dienumerasi.
+ *
+ * Pengenal TETAP boleh NIM maupun surel. Yang berbahaya dulu adalah NIM
+ * sebagai kata sandi, bukan sebagai pengenal — begitu kata sandinya acak, NIM
+ * kembali menjadi nama pengguna biasa yang memang tidak perlu rahasia, dan
+ * membuangnya hanya menyulitkan alumni yang lupa surel mana yang terdaftar.
  *
  * Login berhasil menerbitkan token Sanctum pada guard 'alumni'. Token itulah
- * satu-satunya cara memanggil POST /api/tracer-study/submit — sebelumnya
- * endpoint tersebut publik, sehingga siapa pun bisa mengirim jawaban atas nama
- * NIM mana pun tanpa login sama sekali.
+ * satu-satunya cara memanggil POST /api/tracer-study/submit.
  */
 class AlumniAuthService
 {
@@ -50,8 +62,20 @@ class AlumniAuthService
             throw new BusinessException('Akun alumni tidak aktif. Hubungi admin.', 403);
         }
 
-        if (!$this->isValidPassword($alumni, $password)) {
-            throw new BusinessException('Password salah. Gunakan NIM Anda sebagai password.', 401);
+        // Alumni yang kredensialnya belum pernah diterbitkan dibedakan dari
+        // kata sandi salah, karena jalan keluarnya berbeda: yang satu harus
+        // meminta ke Tim Tracer, yang lain cukup mengetik ulang. Menyamakan
+        // keduanya membuat alumni mencoba berulang kali sampai terkena
+        // pembatas laju, padahal tidak ada kata sandi yang bisa benar.
+        if (empty($alumni->password)) {
+            throw new BusinessException(
+                'Akun Anda belum memiliki kata sandi. Silakan hubungi Tim Tracer Study untuk memperoleh kredensial masuk.',
+                401,
+            );
+        }
+
+        if (!Hash::check($password, $alumni->password)) {
+            throw new BusinessException('Kata sandi salah.', 401);
         }
 
         // Satu alumni = satu token aktif, sama seperti AuthService staff.
@@ -85,22 +109,4 @@ class AlumniAuthService
         $alumni->tokens()->delete();
     }
 
-    /**
-     * Password default yang diterima:
-     * - NIM (case sensitive & lowercase)
-     * - 6 digit terakhir NIK (kalau NIK tersedia)
-     */
-    private function isValidPassword(object $alumni, string $password): bool
-    {
-        $valid = [
-            $alumni->nim,
-            strtolower($alumni->nim),
-        ];
-
-        if ($alumni->nik) {
-            $valid[] = substr($alumni->nik, -6);
-        }
-
-        return in_array($password, $valid, strict: true);
-    }
 }
