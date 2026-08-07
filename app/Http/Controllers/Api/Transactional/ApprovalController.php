@@ -120,11 +120,18 @@ class ApprovalController extends Controller
             return 'Request disetujui.';
         }
 
-        $reopened = $this->reopenService->reopen((int) $payload['alumni_id']);
+        // Lingkupnya kuesioner yang dituliskan pemohon, bukan seluruh
+        // kuesioner aktif alumni. Payload selalu memuat questionnaire_id —
+        // requestReopen() mengisinya dengan kuesioner aktif pertama bila
+        // pemohon tidak menyebut satu pun.
+        $reopened = $this->reopenService->reopen(
+            (int) $payload['alumni_id'],
+            isset($payload['questionnaire_id']) ? [(int) $payload['questionnaire_id']] : null,
+        );
 
         return $reopened > 0
-            ? "Request disetujui. Pengisian alumni dibuka kembali ({$reopened} kuesioner) dan jawaban sebelumnya dipertahankan."
-            : 'Request disetujui, tetapi pengisian alumni sudah tidak berstatus Finish sehingga tidak ada yang dibuka.';
+            ? 'Request disetujui. Pengisian alumni pada kuesioner tersebut dibuka kembali dan jawaban sebelumnya dipertahankan.'
+            : 'Request disetujui, tetapi pengisian alumni pada kuesioner tersebut sudah tidak berstatus Finish sehingga tidak ada yang dibuka.';
     }
 
     /** POST /api/approvals/request-delete — tracer_team submits delete request */
@@ -180,19 +187,21 @@ class ApprovalController extends Controller
             ], 422);
         }
 
-        // Kembar diperiksa per ALUMNI saja, bukan per kuesioner: satu
-        // persetujuan membuka seluruh kuesioner aktif alumni tersebut, jadi
-        // permintaan kedua untuk alumni yang sama tidak akan menemukan apa
-        // pun lagi untuk dibuka.
+        // Kembar diperiksa per PASANGAN alumni-kuesioner. Dulu cukup per
+        // alumni, karena satu persetujuan membuka seluruh kuesioner aktifnya
+        // sekaligus sehingga permintaan kedua pasti mubazir. Sejak lingkupnya
+        // menjadi per kuesioner, permintaan untuk kuesioner yang berbeda pada
+        // alumni yang sama adalah permintaan yang sah dan tidak boleh ditolak.
         $duplicate = ApprovalRequest::where('type', ApprovalRequest::TYPE_REOPEN_RESPONSE)
             ->where('status', ApprovalRequest::STATUS_PENDING)
             ->whereRaw("payload->>'alumni_id' = ?", [(string) $validated['alumni_id']])
+            ->whereRaw("payload->>'questionnaire_id' = ?", [(string) $questionnaireId])
             ->exists();
 
         if ($duplicate) {
             return response()->json([
                 'success' => false,
-                'message' => 'Sudah ada permintaan pembukaan kembali yang menunggu persetujuan untuk alumni ini.',
+                'message' => 'Sudah ada permintaan pembukaan kembali yang menunggu persetujuan untuk alumni dan kuesioner ini.',
             ], 422);
         }
 

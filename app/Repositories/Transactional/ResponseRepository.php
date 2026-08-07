@@ -31,6 +31,35 @@ class ResponseRepository
             ->first();
     }
 
+    /**
+     * Kuesioner mana saja, dari daftar yang diberikan, yang pengisiannya sudah
+     * SELESAI (submitted/verified) bagi seorang alumni.
+     *
+     * Dipakai jalur submit untuk menegakkan RBAC-18 (satu kali pengisian per
+     * kuesioner). Sengaja mengembalikan daftar, bukan boolean: alumni bisa
+     * punya beberapa kuesioner aktif sekaligus, dan pesan galatnya perlu
+     * menyebut kuesioner MANA yang sudah terkunci — bukan sekadar menolak
+     * seluruh kiriman tanpa keterangan.
+     *
+     * @param  array<int> $questionnaireIds
+     * @return array<int>
+     */
+    public function findSubmittedQuestionnaireIds(int $alumniId, array $questionnaireIds): array
+    {
+        if (empty($questionnaireIds)) {
+            return [];
+        }
+
+        return DB::connection(self::CONN)->table('responses')
+            ->where('alumni_id', $alumniId)
+            ->whereIn('questionnaire_id', $questionnaireIds)
+            ->whereIn('status', ['submitted', 'verified'])
+            ->orderBy('questionnaire_id')
+            ->pluck('questionnaire_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     /** Ambil semua answers untuk sekumpulan response_id (dipakai report export). */
     public function getAnswersByResponseIds(array $responseIds): Collection
     {
@@ -48,12 +77,30 @@ class ResponseRepository
     // WRITE
     // ═══════════════════════════════════════════════════════════
 
-    public function deleteByQuestionnaireAndAlumni(int $questionnaireId, int $alumniId): void
+    /**
+     * Hapus pengisian yang BELUM selesai ('started') untuk satu pasangan
+     * kuesioner-alumni. Dipakai jalur submit: draf yang tertinggal digantikan
+     * baris submisi yang baru.
+     *
+     * Baris 'submitted'/'verified' sengaja TIDAK ikut terhapus. Dulu method ini
+     * menghapus tanpa memandang status, dan itulah yang membuat
+     * UNIQUE(questionnaire_id, alumni_id) tidak pernah berfungsi sebagai
+     * penjaga: kiriman kedua menghapus dulu baris lamanya, jadi aturan uniknya
+     * tidak pernah tersentuh dan jawaban alumni tertimpa diam-diam. Sekarang
+     * pengisian yang sudah selesai ditolak lebih awal di
+     * TracerStudySubmitService (RBAC-18), dan lapisan ini menjadi jaring
+     * pengaman kedua: seandainya pemeriksaan itu terlewat, insert-nya akan
+     * gagal karena bentrok unique — berisik, bukan diam-diam menimpa.
+     *
+     * @return int jumlah draf yang terhapus
+     */
+    public function deleteDraftByQuestionnaireAndAlumni(int $questionnaireId, int $alumniId): int
     {
-        DB::connection(self::CONN)->table('responses')
+        return DB::connection(self::CONN)->table('responses')
             ->where('questionnaire_id', $questionnaireId)
             ->where('alumni_id', $alumniId)
-            ->delete();
+            ->where('status', 'started')
+            ->delete();   // response_answers ikut terhapus lewat cascade FK
     }
 
     /**
@@ -68,8 +115,8 @@ class ResponseRepository
      * Sekarang cukup ubah status. Tiga jalur yang sudah ada langsung
      * bekerja tanpa perubahan:
      *
-     *   - hasAlumniResponded() tidak menghitung 'started', sehingga borang
-     *     alumni terbuka kembali;
+     *   - respondedQuestionnaireIds() tidak menghitung 'started', sehingga
+     *     borang alumni terbuka kembali;
      *   - GET tracer-study/draft memuat response_answers yang tertinggal
      *     sebagai draf, sehingga jawaban lama muncul kembali di formulir;
      *   - ETL hanya memproses 'submitted', sehingga alumni ini tidak ikut
@@ -89,23 +136,26 @@ class ResponseRepository
     }
 
     /**
-     * Buka kembali SELURUH pengisian terkirim milik satu alumni pada
-     * sekumpulan kuesioner sekaligus.
+     * Buka kembali pengisian terkirim milik satu alumni pada sekumpulan
+     * kuesioner.
      *
-     * Membuka satu kuesioner saja tidak cukup, dan diam-diam merusak:
-     * borang alumni menggabungkan seluruh kuesioner aktif (umum + prodi)
-     * menjadi satu formulir, sementara pengirimannya menghasilkan baris
-     * responses terpisah per kuesioner. Kalau hanya satu yang dibuka:
+     * Membuka sebagian kini SAH, dan itu perubahan yang disengaja. Dulu
+     * lingkupnya dipaksa mencakup seluruh kuesioner aktif alumni karena
+     * membuka satu saja tidak menghasilkan apa-apa: status pengisian dibaca
+     * sebagai satu boleaan untuk semua kuesioner sekaligus, sehingga alumni
+     * tetap tertahan di layar "Anda Sudah Mengisi"; dan seandainya bisa masuk
+     * pun, kuesioner yang masih terkirim ikut tampil kosong lalu tertimpa saat
+     * dikirim.
      *
-     *   - hasAlumniResponded() masih menemukan baris 'submitted' pada
-     *     kuesioner lain, sehingga alumni tetap melihat "Anda Sudah
-     *     Mengisi" dan tidak pernah bisa masuk;
-     *   - seandainya bisa masuk pun, getDraft() hanya membaca baris
-     *     berstatus 'started', jadi jawaban kuesioner yang masih terkirim
-     *     tidak ikut terisi ulang di formulir — alumni melihatnya kosong
-     *     dan berisiko menimpanya dengan jawaban kosong saat mengirim.
+     * Keduanya sudah ditutup: statusnya kini per kuesioner
+     * (QuestionnaireFetchService::respondedQuestionnaireIds), formulir hanya
+     * menampilkan kuesioner yang belum selesai, dan submit hanya menyentuh
+     * kuesioner yang memang terbuka
+     * (TracerStudySubmitService::resolveTargets). Penentuan lingkupnya
+     * dipindahkan ke ResponseReopenService — di sini tinggal menjalankan.
      *
-     * @param  array<int> $questionnaireIds kuesioner yang sedang aktif bagi alumni ini
+     * @param  array<int> $questionnaireIds kuesioner yang hendak dibuka kembali;
+     *                    sudah disaring pemanggil terhadap kuesioner aktif alumni
      * @return int jumlah pengisian yang berhasil dibuka kembali
      */
     public function reopenForAlumni(int $alumniId, array $questionnaireIds): int

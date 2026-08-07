@@ -132,24 +132,26 @@ class AlumniController extends Controller
     /** POST /api/alumni/{alumniId}/reset-response */
     public function resetResponse(Request $request, int $alumniId): JsonResponse
     {
-        // questionnaire_id tetap divalidasi demi kecocokan dengan pemanggil
-        // yang sudah ada, tapi TIDAK menentukan lingkup: pembukaan kembali
-        // selalu mencakup seluruh kuesioner aktif milik alumni tersebut.
-        // Lihat ResponseReopenService.
-        $request->validate(['questionnaire_id' => ['required', 'integer']]);
+        // questionnaire_id kini MENENTUKAN lingkup. Petugas membuka halaman
+        // responden satu kuesioner tertentu, jadi yang dibuka kembali memang
+        // kuesioner itu saja — kuesioner lain milik alumni yang sama tetap
+        // terkirim. Sebelumnya nilai ini divalidasi lalu diabaikan, dan satu
+        // penekanan tombol membuka semuanya sekaligus.
+        $validated = $request->validate(['questionnaire_id' => ['required', 'integer']]);
 
-        $reopened = app(\App\Services\Transactional\ResponseReopenService::class)->reopen($alumniId);
+        $reopened = app(\App\Services\Transactional\ResponseReopenService::class)
+            ->reopen($alumniId, [$validated['questionnaire_id']]);
 
         if ($reopened === 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Responden tidak dalam status finished atau tidak ditemukan.',
+                'message' => 'Pengisian alumni pada kuesioner ini tidak berstatus Finish, atau kuesionernya sudah tidak aktif bagi alumni tersebut.',
             ], 422);
         }
 
         return response()->json([
             'success' => true,
-            'message' => "Pengisian alumni dibuka kembali ({$reopened} kuesioner). Jawaban sebelumnya dipertahankan dan akan muncul kembali saat alumni membuka formulir.",
+            'message' => 'Pengisian alumni pada kuesioner ini dibuka kembali. Jawaban sebelumnya dipertahankan dan akan muncul kembali saat alumni membuka formulir.',
         ]);
     }
 }

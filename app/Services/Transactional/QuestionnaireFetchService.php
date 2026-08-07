@@ -149,29 +149,51 @@ class QuestionnaireFetchService
     }
 
     /**
-     * Cek apakah alumni (by NIM) sudah pernah submit response ke salah satu kuesioner aktif.
+     * Kuesioner MANA SAJA yang sudah dikirim alumni (by NIM), dari sekumpulan
+     * kuesioner aktif yang sedang ditawarkan kepadanya.
      *
      * "Sudah mengisi" = status submitted/verified, BUKAN sekadar ada barisnya.
      * Baris berstatus 'started' adalah pengisian yang belum selesai — kalau ikut
      * dihitung di sini, FE menutup formulir dan alumni melihat "Anda sudah
      * mengisi" padahal belum, tanpa cara keluar dari keadaan itu (lihat
      * useTracerForm.ts, flag has_responded juga mematikan autosave draf).
+     *
+     * Sebelumnya method ini mengembalikan satu boolean hasil exists() atas
+     * SELURUH kuesioner aktif sekaligus — artinya "ada SALAH SATU yang sudah
+     * dikirim". Itu keliru dan diam-diam merusak: begitu prodi menerbitkan
+     * kuesioner tambahan setelah alumni mengirim kuesioner umum, endpoint
+     * tetap menjawab "sudah mengisi", FE menutup formulir, dan kuesioner
+     * prodi yang baru itu tidak akan pernah bisa diisi siapa pun tanpa satu
+     * pun pesan galat.
+     *
+     * Dengan daftar per-kuesioner, pemanggil bisa membedakan "sudah semua"
+     * (baru boleh menutup formulir) dari "sebagian" (tampilkan sisanya).
+     *
+     * @param  array $questionnaires kuesioner aktif hasil getActiveForms()
+     * @return array<int> id kuesioner yang sudah dikirim, urut menaik
      */
-    public function hasAlumniResponded(string $nim, array $questionnaires): bool
+    public function respondedQuestionnaireIds(string $nim, array $questionnaires): array
     {
+        $questionnaireIds = collect($questionnaires)->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        if (empty($questionnaireIds)) {
+            return [];
+        }
+
         $alumniId = DB::connection('oltp')->table('alumni_profiles')
             ->where('nim', $nim)->value('id');
 
         if (!$alumniId) {
-            return false;
+            return [];
         }
-
-        $questionnaireIds = collect($questionnaires)->pluck('id')->toArray();
 
         return DB::connection('oltp')->table('responses')
             ->where('alumni_id', $alumniId)
             ->whereIn('questionnaire_id', $questionnaireIds)
             ->whereIn('status', ['submitted', 'verified'])
-            ->exists();
+            ->orderBy('questionnaire_id')
+            ->pluck('questionnaire_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 }

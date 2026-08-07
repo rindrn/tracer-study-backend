@@ -12,6 +12,7 @@ use App\Repositories\Transactional\QuestionnaireRepository;
 use App\Repositories\Transactional\ResponseRepository;
 use App\Repositories\Transactional\StakeholderContactRepository;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -79,35 +80,57 @@ class TracerStudySubmitService
             // 1. Upsert alumni
             $alumniId = $this->upsertAlumni($validated, $program->id);
 
-            // 2. Persist response ke kuesioner global (wajib ada)
+            // 2. Tentukan kuesioner mana yang benar-benar dikirim kali ini.
+            //
+            // Kandidatnya diambil dari sumber YANG SAMA dengan halaman
+            // pengisian (QuestionnaireFetchService::getActiveForms), bukan
+            // lewat findActiveGlobal*/findActiveByProgram* yang hanya
+            // mengembalikan satu baris pertama. Kalau keduanya berbeda,
+            // kuesioner yang tampil di formulir bisa ditolak saat dikirim —
+            // dan alumni tidak punya cara memahami penolakannya.
             $graduationYear = (int) ($validated['tahun_lulus'] ?? 0);
-            $globalQnr = $graduationYear > 0
-                ? $this->questionnaireRepo->findActiveGlobalForYear($graduationYear)
-                : $this->questionnaireRepo->findActiveGlobal();
+            $candidates = $graduationYear > 0
+                ? $this->questionnaireRepo->findActiveForProdiAndYear($program->id, $graduationYear)
+                : $this->questionnaireRepo->findActiveForProdi($program->id);
+
+            $globalQnr = $candidates->first(fn ($qnr) => is_null($qnr->program_id));
             if (!$globalQnr) {
                 throw new BusinessException('Sistem belum memiliki referensi Kuesioner aktif.', 500);
             }
 
+            $targets = $this->resolveTargets($candidates, $validated);
+
+            // 3. RBAC-18 — satu kali pengisian per kuesioner.
+            $this->assertNotYetSubmitted($alumniId, $targets);
+
             $expandedAnswers = $this->expandCheckboxGroups($rawAnswers);
 
-            $this->persistResponse($globalQnr->id, $alumniId, $expandedAnswers);
+            // 4. Persist response, hanya ke kuesioner yang jadi sasaran
+            foreach ($targets as $qnr) {
+                // Kuesioner prodi hanya menerima kode miliknya sendiri;
+                // kuesioner umum menerima seluruh jawaban.
+                $filterCodes = is_null($qnr->program_id)
+                    ? null
+                    : $this->questionnaireRepo->getQuestionCodesByQuestionnaireId($qnr->id);
 
-            // 3. Persist response ke kuesioner prodi (opsional)
-            $prodiQnr = $graduationYear > 0
-                ? $this->questionnaireRepo->findActiveByProgramForYear($program->id, $graduationYear)
-                : $this->questionnaireRepo->findActiveByProgram($program->id);
-            if ($prodiQnr) {
-                $prodiCodes = $this->questionnaireRepo->getQuestionCodesByQuestionnaireId($prodiQnr->id);
-                $this->persistResponse(
-                    $prodiQnr->id,
-                    $alumniId,
-                    $expandedAnswers,
-                    filterCodes: $prodiCodes,
-                );
+                $this->persistResponse($qnr->id, $alumniId, $expandedAnswers, filterCodes: $filterCodes);
             }
 
-            // 4. Normalisasi data ke employment / education records
-            $this->persistNormalizedRecords($validated, $alumniId, $globalQnr->id);
+            // 5. Normalisasi data ke employment / education records.
+            //
+            // HANYA kalau kuesioner umum ikut dikirim. Seluruh isian yang
+            // dinormalisasi di sini (f8 status alumni, f502 masa tunggu, f505
+            // gaji, f18b/f18c studi lanjut, stk* kontak penilai) adalah milik
+            // kuesioner umum. Pada pengiriman yang hanya mencakup kuesioner
+            // prodi — mis. setelah Ketua Tracer membuka kembali kuesioner
+            // prodi saja — isian itu tidak ada di payload, sehingga f8 terbaca
+            // 0 dan persistNormalizedRecords() akan MENGHAPUS kontak penilai
+            // serta membiarkan employment/education record lama menggantung.
+            // Melewatinya adalah perilaku yang benar: tidak ada pernyataan
+            // baru tentang pekerjaan alumni pada kiriman ini.
+            if ($this->includesGlobal($targets)) {
+                $this->persistNormalizedRecords($validated, $alumniId, $globalQnr->id);
+            }
         });
         // Transaction sudah commit (DB::transaction() commit otomatis sebelum
         // closure-nya return tanpa exception). Dispatch di sini — bukan di
@@ -122,6 +145,103 @@ class TracerStudySubmitService
     // ═══════════════════════════════════════════════════════════
     // Private helpers
     // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Kuesioner yang benar-benar disasar kiriman ini.
+     *
+     * Formulir alumni menggabungkan kuesioner umum dan kuesioner prodi menjadi
+     * satu tampilan, tapi pengirimannya menghasilkan baris responses terpisah
+     * per kuesioner. Sejak pembukaan kembali bisa bersifat sebagian, "kuesioner
+     * mana yang sedang terbuka" tidak lagi selalu berarti keduanya — dan
+     * frontend sudah lama mengirimkan jawabannya lewat `questionnaire_ids`
+     * (daftar bagian yang benar-benar ditampilkan). Nilai itu dulu dibuang
+     * begitu saja di persistResponse(); di sini akhirnya dipakai.
+     *
+     * Daftar dari klien TIDAK dipercaya apa adanya, hanya dipakai sebagai
+     * penyaring atas kuesioner yang memang aktif bagi alumni ini. Dengan
+     * begitu id karangan tidak bisa menyelipkan kiriman ke kuesioner milik
+     * prodi lain, dan kiriman lama yang belum mengirim field ini tetap
+     * berjalan seperti sebelumnya (keduanya jadi sasaran).
+     *
+     * @param  Collection<int,object> $candidates kuesioner aktif bagi alumni ini
+     * @return array<object> kuesioner sasaran
+     */
+    private function resolveTargets(Collection $candidates, array $validated): array
+    {
+        $requested = $validated['questionnaire_ids'] ?? null;
+        if (!is_array($requested) || empty($requested)) {
+            return $candidates->values()->all();
+        }
+
+        $requestedIds = array_map('intval', $requested);
+        $targets = $candidates
+            ->filter(fn ($qnr) => in_array((int) $qnr->id, $requestedIds, strict: true))
+            ->values()
+            ->all();
+
+        if (empty($targets)) {
+            throw new BusinessException(
+                'Kuesioner yang dikirim tidak sesuai dengan kuesioner aktif untuk program studi dan tahun lulus Anda.',
+                422,
+            );
+        }
+
+        return $targets;
+    }
+
+    /**
+     * RBAC-18 — alumni hanya boleh mengisi satu kali per kuesioner.
+     *
+     * Ditegakkan DI SINI, bukan sekadar disembunyikan di antarmuka. Selama ini
+     * satu-satunya penghalang pengiriman kedua adalah layar "Anda Sudah
+     * Mengisi" di frontend, sementara jalur submit-nya menghapus baris lama
+     * lalu menulis ulang — siapa pun yang mengirim POST langsung bisa menimpa
+     * jawabannya sendiri tanpa jejak, dan perubahan itu ikut merembes ke
+     * dashboard lewat ETL pada snapshot berikutnya.
+     *
+     * Pemeriksaan bersifat PER KUESIONER, bukan per alumni. Kalau Ketua Tracer
+     * membuka kembali kuesioner prodi saja, kuesioner umum yang masih terkirim
+     * tidak boleh membuat seluruh kiriman ditolak — yang ditolak hanya
+     * kuesioner yang memang masih terkunci. Baris berstatus 'started' (draf
+     * maupun hasil pembukaan kembali) sengaja tidak dihitung; itulah yang
+     * membuat alur reset tetap bisa berjalan.
+     *
+     * @param array<object> $targets
+     * @throws BusinessException 409
+     */
+    private function assertNotYetSubmitted(int $alumniId, array $targets): void
+    {
+        $targetIds = array_map(fn ($qnr) => (int) $qnr->id, $targets);
+        $locked    = $this->responseRepo->findSubmittedQuestionnaireIds($alumniId, $targetIds);
+
+        if (empty($locked)) {
+            return;
+        }
+
+        $titles = collect($targets)
+            ->filter(fn ($qnr) => in_array((int) $qnr->id, $locked, strict: true))
+            ->pluck('title')
+            ->implode(', ');
+
+        throw new BusinessException(
+            "Anda sudah pernah mengirim kuesioner berikut: {$titles}. "
+            . 'Pengisian hanya dapat dilakukan satu kali. Hubungi Tim Tracer '
+            . 'bila ada jawaban yang perlu diperbaiki.',
+            409,
+        );
+    }
+
+    /** @param array<object> $targets */
+    private function includesGlobal(array $targets): bool
+    {
+        foreach ($targets as $qnr) {
+            if (is_null($qnr->program_id)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private function upsertAlumni(array $validated, int $programId): int
     {
@@ -164,12 +284,15 @@ class TracerStudySubmitService
     }
 
     /**
-     * Delete response lama (upsert behavior) + insert response baru + bulk insert answers.
+     * Ganti draf yang tertinggal dengan baris submisi + bulk insert answers.
      * Kalau $filterCodes diberikan, hanya answer dengan question_code di list itu yang disimpan.
+     *
+     * Yang dihapus hanya baris berstatus 'started'. Pengisian yang sudah
+     * selesai tidak pernah sampai ke sini — sudah ditolak assertNotYetSubmitted().
      */
     private function persistResponse(int $questionnaireId, int $alumniId, array $answers, ?array $filterCodes = null): void
     {
-        $this->responseRepo->deleteByQuestionnaireAndAlumni($questionnaireId, $alumniId);
+        $this->responseRepo->deleteDraftByQuestionnaireAndAlumni($questionnaireId, $alumniId);
         $responseId = $this->responseRepo->createResponse($questionnaireId, $alumniId);
 
         $records = [];

@@ -16,9 +16,24 @@ use App\Repositories\Transactional\ResponseRepository;
  * Penentuan "kuesioner mana saja yang dibuka" ditaruh di satu tempat ini
  * supaya keduanya tidak bisa menyimpang diam-diam.
  *
- * Lingkupnya SELALU seluruh kuesioner yang sedang aktif bagi alumni
- * tersebut, bukan hanya kuesioner yang kebetulan sedang dibuka petugas.
- * Alasannya ada di ResponseRepository::reopenForAlumni().
+ * LINGKUP — berubah, baca ini sebelum mengubah lagi.
+ *
+ * Dulu lingkupnya SELALU seluruh kuesioner aktif alumni, sekalipun petugas
+ * hanya menunjuk satu. Itu bukan desain yang diinginkan, melainkan penambal
+ * atas dua keterbatasan yang kini sudah hilang:
+ *
+ *   - `has_responded` dulu bernilai "ada salah satu yang sudah dikirim",
+ *     sehingga membuka sebagian tidak ada gunanya — alumni tetap terkunci di
+ *     layar "Anda Sudah Mengisi". Sekarang statusnya per kuesioner.
+ *   - Formulir dulu menampilkan seluruh kuesioner aktif sekaligus dan
+ *     mengirimkannya sekaligus, sehingga kuesioner yang masih terkirim akan
+ *     tampil kosong lalu tertimpa. Sekarang bagian yang sudah selesai
+ *     disembunyikan, dan submit hanya menyentuh kuesioner yang terbuka.
+ *
+ * Karena itu lingkupnya kini mengikuti apa yang diminta pemanggil, dan hanya
+ * jatuh ke "seluruh kuesioner aktif" bila pemanggil memang tidak menyebut
+ * satu pun. Permintaan tetap disaring terhadap kuesioner yang benar-benar
+ * aktif bagi alumni tersebut — id di luar itu diabaikan, bukan dipercaya.
  */
 class ResponseReopenService
 {
@@ -29,15 +44,21 @@ class ResponseReopenService
     ) {}
 
     /**
+     * @param  array<int>|null $questionnaireIds kuesioner yang diminta dibuka;
+     *                         null berarti seluruh kuesioner aktif alumni
      * @return int jumlah pengisian yang dibuka kembali; 0 berarti tidak ada
-     *             yang berstatus Finish (mis. sudah dibuka sebelumnya)
+     *             yang berstatus Finish (mis. sudah dibuka sebelumnya) atau
+     *             yang diminta bukan kuesioner aktif alumni ini
      */
-    public function reopen(int $alumniId): int
+    public function reopen(int $alumniId, ?array $questionnaireIds = null): int
     {
-        return $this->responseRepo->reopenForAlumni(
-            $alumniId,
-            $this->activeQuestionnaireIds($alumniId),
-        );
+        $active = $this->activeQuestionnaireIds($alumniId);
+
+        $scope = $questionnaireIds === null
+            ? $active
+            : array_values(array_intersect($active, array_map('intval', $questionnaireIds)));
+
+        return $this->responseRepo->reopenForAlumni($alumniId, $scope);
     }
 
     /**

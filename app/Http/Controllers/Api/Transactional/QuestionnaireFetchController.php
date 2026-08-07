@@ -17,7 +17,20 @@ class QuestionnaireFetchController extends Controller
      * GET /api/tracer-study/forms?kode_prodi=TI3&graduation_year=2024&nim=xxx
      *
      * Mengambil daftar kuesioner aktif (Pusat + Jurusan terkait).
-     * Jika nim diberikan, tambahkan flag has_responded.
+     * Jika nim diberikan, tambahkan status pengisian per kuesioner.
+     *
+     * Dua field dikirim, dan bedanya penting:
+     *
+     *   - `responded_questionnaire_ids` — kuesioner yang sudah dikirim.
+     *     Inilah yang dipakai FE untuk menyembunyikan bagian yang sudah
+     *     selesai dan menyisakan yang belum.
+     *   - `has_responded` — bernilai true hanya kalau SELURUH kuesioner
+     *     aktif sudah dikirim. Ini yang boleh menutup formulir.
+     *
+     * Sebelumnya `has_responded` berarti "ada salah satu yang sudah dikirim",
+     * sehingga kuesioner prodi yang diterbitkan setelah alumni mengirim
+     * kuesioner umum tidak pernah bisa diisi. Lihat catatan panjang di
+     * QuestionnaireFetchService::respondedQuestionnaireIds().
      */
     public function getActiveForms(Request $request): JsonResponse
     {
@@ -26,23 +39,25 @@ class QuestionnaireFetchController extends Controller
 
         if (empty($data)) {
             return response()->json([
-                'success'       => true,
-                'data'          => [],
-                'has_responded' => false,
-                'message'       => 'Tidak ada kuesioner aktif.',
+                'success'                     => true,
+                'data'                        => [],
+                'has_responded'               => false,
+                'responded_questionnaire_ids' => [],
+                'message'                     => 'Tidak ada kuesioner aktif.',
             ]);
         }
 
-        $hasResponded = false;
+        $respondedIds = [];
         $nim = $request->query('nim');
         if ($nim) {
-            $hasResponded = $this->service->hasAlumniResponded($nim, $data);
+            $respondedIds = $this->service->respondedQuestionnaireIds($nim, $data);
         }
 
         return response()->json([
-            'success'       => true,
-            'data'          => $data,
-            'has_responded' => $hasResponded,
+            'success'                     => true,
+            'data'                        => $data,
+            'has_responded'               => count($respondedIds) === count($data),
+            'responded_questionnaire_ids' => $respondedIds,
         ]);
     }
 }
