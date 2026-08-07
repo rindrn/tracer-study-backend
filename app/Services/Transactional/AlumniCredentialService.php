@@ -91,7 +91,7 @@ class AlumniCredentialService
      * Token Sanctum yang masih aktif ikut dicabut — kata sandi lama sudah tidak
      * berlaku, jadi sesi yang lahir darinya juga tidak boleh terus hidup.
      *
-     * @param  array{graduation_year?: int|null, program_id?: int|null, only_without_credentials?: bool, limit?: int|null, after_nim?: string|null} $filters
+     * @param  array{graduation_year?: int|null, jurusan?: string|null, program_id?: int|null, only_without_credentials?: bool, limit?: int|null, after_nim?: string|null} $filters
      * @return array{issued: Collection<int, array{nim: string, name: string, email: string, password: string}>, remaining: int, last_nim: ?string}
      */
     public function issue(array $filters): array
@@ -187,6 +187,22 @@ class AlumniCredentialService
 
         if (!empty($filters['graduation_year'])) {
             $query->where('graduation_year', (int) $filters['graduation_year']);
+        }
+
+        // Jurusan disaring lewat subkueri ke `programs`, bukan JOIN. Alasannya
+        // praktis: findTargets() memilih kolom tanpa awalan nama tabel, dan
+        // sebuah JOIN akan membuat `id` maupun `name` menjadi ambigu di
+        // PostgreSQL. Subkueri menjaga kueri utamanya tetap satu tabel.
+        //
+        // Penyaring ini INDEPENDEN dari program_id. Memilih jurusan saja
+        // berarti seluruh program studi di bawahnya; memilih keduanya berarti
+        // irisannya — dan karena tiap program studi hanya bernaung di satu
+        // jurusan, irisan itu sama dengan program studi tersebut.
+        if (!empty($filters['jurusan'])) {
+            $jurusan = (string) $filters['jurusan'];
+            $query->whereIn('program_id', function ($sub) use ($jurusan) {
+                $sub->from('programs')->select('id')->where('jurusan', $jurusan);
+            });
         }
 
         if (!empty($filters['program_id'])) {

@@ -57,6 +57,10 @@ class AlumniCredentialController extends Controller
     {
         $validated = $request->validate([
             'graduation_year'          => ['nullable', 'integer', 'min:1900', 'max:2200'],
+            // Keduanya opsional dan saling bebas: jurusan saja berarti seluruh
+            // program studi di bawahnya, keduanya berarti irisannya, tidak
+            // satu pun berarti seluruh alumni.
+            'jurusan'                  => ['nullable', 'string', 'max:100'],
             'program_id'               => ['nullable', 'integer', 'exists:oltp.programs,id'],
             'only_without_credentials' => ['nullable', 'boolean'],
             'limit'                    => ['nullable', 'integer', 'min:1', 'max:' . AlumniCredentialService::MAX_BATCH],
