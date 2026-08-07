@@ -30,8 +30,15 @@ class WirausahaRepository extends BaseAnalyticalRepository
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
             ),
-            // hanya alumni wirausaha (status_alumni_sk = 3)
-            [['member' => 'FactTracerStudy.status_alumni_sk', 'operator' => 'equals', 'values' => ['3']]],
+            // hanya alumni wirausaha. status_alumni_sk BUKAN literal stabil --
+            // dim_status_alumni Type1 membuat surrogate key baru per
+            // questionnaire_id (mis. sk 3, 8, 13 sama-sama label "Wiraswasta"
+            // tapi dari questionnaire berbeda), jadi equals ke satu angka
+            // diam-diam membuang alumni yang jawab lewat questionnaire lain
+            // -- persis kasus yang membuat pie & bar Wirausaha kehilangan
+            // sebagian data padahal getKotaData() (di bawah) sudah benar
+            // pakai pola contains ini.
+            [['member' => 'DimStatusAlumni.id_status_alumni', 'operator' => 'contains', 'values' => [':f8:3']]],
         );
 
         return $this->cube->load([
@@ -115,8 +122,9 @@ class WirausahaRepository extends BaseAnalyticalRepository
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
             ),
-            // hanya alumni wirausaha
-            [['member' => 'FactTracerStudy.status_alumni_sk', 'operator' => 'equals', 'values' => ['3']]],
+            // hanya alumni wirausaha -- lihat catatan di getBarData() soal
+            // kenapa contains ':f8:3' dipakai, bukan equals ke status_alumni_sk.
+            [['member' => 'DimStatusAlumni.id_status_alumni', 'operator' => 'contains', 'values' => [':f8:3']]],
         );
 
         return $this->cube->load([
@@ -197,7 +205,8 @@ class WirausahaRepository extends BaseAnalyticalRepository
         int     $perPage        = 15,
     ): array {
         $extra = [
-            ['member' => 'FactTracerStudy.status_alumni_sk', 'operator' => 'equals', 'values' => ['3']],
+            // lihat catatan di getBarData() soal contains ':f8:3' vs equals status_alumni_sk.
+            ['member' => 'DimStatusAlumni.id_status_alumni', 'operator' => 'contains', 'values' => [':f8:3']],
         ];
 
         // Filter jabatan hanya ditambahkan kalau tidak null
@@ -293,11 +302,12 @@ class WirausahaRepository extends BaseAnalyticalRepository
             ];
         }
 
-        // Hanya alumni wirausaha
+        // Hanya alumni wirausaha -- lihat catatan di getBarData() soal
+        // contains ':f8:3' vs equals status_alumni_sk.
         $extra[] = [
-            'member'   => 'FactTracerStudy.status_alumni_sk',
-            'operator' => 'equals',
-            'values'   => ['3'],
+            'member'   => 'DimStatusAlumni.id_status_alumni',
+            'operator' => 'contains',
+            'values'   => [':f8:3'],
         ];
 
         $filters = $this->buildGlobalFilters(
