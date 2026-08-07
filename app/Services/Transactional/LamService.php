@@ -35,13 +35,17 @@ class LamService
 
                     if (in_array('versions', $include)) {
                         $data['versions'] = collect($lam->versions ?? [])
-                            ->map(fn($v) => [
-                                'id'           => $v->id,
-                                'year'         => $v->year,
-                                'year_end'     => $v->year_end ?? null,
-                                'version_name' => $v->version_name,
-                                'is_active'    => (bool) $v->is_active,
-                            ])->toArray();
+                            ->map(function ($v) {
+                                $vObj = (object) $v;
+                                return [
+                                    'id'           => $vObj->id,
+                                    'year'         => $vObj->year,
+                                    'year_end'     => $vObj->year_end ?? null,
+                                    'version_name' => $vObj->version_name ?? null,
+                                    'is_active'    => (bool) ($vObj->is_active ?? false),
+                                    'thresholds'   => $vObj->thresholds ?? [],
+                                ];
+                            })->toArray();
                     }
 
                     if (in_array('programs', $include)) {

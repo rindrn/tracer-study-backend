@@ -173,7 +173,24 @@ class QuestionnaireSeeder extends Seeder
 
         $insertQuestion(1, 'f5b', 'Apa nama perusahaan/kantor tempat Anda bekerja?', 'short_text', false, ['show_if' => ['f8' => [1]]]);
 
-        $insertQuestion(1, 'f5c', 'Bila berwiraswasta, apa posisi/jabatan Anda saat ini?', 'number', false, ['show_if' => ['f8' => [3]]]);
+        // single_choice, bukan number -- lihat migration
+        // 2026_06_21_000001_fix_f5c_jabatan_wirausaha_to_choice.php. Kode angka
+        // (1-4) mengikuti POSITIONS di migration itu; jangan diubah tanpa
+        // menyesuaikan migration-nya juga, karena keduanya harus tetap sinkron.
+        $insertQuestion(1, 'f5c', 'Bila berwiraswasta, apa posisi/jabatan Anda saat ini?', 'single_choice', false, [
+            'show_if'      => ['f8' => [3]],
+            'option_hints' => [
+                '1' => 'Pendiri utama usaha',
+                '2' => 'Salah satu pendiri bersama rekan lain',
+                '3' => 'Pekerja atau karyawan di usaha tersebut',
+                '4' => 'Pekerja paruh waktu atau lepas',
+            ],
+        ], [
+            ['1', 'Founder'],
+            ['2', 'Co-Founder'],
+            ['3', 'Staff'],
+            ['4', 'Freelance / Kerja Lepas'],
+        ]);
 
         $insertQuestion(1, 'f5d', 'Apa tingkat tempat kerja Anda?', 'single_choice', false, ['show_if' => ['f8' => [1, 3]]], [
             ['1', 'Lokal/Wilayah/Wiraswasta tidak berbadan hukum'],

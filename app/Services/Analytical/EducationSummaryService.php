@@ -112,22 +112,26 @@ class EducationSummaryService
 
         if ($joined->isEmpty()) {
             return [
-                'skor_kompetensi' => ['value' => 0.0, 'hint' => 'Avg Likert'],
+                'skor_kompetensi' => ['label' => '-', 'value' => 0.0, 'hint' => '-'],
                 'gap_terbesar'    => ['label' => '-', 'gap' => 0.0, 'hint' => '-'],
             ];
         }
 
-        // Weighted average skor kompetensi (Kompetensi_A saja)
-        $totalCount        = $joined->sum('count');
-        $avgSkorKompetensi = $totalCount > 0
-            ? round($joined->sum(fn($r) => $r['skor_lulus'] * $r['count']) / $totalCount, 2)
-            : 0.0;
+        // FR-047: kompetensi dengan SKOR RATA-RATA TERTINGGI saat lulus —
+        // bukan rata-rata dari semua kompetensi (itu tidak menunjukkan
+        // kompetensi mana yang unggul, cuma angka gabungan tanpa makna).
+        $maxSkorRow      = $joined->sortByDesc('skor_lulus')->first();
+        $skorKompetensi  = $maxSkorRow['skor_lulus'] ?? 0.0;
 
         $maxGapRow = $joined->filter(fn($r) => $r['gap'] !== null)->sortByDesc('gap')->first();
         $gapValue  = $maxGapRow['gap'] ?? 0.0;
 
         return [
-            'skor_kompetensi' => ['value' => $avgSkorKompetensi, 'hint' => 'Avg Likert'],
+            'skor_kompetensi' => [
+                'label' => $maxSkorRow['label'] ?? '-',
+                'value' => round($skorKompetensi, 2),
+                'hint'  => 'Skor ' . number_format($skorKompetensi, 1, ',', '.'),
+            ],
             'gap_terbesar'    => [
                 'label' => $maxGapRow['label'] ?? '-',
                 'gap'   => $gapValue,

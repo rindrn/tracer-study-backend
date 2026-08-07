@@ -435,6 +435,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('distribusi', [MasaTungguController::class, 'distribusi']);
         Route::get('drill-down', [MasaTungguController::class, 'drillDown']);
         Route::get('bandingkan', [MasaTungguController::class, 'bandingkan']);
+        Route::get('pola-pencarian', [MasaTungguController::class, 'polaPencarianKerja']);
+        Route::get('prediksi', [MasaTungguController::class, 'prediksi']);
     });
 
     Route::prefix('dashboard/kesesuaian')->group(function () {

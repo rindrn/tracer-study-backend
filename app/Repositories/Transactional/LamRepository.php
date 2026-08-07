@@ -44,30 +44,24 @@ class LamRepository
             }
         }
 
-        // --- include=thresholds (ambil versi aktif per LAM) ---
+        // --- include=thresholds (ambil threshold per version dan per active LAM) ---
         $thresholdsMap = [];
+        $versionThresholdsMap = [];
         if (in_array('thresholds', $include)) {
-            // Ambil lam_version aktif terbaru per lam_id
-            $activeVersions = DB::connection('oltp')
+            $allVersions = DB::connection('oltp')
                 ->table('lam_versions')
                 ->whereIn('lam_id', $lamIds)
-                ->where('is_active', true)
-                ->orderByDesc('year')
-                ->get()
-                ->unique('lam_id');   // 1 versi aktif per LAM (terbaru)
+                ->get();
 
-            $versionIds = $activeVersions->pluck('id')->toArray();
+            $allVersionIds = $allVersions->pluck('id')->toArray();
+            $versionLamMap = $allVersions->pluck('lam_id', 'id')->toArray();
 
-            // Map version_id → lam_id
-            $versionLamMap = $activeVersions->pluck('lam_id', 'id')->toArray();
+            $activeVersionLamMap = $allVersions->where('is_active', true)
+                ->sortByDesc('year')
+                ->unique('lam_id')
+                ->pluck('id', 'lam_id')
+                ->toArray();
 
-            // Query ini dulu memakai vw_thresholds_complete, tapi view itu TIDAK
-            // punya kolom param_value, dynamic_param_unit, maupun
-            // is_system_calculated. Akibatnya seluruh indikator dinamis tampil
-            // tanpa nilai parameter di tabel Kelola Threshold (kolomnya "…"),
-            // padahal grafik benar — grafik lewat ThresholdRepository yang
-            // memang JOIN threshold_configs. Join di bawah menyamakan bentuk
-            // baris dengan jalur itu, jadi kedua jalur baca sumber yang sama.
             $thresholds = DB::connection('oltp')
                 ->table('thresholds as t')
                 ->join('threshold_indicators as ti', 'ti.id', '=', 't.indicator_id')
@@ -75,7 +69,7 @@ class LamRepository
                     $join->on('tc.lam_version_id', '=', 't.lam_version_id')
                          ->on('tc.indicator_id', '=', 't.indicator_id');
                 })
-                ->whereIn('t.lam_version_id', $versionIds)
+                ->whereIn('t.lam_version_id', $allVersionIds)
                 ->select(
                     't.id as threshold_id',
                     't.value as threshold_value',
@@ -94,51 +88,62 @@ class LamRepository
                 ->orderBy('t.level')
                 ->get();
 
-            // Group per lam_id, lalu per indicator_id
             foreach ($thresholds as $t) {
-                $lamId = $versionLamMap[$t->lam_version_id] ?? null;
-                if (! $lamId) continue;
-                $thresholdsMap[$lamId][$t->indicator_id][$t->threshold_level] = $t;
+                $vId   = $t->lam_version_id;
+                $lamId = $versionLamMap[$vId] ?? null;
+
+                $versionThresholdsMap[$vId][$t->indicator_id][$t->threshold_level] = $t;
+
+                if ($lamId && isset($activeVersionLamMap[$lamId]) && $activeVersionLamMap[$lamId] === $vId) {
+                    $thresholdsMap[$lamId][$t->indicator_id][$t->threshold_level] = $t;
+                }
             }
         }
 
+        $formatThresholds = function (array $rawIndicators) {
+            return collect($rawIndicators)->map(function ($levels, $indicatorId) {
+                $first      = collect($levels)->first();
+                $paramValue = $first->param_value ?? null;
+
+                $name = $first->indicator_name;
+                if ($paramValue !== null && str_contains($name, '{value}')) {
+                    $formatted = rtrim(rtrim(number_format((float) $paramValue, 2, '.', ''), '0'), '.');
+                    $name = str_replace('{value}', $formatted, $name);
+                }
+
+                return [
+                    'indicator_id'         => (int) $indicatorId,
+                    'indicator_key'        => $first->indicator_key,
+                    'indicator_name'       => $name,
+                    'unit'                 => $first->indicator_unit,
+                    'operator'             => $first->indicator_operator,
+                    'dynamic_param'        => $first->dynamic_param_unit
+                        ? ['value' => $paramValue !== null ? (float) $paramValue : null, 'unit' => $first->dynamic_param_unit]
+                        : null,
+                    'is_system_calculated' => (bool) $first->is_system_calculated,
+                    'baik'   => isset($levels['baik'])   ? ['threshold_id' => $levels['baik']->threshold_id,   'value' => (float) $levels['baik']->threshold_value]   : null,
+                    'unggul' => isset($levels['unggul']) ? ['threshold_id' => $levels['unggul']->threshold_id, 'value' => (float) $levels['unggul']->threshold_value] : null,
+                ];
+            })->values()->toArray();
+        };
+
         // Attach ke setiap LAM
-        return $lams->map(function ($lam) use ($include, $versionsMap, $programsMap, $thresholdsMap) {
+        return $lams->map(function ($lam) use ($include, $versionsMap, $programsMap, $thresholdsMap, $versionThresholdsMap, $formatThresholds) {
             if (in_array('versions', $include)) {
-                $lam->versions = $versionsMap[$lam->id] ?? [];
+                $versions = $versionsMap[$lam->id] ?? [];
+                if (in_array('thresholds', $include)) {
+                    foreach ($versions as $v) {
+                        $v->thresholds = $formatThresholds($versionThresholdsMap[$v->id] ?? []);
+                    }
+                }
+                $lam->versions = $versions;
             }
             if (in_array('programs', $include)) {
                 $lam->programs = $programsMap[$lam->id] ?? [];
             }
             if (in_array('thresholds', $include)) {
                 $raw = $thresholdsMap[$lam->id] ?? [];
-
-                // Format: grouped per indicator
-                $lam->thresholds = collect($raw)->map(function ($levels, $indicatorId) {
-                    $first      = collect($levels)->first();
-                    $paramValue = $first->param_value ?? null;
-
-                    // Sama seperti ThresholdService::interpolateName().
-                    $name = $first->indicator_name;
-                    if ($paramValue !== null && str_contains($name, '{value}')) {
-                        $formatted = rtrim(rtrim(number_format((float) $paramValue, 2, '.', ''), '0'), '.');
-                        $name = str_replace('{value}', $formatted, $name);
-                    }
-
-                    return [
-                        'indicator_id'          => (int) $indicatorId,
-                        'indicator_key'         => $first->indicator_key,
-                        'indicator_name'        => $name,
-                        'unit'                  => $first->indicator_unit,
-                        'operator'              => $first->indicator_operator,
-                        'dynamic_param'         => $first->dynamic_param_unit
-                            ? ['value' => $paramValue !== null ? (float) $paramValue : null, 'unit' => $first->dynamic_param_unit]
-                            : null,
-                        'is_system_calculated'  => (bool) $first->is_system_calculated,
-                        'baik'   => isset($levels['baik'])   ? ['threshold_id' => $levels['baik']->threshold_id,   'value' => (float) $levels['baik']->threshold_value]   : null,
-                        'unggul' => isset($levels['unggul']) ? ['threshold_id' => $levels['unggul']->threshold_id, 'value' => (float) $levels['unggul']->threshold_value] : null,
-                    ];
-                })->values()->toArray();
+                $lam->thresholds = $formatThresholds($raw);
             }
             return $lam;
         });

@@ -110,6 +110,45 @@ class MasaTungguController extends Controller
         }
     }
 
+    // FR-026: pola pencarian kerja (bulan sebelum lulus mulai cari kerja + durasi)
+    public function polaPencarianKerja(Request $request): JsonResponse
+    {
+        $request->validate([
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jurusan'         => 'nullable|string|max:100',
+            'nama_prodi'      => 'nullable|string|max:100',
+            'tahun_lulus'     => 'nullable|string|max:5',
+            'minggu_snapshot' => 'nullable|string|max:10',
+        ]);
+        $p = $this->scopedParams($request);
+
+        try {
+            $dto = $this->service->getPolaPencarianKerja($p);
+            return response()->json(['success' => true, 'data' => $dto->toArray()]);
+        } catch (\RuntimeException $e) {
+            return $this->serviceError($e);
+        }
+    }
+
+    // FR-027: prediksi tren median masa tunggu periode berikutnya (regresi linier)
+    public function prediksi(Request $request): JsonResponse
+    {
+        $request->validate([
+            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jurusan'         => 'nullable|string|max:100',
+            'nama_prodi'      => 'nullable|string|max:100',
+            'minggu_snapshot' => 'nullable|string|max:10',
+        ]);
+        $p = $this->scopedParams($request);
+
+        try {
+            $dto = $this->service->getPrediksi($p);
+            return response()->json(['success' => true, 'data' => $dto->toArray()]);
+        } catch (\RuntimeException $e) {
+            return $this->serviceError($e);
+        }
+    }
+
     private function serviceError(\RuntimeException $e): JsonResponse
     {
         return response()->json([

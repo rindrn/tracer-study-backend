@@ -46,6 +46,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
                 'FactTracerStudy.count_alumni',
                 'FactTracerStudy.count_terserap',
                 'FactTracerStudy.avg_masa_tunggu_bekerja',
+                'FactTracerStudy.median_masa_tunggu_bekerja',
             ],
             'dimensions' => $dims,
             'filters' => $filters,
@@ -58,17 +59,158 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         $cepatByGroup = $this->cepatCountsByGroup($dims, $filters, $batasCepatBulan);
 
         return $raw->map(fn($r) => [
-            'nama_prodi'              => $r['DimProdi.nama_prodi']                    ?? '',
-            'jenjang'                 => $r['DimProdi.jenjang']                       ?? '',
-            'jurusan'                 => $r['DimProdi.jurusan']                       ?? '',
-            'tahun_lulus'             => $r['DimAlumni.tahun_lulus']                  ?? '',
-            'count_alumni'            => (int)   ($r['FactTracerStudy.count_alumni']            ?? 0),
-            'count_terserap'          => (int)   ($r['FactTracerStudy.count_terserap']          ?? 0),
-            'count_masa_tunggu_cepat' => $cepatByGroup->get(
+            'nama_prodi'                 => $r['DimProdi.nama_prodi']                       ?? '',
+            'jenjang'                    => $r['DimProdi.jenjang']                          ?? '',
+            'jurusan'                    => $r['DimProdi.jurusan']                          ?? '',
+            'tahun_lulus'                => $r['DimAlumni.tahun_lulus']                     ?? '',
+            'count_alumni'               => (int)   ($r['FactTracerStudy.count_alumni']               ?? 0),
+            'count_terserap'             => (int)   ($r['FactTracerStudy.count_terserap']             ?? 0),
+            'count_masa_tunggu_cepat'    => $cepatByGroup->get(
                 self::rowKey($dims, $r), 0
             ),
-            'avg_masa_tunggu_bekerja' => (float) ($r['FactTracerStudy.avg_masa_tunggu_bekerja'] ?? 0),
+            'avg_masa_tunggu_bekerja'    => (float) ($r['FactTracerStudy.avg_masa_tunggu_bekerja']    ?? 0),
+            'median_masa_tunggu_bekerja' => (float) ($r['FactTracerStudy.median_masa_tunggu_bekerja'] ?? 0),
         ]);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  FR-026 — Pola pencarian kerja: rata-rata bulan sebelum lulus mulai
+    //  mencari kerja + rata-rata masa tunggu (durasi), per prodi × tahun.
+    //  Konteks penjelas pola masa tunggu — BUKAN chart besar berdiri sendiri.
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * avg_bulan_sebelum_lulus (f302) & avg_bulan_sesudah_lulus (f303): kedua
+     * sisi sekarang data ASLI — f303 dipetakan ke role bulan_sesudah_lulus
+     * via migration `2026_08_06_000001_map_f303_to_bulan_sesudah_lulus`,
+     * dan AlumniFactBuilderService sudah diubah untuk resolve keduanya
+     * (dulu bulan_sesudah_lulus hardcode null). Alumni hanya mengisi SATU
+     * dari f302/f303 (show_if f301), jadi count_mulai_sebelum/count_mulai_sesudah
+     * di sini saling eksklusif per alumni.
+     *
+     * @return Collection<array{nama_prodi, jenjang, jurusan, tahun_lulus,
+     *                          count_alumni, avg_bulan_sebelum_lulus,
+     *                          avg_bulan_sesudah_lulus, count_mulai_sebelum,
+     *                          count_mulai_sesudah, avg_masa_tunggu_bekerja}>
+     */
+    public function getPolaPencarianKerja(
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $namaProdi      = null,
+        ?string $tahunLulus     = null,
+        ?string $mingguSnapshot = null,
+    ): Collection {
+        $filters = $this->buildGlobalFilters(
+            jenjang:        $jenjang,
+            jurusan:        $jurusan,
+            namaProdi:      $namaProdi,
+            tahunLulus:     $tahunLulus,
+            mingguSnapshot: $mingguSnapshot,
+            extra: [[
+                // Hanya alumni bekerja di perusahaan — sejalan dengan denominator
+                // masa tunggu di getBarData().
+                'member'   => 'FactTracerStudy.perusahaan_sk',
+                'operator' => 'set',
+            ]],
+        );
+
+        $dims = ['DimProdi.jenjang', 'DimProdi.jurusan', 'DimProdi.nama_prodi', 'DimAlumni.tahun_lulus'];
+
+        $raw = $this->cube->load([
+            'measures' => [
+                'FactTracerStudy.count_alumni',
+                'FactTracerStudy.avg_bulan_sebelum_lulus',
+                'FactTracerStudy.avg_bulan_sesudah_lulus',
+                'FactTracerStudy.avg_masa_tunggu_bekerja',
+            ],
+            'dimensions' => $dims,
+            'filters'    => $filters,
+            'order'      => [
+                ['DimAlumni.tahun_lulus', 'asc'],
+                ['DimProdi.nama_prodi',   'asc'],
+            ],
+        ]);
+
+        $sebelumCounts = $this->countByGroupWhereSet($dims, $filters, 'FactTracerStudy.bulan_sebelum_lulus');
+        $sesudahCounts = $this->countByGroupWhereSet($dims, $filters, 'FactTracerStudy.bulan_sesudah_lulus');
+
+        return $raw->map(function ($r) use ($dims, $sebelumCounts, $sesudahCounts) {
+            $key = self::rowKey($dims, $r);
+
+            return [
+                'nama_prodi'              => $r['DimProdi.nama_prodi']  ?? '',
+                'jenjang'                 => $r['DimProdi.jenjang']     ?? '',
+                'jurusan'                 => $r['DimProdi.jurusan']     ?? '',
+                'tahun_lulus'             => $r['DimAlumni.tahun_lulus'] ?? '',
+                'count_alumni'            => (int)   ($r['FactTracerStudy.count_alumni']            ?? 0),
+                'avg_bulan_sebelum_lulus' => (float) ($r['FactTracerStudy.avg_bulan_sebelum_lulus']  ?? 0),
+                'avg_bulan_sesudah_lulus' => (float) ($r['FactTracerStudy.avg_bulan_sesudah_lulus']  ?? 0),
+                'count_mulai_sebelum'     => $sebelumCounts->get($key, 0),
+                'count_mulai_sesudah'     => $sesudahCounts->get($key, 0),
+                'avg_masa_tunggu_bekerja' => (float) ($r['FactTracerStudy.avg_masa_tunggu_bekerja']  ?? 0),
+            ];
+        });
+    }
+
+    /**
+     * Jumlah alumni per grup dimensi yang punya nilai pada $member (operator
+     * 'set') — dipakai untuk menghitung berapa alumni mulai cari kerja
+     * sebelum vs sesudah lulus (mengisi salah satu dari f302/f303).
+     */
+    private function countByGroupWhereSet(array $dimensions, array $baseFilters, string $member): Collection
+    {
+        $filters = array_merge($baseFilters, [
+            ['member' => $member, 'operator' => 'set'],
+        ]);
+
+        return $this->cube->load([
+            'measures'   => ['FactTracerStudy.count_alumni'],
+            'dimensions' => $dimensions,
+            'filters'    => $filters,
+        ])->keyBy(fn ($r) => self::rowKey($dimensions, $r))
+          ->map(fn ($r) => (int) ($r['FactTracerStudy.count_alumni'] ?? 0));
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  FR-027 — Tren median masa tunggu per tahun (basis prediksi)
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Median masa tunggu per tahun_lulus (semua prodi digabung, atau
+     * ter-filter jenjang/jurusan/prodi) — dipakai sebagai data historis
+     * untuk proyeksi tren periode berikutnya (regresi linier sederhana,
+     * lihat MasaTungguService::getPrediksi()).
+     *
+     * @return Collection<array{tahun_lulus:string, count_alumni:int, median_masa_tunggu_bekerja:float}>
+     */
+    public function getMedianTrendPerTahun(
+        ?string $jenjang        = null,
+        ?string $jurusan        = null,
+        ?string $namaProdi      = null,
+        ?string $mingguSnapshot = null,
+    ): Collection {
+        $filters = $this->buildGlobalFilters(
+            jenjang:        $jenjang,
+            jurusan:        $jurusan,
+            namaProdi:      $namaProdi,
+            mingguSnapshot: $mingguSnapshot,
+            extra: [[
+                'member'   => 'FactTracerStudy.perusahaan_sk',
+                'operator' => 'set',
+            ]],
+        );
+
+        return $this->cube->load([
+            'measures'   => ['FactTracerStudy.count_alumni', 'FactTracerStudy.median_masa_tunggu_bekerja'],
+            'dimensions' => ['DimAlumni.tahun_lulus'],
+            'filters'    => $filters,
+            'order'      => [['DimAlumni.tahun_lulus', 'asc']],
+        ])->map(fn($r) => [
+            'tahun_lulus'                => $r['DimAlumni.tahun_lulus'] ?? '',
+            'count_alumni'               => (int)   ($r['FactTracerStudy.count_alumni']               ?? 0),
+            'median_masa_tunggu_bekerja' => (float) ($r['FactTracerStudy.median_masa_tunggu_bekerja'] ?? 0),
+        ])->filter(fn($r) => $r['tahun_lulus'] !== '' && $r['count_alumni'] > 0)
+          ->values();
     }
 
     // ──────────────────────────────────────────────────────────────

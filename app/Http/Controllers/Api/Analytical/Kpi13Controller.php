@@ -48,7 +48,9 @@ class Kpi13Controller extends Controller
      *         "wirausaha": 6.67,
      *         "masa_tunggu": 76.21,
      *         "kesesuaian": 82.14,
-     *         "raw": { "bekerja": 103, "cepat": 78, "sesuai": 85, "wirausaha": 8 }
+     *         "pendapatan": 54.32,
+     *         "threshold_status": { "keterserapan": "baik", "wirausaha": "kurang", "masa_tunggu": "unggul", "kesesuaian": "baik", "pendapatan": null },
+     *         "raw": { "bekerja": 103, "cepat": 78, "sesuai": 85, "wirausaha": 8, "avg_gaji": 4500000, "ambang_ump_multiplier": 1.2 }
      *       }
      *     ]
      *   }
@@ -105,7 +107,7 @@ class Kpi13Controller extends Controller
 
     private function toCsv(array $rows): \Illuminate\Http\Response
     {
-        $headers = ['Program Studi', 'Jurusan', 'Total Alumni', 'Keterserapan (%)', 'Wirausaha (%)', 'Masa Tunggu ≤6bln (%)', 'Kesesuaian Bidang (%)'];
+        $headers = ['Program Studi', 'Jurusan', 'Total Alumni', 'Keterserapan (%)', 'Wirausaha (%)', 'Masa Tunggu ≤6bln (%)', 'Kesesuaian Bidang (%)', 'Pendapatan ≥1,2x UMP (%)'];
         $lines   = [implode(',', $headers)];
 
         foreach ($rows as $r) {
@@ -117,6 +119,7 @@ class Kpi13Controller extends Controller
                 $r['wirausaha'],
                 $r['masa_tunggu'],
                 $r['kesesuaian'],
+                $r['pendapatan'],
             ]);
         }
 
@@ -139,11 +142,11 @@ class Kpi13Controller extends Controller
         $sheet       = $spreadsheet->getActiveSheet()->setTitle('KPI 13');
 
         $sheet->fromArray(
-            [['Program Studi', 'Jurusan', 'Total Alumni', 'Keterserapan (%)', 'Wirausaha (%)', 'Masa Tunggu ≤6bln (%)', 'Kesesuaian Bidang (%)']],
+            [['Program Studi', 'Jurusan', 'Total Alumni', 'Keterserapan (%)', 'Wirausaha (%)', 'Masa Tunggu ≤6bln (%)', 'Kesesuaian Bidang (%)', 'Pendapatan ≥1,2x UMP (%)']],
             null, 'A1'
         );
         $sheet->fromArray(
-            array_map(fn($r) => [$r['prodi'], $r['jurusan'], $r['total_alumni'], $r['keterserapan'], $r['wirausaha'], $r['masa_tunggu'], $r['kesesuaian']], $rows),
+            array_map(fn($r) => [$r['prodi'], $r['jurusan'], $r['total_alumni'], $r['keterserapan'], $r['wirausaha'], $r['masa_tunggu'], $r['kesesuaian'], $r['pendapatan']], $rows),
             null, 'A2'
         );
 

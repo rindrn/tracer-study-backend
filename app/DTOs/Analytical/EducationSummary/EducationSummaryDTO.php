@@ -10,7 +10,7 @@ namespace App\DTOs\Analytical\EducationSummary;
  * {
  *   "filters": {},
  *   "cards": {
- *     "skor_kompetensi":  { "value": 4.1, "hint": "Avg Likert" },
+ *     "skor_kompetensi":  { "label": "Berpikir Kritis", "value": 4.6, "hint": "Skor 4,6" },
  *     "gap_terbesar":     { "label": "Bahasa Inggris", "gap": -1.1, "hint": "-1,1 poin" },
  *     "metode_terbaik":   { "label": "Magang/PKL", "skor": 4.5, "hint": "Skor 4,5" },
  *     "avg_persepsi":     { "value": 4.0, "hint": "Semua metode" },
@@ -20,7 +20,8 @@ namespace App\DTOs\Analytical\EducationSummary;
  * }
  *
  * Mapping ke FE SummaryCardItem (EducationPageContent.tsx):
- *   skor_kompetensi.value   → "Skor Kompetensi"   value (FE: "4,1")
+ *   skor_kompetensi.label   → "Skor Kompetensi"   value (FE: "Berpikir Kritis")
+ *   skor_kompetensi.hint    → "Skor Kompetensi"   hint  (FE: "Skor 4,6")
  *   gap_terbesar.label      → "Gap Terbesar"      value (FE: "B. Inggris")
  *   gap_terbesar.hint       → "Gap Terbesar"      hint  (FE: "-1,1 poin")
  *   metode_terbaik.label    → "Metode Terbaik"    value (FE: "Magang")
