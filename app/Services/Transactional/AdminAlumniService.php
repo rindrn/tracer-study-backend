@@ -5,6 +5,7 @@ namespace App\Services\Transactional;
 use App\Exceptions\BusinessException;
 use App\Models\Transactional\User;
 use App\Repositories\Transactional\AlumniProfileRepository;
+use App\Support\PhoneNumber;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
@@ -103,6 +104,8 @@ class AdminAlumniService
             $data['program_id'] = $user->program_id;
         }
 
+        $data = $this->normalizePhone($data);
+
         return $this->alumniRepo->create($data);
     }
 
@@ -125,7 +128,31 @@ class AdminAlumniService
             unset($data['program_id']);
         }
 
+        $data = $this->normalizePhone($data);
+
         $this->alumniRepo->updateById($id, $data);
+    }
+
+    /**
+     * Bakukan nomor telepon sebelum disimpan (DATA-09).
+     *
+     * Jalur impor massal dan jalur pengisian oleh alumni sudah lama
+     * melakukannya, sedangkan jalur ini tidak — sehingga staf yang mengetik
+     * `08123456789` atau `0812-3456-789` di borang Tambah Alumni menyimpannya
+     * apa adanya, dan aturan validasinya pun tidak menahannya.
+     *
+     * Kuncinya diperiksa dengan array_key_exists, bukan isset: pada
+     * pembaruan, `phone` bernilai null berarti staf sengaja mengosongkannya,
+     * dan itu harus tetap tersimpan sebagai kosong. Memakai isset akan
+     * membuat pengosongan diam-diam terabaikan.
+     */
+    private function normalizePhone(array $data): array
+    {
+        if (array_key_exists('phone', $data)) {
+            $data['phone'] = PhoneNumber::normalize($data['phone']);
+        }
+
+        return $data;
     }
 
     // ═══════════════════════════════════════════════════════════

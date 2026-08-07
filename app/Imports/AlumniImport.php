@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Repositories\Transactional\AlumniProfileRepository;
+use App\Support\PhoneNumber;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -109,19 +110,14 @@ class AlumniImport implements ToCollection, WithHeadingRow
         return $this->importedCount;
     }
 
+    /**
+     * Aturannya dipindahkan ke App\Support\PhoneNumber supaya jalur impor,
+     * jalur pengisian oleh alumni, dan jalur penyuntingan oleh staf memakai
+     * definisi yang sama persis (DATA-09). Pembungkus ini dipertahankan agar
+     * pemanggilan di dalam kelas ini tidak perlu berubah.
+     */
     private function normalizePhone(?string $phone): ?string
     {
-        if (!$phone) return null;
-        $phone = preg_replace('/[\s\-\(\)]/', '', $phone);
-        if (str_starts_with($phone, '08')) {
-            return '+62' . substr($phone, 1);
-        }
-        if (str_starts_with($phone, '62')) {
-            return '+' . $phone;
-        }
-        if (str_starts_with($phone, '+62')) {
-            return $phone;
-        }
-        return $phone;
+        return PhoneNumber::normalize($phone);
     }
 }

@@ -11,6 +11,7 @@ use App\Repositories\Transactional\ProgramRepository;
 use App\Repositories\Transactional\QuestionnaireRepository;
 use App\Repositories\Transactional\ResponseRepository;
 use App\Repositories\Transactional\StakeholderContactRepository;
+use App\Support\PhoneNumber;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -245,12 +246,11 @@ class TracerStudySubmitService
 
     private function upsertAlumni(array $validated, int $programId): int
     {
-        $phone = $validated['phone'] ?? null;
-        if ($phone) {
-            $phone = preg_replace('/[\s\-\(\)]/', '', $phone);
-            if (str_starts_with($phone, '08')) $phone = '+62' . substr($phone, 1);
-            elseif (str_starts_with($phone, '62')) $phone = '+' . $phone;
-        }
+        // Aturan pembakuan dipusatkan di App\Support\PhoneNumber (DATA-09).
+        // Salinan yang dulu ada di sini sudah menyimpang dari salinan di
+        // AlumniImport: yang ini tidak punya cabang untuk nomor yang sudah
+        // berawalan '+62'.
+        $phone = PhoneNumber::normalize($validated['phone'] ?? null);
 
         return $this->alumniRepo->upsertByNim($validated['nim'], [
             'name'            => $validated['name'],
