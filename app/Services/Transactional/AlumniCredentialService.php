@@ -2,7 +2,6 @@
 // app/Services/Transactional/AlumniCredentialService.php
 namespace App\Services\Transactional;
 
-use App\Exceptions\BusinessException;
 use App\Models\Transactional\AlumniProfile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -47,60 +46,68 @@ class AlumniCredentialService
     private const GROUP_COUNT = 3;
 
     /**
-     * Batas jumlah alumni per penerbitan.
+     * Batas jumlah alumni per PERMINTAAN — bukan per penerbitan.
      *
-     * Bcrypt sengaja lambat — itu justru gunanya — dan pada mesin ini satu
+     * Bcrypt sengaja lambat, itu justru gunanya, dan pada mesin ini satu
      * cincangan memakan sekitar sepertiga detik. Biayanya lurus terhadap
-     * jumlah baris, sehingga satu angkatan penuh dengan mudah melewati batas
-     * waktu eksekusi PHP maupun batas tunggu proksi di depannya, dan yang
-     * terjadi bukan galat yang rapi melainkan permintaan yang mati di tengah.
+     * jumlah baris: seribu alumni berarti enam menit dalam satu permintaan
+     * HTTP, yang akan mati di batas waktu proksi jauh sebelum selesai.
      *
-     * Membatasi di sini membuat kegagalannya jelas dan bisa ditindaklanjuti:
-     * pesan galatnya menyebut berapa yang cocok dan menyarankan mempersempit
-     * penyaring. Itu juga sejalan dengan cara kerjanya di lapangan — kiriman
-     * surel memang dilakukan bertahap per angkatan atau per program studi,
-     * bukan sekali tembak untuk semua.
+     * Membatasi jumlah alumni yang boleh diterbitkan sekali jalan BUKAN
+     * jawabannya — satu angkatan di politeknik bisa mencapai ribuan orang,
+     * dan menyuruh petugas memecahnya sendiri per program studi hanya
+     * memindahkan pekerjaan yang seharusnya dilakukan mesin.
      *
-     * Naikkan hanya bersamaan dengan menaikkan batas waktu di PHP DAN di
-     * proksi; kalau hanya salah satu, gejalanya sulit dilacak.
+     * Karena itu penerbitan dipecah menjadi beberapa permintaan pendek yang
+     * berjalan berurutan, dikendalikan kursor `after_nim`. Tiap permintaan
+     * selesai dalam hitungan puluhan detik, dan pemanggil mengulang sampai
+     * `remaining` habis. Konstanta ini adalah batas ATAS yang boleh diminta
+     * per permintaan; nilai bawaannya lebih kecil, lihat DEFAULT_LIMIT.
      */
     public const MAX_BATCH = 250;
 
     /**
-     * Terbitkan kata sandi baru untuk sekumpulan alumni.
+     * Jumlah bawaan per permintaan bila pemanggil tidak menentukan.
      *
-     * Dijalankan dalam satu transaksi: kalau ada satu baris yang gagal
-     * diperbarui, tidak boleh ada alumni yang kata sandinya sudah berganti
-     * sementara berkas unduhannya tidak pernah sampai ke tangan Tim Tracer.
+     * Seratus baris ≈ 36 detik pada mesin ini — di bawah batas tunggu proksi
+     * yang lazim (60 detik) dengan margin yang masuk akal, sambil menjaga
+     * jumlah bolak-balik tetap wajar untuk angkatan besar.
+     */
+    public const DEFAULT_LIMIT = 100;
+
+    /**
+     * Terbitkan kata sandi baru untuk SATU POTONG alumni.
+     *
+     * Pemanggil mengulang sampai `remaining` bernilai nol, membawa `last_nim`
+     * potongan sebelumnya sebagai `after_nim`. Kursor memakai NIM, bukan
+     * OFFSET: penerbitan mengubah baris yang sedang dilalui, sehingga OFFSET
+     * akan bergeser dan melewatkan orang tanpa gejala apa pun.
+     *
+     * Dijalankan dalam satu transaksi PER POTONG. Potongan yang gagal
+     * dibatalkan seluruhnya, sementara potongan yang sudah selesai tetap
+     * berlaku — itu memang yang diinginkan, karena penerbitan yang terputus
+     * dapat dilanjutkan alih-alih diulang dari nol.
      *
      * Token Sanctum yang masih aktif ikut dicabut — kata sandi lama sudah tidak
      * berlaku, jadi sesi yang lahir darinya juga tidak boleh terus hidup.
      *
-     * @param  array{graduation_year?: int|null, program_id?: int|null, only_without_credentials?: bool} $filters
-     * @return Collection<int, array{nim: string, name: string, email: string, password: string}>
+     * @param  array{graduation_year?: int|null, program_id?: int|null, only_without_credentials?: bool, limit?: int|null, after_nim?: string|null} $filters
+     * @return array{issued: Collection<int, array{nim: string, name: string, email: string, password: string}>, remaining: int, last_nim: ?string}
      */
-    public function issue(array $filters): Collection
+    public function issue(array $filters): array
     {
-        $targets = $this->findTargets($filters);
+        $limit = (int) ($filters['limit'] ?? self::DEFAULT_LIMIT);
+        $limit = max(1, min($limit, self::MAX_BATCH));
+
+        $targets = $this->findTargets($filters)->take($limit);
 
         if ($targets->isEmpty()) {
-            return collect();
+            return ['issued' => collect(), 'remaining' => 0, 'last_nim' => null];
         }
 
-        if ($targets->count() > self::MAX_BATCH) {
-            throw new BusinessException(sprintf(
-                'Penyaring ini menjangkau %d alumni, melebihi batas %d per penerbitan. '
-                . 'Persempit dengan memilih tahun lulus atau program studi, lalu terbitkan bertahap. '
-                . 'Batas ini ada karena pencincangan kata sandi sengaja lambat, sehingga kelompok '
-                . 'yang terlalu besar akan mati di tengah jalan.',
-                $targets->count(),
-                self::MAX_BATCH,
-            ), 422);
-        }
-
-        return DB::connection(self::CONN)->transaction(function () use ($targets) {
-            $issued = collect();
-            $now    = now();
+        $issued = DB::connection(self::CONN)->transaction(function () use ($targets) {
+            $out = collect();
+            $now = now();
 
             foreach ($targets as $row) {
                 $plain = $this->generatePassword();
@@ -112,7 +119,7 @@ class AlumniCredentialService
 
                 $alumni->tokens()->delete();
 
-                $issued->push([
+                $out->push([
                     'nim'      => (string) $row->nim,
                     'name'     => (string) ($row->name ?? ''),
                     'email'    => (string) ($row->email ?? ''),
@@ -120,8 +127,29 @@ class AlumniCredentialService
                 ]);
             }
 
-            return $issued;
+            return $out;
         });
+
+        $lastNim = (string) $targets->last()->nim;
+
+        return [
+            'issued'    => $issued,
+            'remaining' => $this->countRemaining($filters, $lastNim),
+            'last_nim'  => $lastNim,
+        ];
+    }
+
+    /**
+     * Berapa alumni lagi yang tersisa setelah potongan ini.
+     *
+     * Dihitung ULANG setiap potong, bukan dikurangi dari cacah awal. Pada mode
+     * `only_without_credentials`, baris yang baru saja diterbitkan otomatis
+     * keluar dari himpunan — menghitung ulang membuat angkanya tetap benar
+     * tanpa perlu memodelkan efek itu secara terpisah.
+     */
+    private function countRemaining(array $filters, string $afterNim): int
+    {
+        return $this->baseQuery($filters)->where('nim', '>', $afterNim)->count();
     }
 
     /**
@@ -133,6 +161,26 @@ class AlumniCredentialService
      * unduhan yang tidak berguna dan tidak seharusnya beredar.
      */
     private function findTargets(array $filters): Collection
+    {
+        $query = $this->baseQuery($filters);
+
+        // Kursor. Urutan NIM menaik dipakai konsisten di sini dan di
+        // countRemaining(), sehingga potongan berikutnya selalu melanjutkan
+        // persis dari tempat potongan sebelumnya berhenti.
+        if (!empty($filters['after_nim'])) {
+            $query->where('nim', '>', (string) $filters['after_nim']);
+        }
+
+        $limit = (int) ($filters['limit'] ?? self::DEFAULT_LIMIT);
+        $limit = max(1, min($limit, self::MAX_BATCH));
+
+        return collect(
+            $query->orderBy('nim')->limit($limit)->get(['id', 'nim', 'name', 'email'])
+        );
+    }
+
+    /** Penyaring bersama findTargets() dan countRemaining(), tanpa kursor. */
+    private function baseQuery(array $filters): \Illuminate\Database\Query\Builder
     {
         $query = DB::connection(self::CONN)->table('alumni_profiles')
             ->where('is_active', true);
@@ -152,7 +200,7 @@ class AlumniCredentialService
             $query->whereNull('password_issued_at');
         }
 
-        return collect($query->orderBy('nim')->get(['id', 'nim', 'name', 'email']));
+        return $query;
     }
 
     /**

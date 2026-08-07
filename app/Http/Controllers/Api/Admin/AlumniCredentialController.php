@@ -6,22 +6,30 @@ use App\Http\Controllers\Controller;
 use App\Services\Transactional\AlumniCredentialService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 
 /**
  * Penerbitan kredensial alumni untuk kiriman surel (RBAC-16).
  *
- * KENAPA MEMBANGKITKAN DAN MENGUNDUH DALAM SATU LANGKAH
+ * KENAPA POTONGAN, DAN KENAPA JSON ALIH-ALIH BERKAS
  *
- * Kata sandi disimpan sebagai cincangan bcrypt, yang tidak dapat dibalik. Jadi
- * tidak mungkin ada endpoint "ekspor kata sandi" terpisah yang dipanggil
- * belakangan atas data yang sudah tersimpan — teks polosnya hanya ada pada
- * detik ia dibangkitkan. Karena itu satu permintaan ini melakukan keduanya:
- * menerbitkan, lalu langsung mengalirkan berkasnya.
+ * Kata sandi disimpan sebagai cincangan bcrypt yang tidak dapat dibalik, jadi
+ * teks polosnya hanya ada pada detik ia dibangkitkan — tidak akan pernah ada
+ * endpoint "ekspor kata sandi" yang dipanggil belakangan. Sekilas itu menuntut
+ * satu permintaan yang membangkitkan sekaligus menyerahkan berkasnya.
  *
- * Berkasnya TIDAK PERNAH ditulis ke disk server. Isinya kredensial yang masih
- * berlaku untuk banyak orang sekaligus; menyimpannya berarti menciptakan
- * salinan kedua yang tidak ada yang mengawasi.
+ * Masalahnya, bcrypt sengaja lambat. Satu angkatan politeknik bisa mencapai
+ * ribuan orang, yang berarti belasan menit dalam satu permintaan HTTP — mati
+ * di batas tunggu proksi jauh sebelum selesai, dan yang diterima petugas bukan
+ * galat yang jelas melainkan koneksi yang putus begitu saja.
+ *
+ * Maka endpoint ini menerbitkan SATU POTONG per permintaan dan mengembalikan
+ * JSON berisi baris yang baru terbit beserta sisa yang belum. Frontend
+ * mengulang sampai habis, menampilkan kemajuannya, lalu merakit berkasnya
+ * sendiri. Bentuk JSON dipilih karena unduhan biner tidak bisa dirangkai
+ * bertahap tanpa menyimpan hasil antara di server — dan menyimpan kata sandi
+ * polos, walau sementara, persis yang harus dihindari.
+ *
+ * Tidak ada kata sandi polos yang pernah menyentuh disk server.
  *
  * Terbatas pada head_tracer lewat middleware di routes/api.php.
  */
@@ -34,59 +42,54 @@ class AlumniCredentialController extends Controller
     /**
      * POST /api/alumni/credentials/issue
      *
-     * Body: { graduation_year?, program_id?, only_without_credentials? }
-     * Balasan: berkas CSV berisi NIM, Nama, Surel, Kata Sandi — atau JSON 422
-     * bila penyaringnya tidak menjangkau seorang pun.
+     * Body: { graduation_year?, program_id?, only_without_credentials?,
+     *         limit?, after_nim? }
+     *
+     * Balasan 200: { data: { issued: [...], remaining, last_nim } }. Selama
+     * `remaining` masih di atas nol, pemanggil memanggil lagi dengan
+     * `after_nim` = `last_nim`.
+     *
+     * Balasan 422 hanya untuk panggilan PERTAMA yang tidak menjangkau seorang
+     * pun — supaya petugas tahu penyaringnya keliru, alih-alih menerima berkas
+     * kosong yang terlihat seperti keberhasilan.
      */
-    public function issue(Request $request): Response|JsonResponse
+    public function issue(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'graduation_year'          => ['nullable', 'integer', 'min:1900', 'max:2200'],
             'program_id'               => ['nullable', 'integer', 'exists:oltp.programs,id'],
             'only_without_credentials' => ['nullable', 'boolean'],
+            'limit'                    => ['nullable', 'integer', 'min:1', 'max:' . AlumniCredentialService::MAX_BATCH],
+            'after_nim'                => ['nullable', 'string', 'max:30'],
         ]);
 
-        // Pencincangan bcrypt memakan sekitar sepertiga detik per alumni, jadi
-        // satu kelompok penuh berjalan puluhan detik — jauh di atas batas
-        // bawaan PHP 30 detik. Jumlah barisnya sendiri sudah dibatasi
-        // AlumniCredentialService::MAX_BATCH, sehingga ini tidak membuka pintu
-        // bagi permintaan yang berjalan tanpa akhir.
+        // Satu potong pun bisa berjalan puluhan detik karena bcrypt sengaja
+        // lambat — di atas batas bawaan PHP 30 detik. Besar potongannya sudah
+        // dibatasi MAX_BATCH, jadi ini tidak membuka pintu bagi permintaan yang
+        // berjalan tanpa akhir.
         //
         // Catatan penggelaran: proksi di depan aplikasi (nginx, Apache) punya
-        // batas tunggunya sendiri yang TIDAK dipengaruhi baris ini. Kalau
-        // penerbitan berhenti di tengah pada server, itu yang perlu dinaikkan.
+        // batas tunggunya sendiri yang TIDAK dipengaruhi baris ini. Bila
+        // potongan sering putus di server, turunkan `limit` dari frontend atau
+        // naikkan batas tunggu proksi.
         set_time_limit(0);
 
-        $issued = $this->service->issue($validated);
+        $result = $this->service->issue($validated);
 
-        if ($issued->isEmpty()) {
-            // 422, bukan berkas kosong: berkas nol baris terlihat seperti
-            // penerbitan yang berhasil dan mudah terkirim begitu saja.
+        if ($result['issued']->isEmpty() && empty($validated['after_nim'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tidak ada alumni aktif yang cocok dengan penyaring tersebut, sehingga tidak ada kredensial yang diterbitkan.',
             ], 422);
         }
 
-        $stamp = now()->format('Ymd_His');
-        $csv   = "NIM,Nama,Surel,Kata Sandi\n";
-
-        foreach ($issued as $row) {
-            $csv .= sprintf(
-                "\"%s\",\"%s\",\"%s\",\"%s\"\n",
-                $row['nim'],
-                str_replace('"', '""', $row['name']),
-                $row['email'],
-                $row['password'],
-            );
-        }
-
-        return response($csv, 200, [
-            'Content-Type'        => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"kredensial_alumni_{$stamp}.csv\"",
-            // Dibaca frontend untuk memberi tahu berapa banyak yang terbit;
-            // jumlah baris tidak bisa disimpulkan dari unduhan biner.
-            'X-Issued-Count'      => (string) $issued->count(),
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'issued'    => $result['issued']->values(),
+                'remaining' => $result['remaining'],
+                'last_nim'  => $result['last_nim'],
+            ],
         ]);
     }
 }

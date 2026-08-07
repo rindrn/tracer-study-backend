@@ -33,11 +33,8 @@ return [
     //
     // Content-Disposition: dibutuhkan agar unduhan bisa memakai nama berkas
     // yang ditetapkan server, bukan nama tebakan peramban.
-    // X-Issued-Count: jumlah kredensial yang terbit pada unduhan CSV
-    // (AlumniCredentialController), tidak bisa disimpulkan dari isi unduhan.
     'exposed_headers' => [
         'Content-Disposition',
-        'X-Issued-Count',
     ],
 
     'max_age' => 0,
