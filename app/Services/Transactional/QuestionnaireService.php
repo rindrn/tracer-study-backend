@@ -141,6 +141,28 @@ class QuestionnaireService
                 throw new BusinessException('Kuisioner tidak ditemukan.', 404);
             }
 
+            // KSN-10 — kuesioner yang sudah dijawab tidak boleh disunting lagi.
+            //
+            // Penyuntingan di sini menghapus SELURUH bagian dan pertanyaan lalu
+            // menyisipkannya ulang (lihat deleteSectionsAndQuestions di bawah).
+            // Untuk kuesioner kosong itu tidak berbahaya, tapi begitu ada
+            // jawaban, jawaban itu menunjuk kode pertanyaan yang bisa berubah
+            // arti, bergeser urutannya, atau lenyap sama sekali — dan tidak ada
+            // jejak yang tersisa untuk menyadarinya. Menonaktifkannya pun
+            // ditolak: alumni yang draf-nya sedang berjalan akan kehilangan
+            // borangnya di tengah pengisian.
+            //
+            // Aturan ini sejajar dengan delete(), yang sudah lebih dulu menolak
+            // kuesioner ber-responden.
+            $responseCount = $this->questionnaireRepo->countResponses($id);
+            if ($responseCount > 0) {
+                throw new BusinessException(
+                    "Kuisioner tidak dapat diubah karena sudah memiliki {$responseCount} responden. "
+                    . 'Buat versi baru bila pertanyaannya perlu berubah.',
+                    422,
+                );
+            }
+
             $programId = $this->resolveProgramId($validated, $existing->program_id);
             $code      = $validated['code']    ?? $existing->code;
             $version   = $validated['version'] ?? $existing->version;

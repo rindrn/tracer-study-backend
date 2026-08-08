@@ -292,8 +292,20 @@ class TracerStudySubmitService
      */
     private function persistResponse(int $questionnaireId, int $alumniId, array $answers, ?array $filterCodes = null): void
     {
+        // Waktu mulai dipungut dari draf SEBELUM drafnya dihapus (ISI-04).
+        // Autosave sudah mencatat kapan alumni pertama kali menjawab; tanpa
+        // langkah ini nilai itu ikut terbuang bersama baris draf, dan durasi
+        // pengisian di SummaryRepository kehilangan salah satu ujungnya.
+        $draft     = $this->responseRepo->findByQuestionnaireAndAlumni($questionnaireId, $alumniId);
+        $startedAt = $draft?->started_at ? Carbon::parse($draft->started_at) : null;
+
         $this->responseRepo->deleteDraftByQuestionnaireAndAlumni($questionnaireId, $alumniId);
-        $responseId = $this->responseRepo->createResponse($questionnaireId, $alumniId);
+        $responseId = $this->responseRepo->createResponse(
+            $questionnaireId,
+            $alumniId,
+            'submitted',
+            $startedAt,
+        );
 
         $records = [];
         foreach ($answers as $key => $value) {

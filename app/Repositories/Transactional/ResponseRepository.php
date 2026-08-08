@@ -184,13 +184,23 @@ class ResponseRepository
      * durasi pengisian di SummaryRepository (started_at → submitted_at) akan
      * menghasilkan angka yang tampak sahih padahal karangan.
      *
-     * started_at sengaja TIDAK diisi untuk submit sekali jalan: waktu alumni
-     * benar-benar mulai mengisi tidak diketahui di titik ini, dan menuliskan
-     * now() akan membuat durasi setiap orang jadi ~0 detik. NULL lebih jujur
-     * daripada nol palsu (lihat catatan di migration restore_started_at).
+     * started_at untuk baris submisi diwariskan dari draf lewat $startedAt
+     * (ISI-04). Jalur submit menghapus draf lalu menyisipkan baris baru, dan
+     * sebelum ini waktu mulai yang sudah tercatat di draf ikut terbuang —
+     * hasilnya 224 dari 229 baris ber-started_at NULL walau alumninya jelas
+     * melewati proses pengisian.
+     *
+     * Kalau tidak ada draf sama sekali (mis. berkas seed atau submit sekali
+     * jalan lewat API), nilainya tetap NULL. Menuliskan now() di titik ini
+     * akan membuat durasi pengisian setiap orang jadi ~0 detik; NULL lebih
+     * jujur daripada nol palsu (lihat catatan di migration restore_started_at).
      */
-    public function createResponse(int $questionnaireId, int $alumniId, string $status = 'submitted'): int
-    {
+    public function createResponse(
+        int $questionnaireId,
+        int $alumniId,
+        string $status = 'submitted',
+        ?Carbon $startedAt = null,
+    ): int {
         $now      = Carbon::now();
         $isDone   = in_array($status, ['submitted', 'verified'], strict: true);
 
@@ -198,7 +208,7 @@ class ResponseRepository
             'questionnaire_id' => $questionnaireId,
             'alumni_id'        => $alumniId,
             'status'           => $status,
-            'started_at'       => $isDone ? null : $now,
+            'started_at'       => $isDone ? $startedAt : ($startedAt ?? $now),
             'submitted_at'     => $isDone ? $now  : null,
             'created_at'       => $now,
             'updated_at'       => $now,

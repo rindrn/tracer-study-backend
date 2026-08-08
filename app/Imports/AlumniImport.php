@@ -9,8 +9,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class AlumniImport implements ToCollection, WithHeadingRow
+class AlumniImport implements ToCollection, WithHeadingRow, WithMultipleSheets
 {
     private array $errors = [];
     private int $importedCount = 0;
@@ -18,6 +19,24 @@ class AlumniImport implements ToCollection, WithHeadingRow
     public function __construct(
         private readonly AlumniProfileRepository $alumniRepo,
     ) {}
+
+    /**
+     * Hanya lembar pertama yang berisi data alumni.
+     *
+     * Tanpa pembatasan ini Laravel Excel memanggil collection() untuk SETIAP
+     * lembar, termasuk "Referensi Kode Prodi" bawaan templat. Ke-34 baris
+     * referensi itu lalu divalidasi sebagai baris alumni dan menghasilkan
+     * puluhan galat "The nim field is required" yang tidak ada hubungannya
+     * dengan berkas yang diunggah petugas — cukup untuk menenggelamkan galat
+     * sungguhan di antaranya.
+     *
+     * Indeks, bukan nama: petugas kerap menyalin templat ke berkas baru dan
+     * mengganti nama lembarnya, sementara urutannya tidak pernah berubah.
+     */
+    public function sheets(): array
+    {
+        return [0 => $this];
+    }
 
     public function collection(Collection $rows): void
     {
@@ -28,6 +47,13 @@ class AlumniImport implements ToCollection, WithHeadingRow
 
         foreach ($rows as $index => $row) {
             $rowNum = $index + 2; // heading = row 1
+
+            // Baris yang seluruh selnya kosong bukan kesalahan petugas —
+            // biasanya sisa baris berformat di bawah data. Melaporkannya
+            // sebagai galat hanya menambah derau.
+            if ($row->filter(fn ($v) => trim((string) $v) !== '')->isEmpty()) {
+                continue;
+            }
 
             // Judul kolom Email→Surel dan Telepon→No. HP berganti pada
             // penyeragaman DATA-03, dan WithHeadingRow menurunkan kunci
