@@ -17,14 +17,18 @@ class AlumniProfileSeeder extends Seeder
         $programs = DB::connection('oltp')->table('programs')->get();
         if ($programs->isEmpty()) return;
 
-        $totalTarget = 500;
-        $perProgram = (int) ceil($totalTarget / $programs->count());
-
         $alumniData = [];
         $nimCounter = 1;
         $graduationYears = [2020, 2021, 2022, 2023, 2024, 2025];
 
         foreach ($programs as $program) {
+            // Sengaja diacak per prodi (15-30 alumni), bukan dibagi rata dari
+            // satu total tetap -- supaya jumlah data per prodi bervariasi
+            // (belasan sampai puluhan), grafik yang di-breakdown per kategori
+            // (mis. Sebaran Level Perusahaan) tidak cuma berisi 1-5 responden
+            // yang menghasilkan persentase kasar seperti 100%/75%/50%.
+            $perProgram = $faker->numberBetween(15, 30);
+
             for ($i = 0; $i < $perProgram; $i++) {
                 $tahunLulus = $faker->randomElement($graduationYears);
                 $duration = $program->degree === 'D3' ? 3 : 4;

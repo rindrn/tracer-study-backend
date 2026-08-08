@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class DatabaseSeeder extends Seeder
@@ -66,6 +67,74 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->importOltpSupplement();
+
+        $this->registerBulanSesudahLulusRole();
+    }
+
+    /**
+     * FR-026: dump/oltp_supplement.sql adalah snapshot lama yang belum
+     * mengenal role "bulan_sesudah_lulus" (f303). Migration
+     * 2026_08_06_000001_map_f303_to_bulan_sesudah_lulus no-op di install
+     * fresh karena jalan SEBELUM tabel semantic_role_registry/
+     * question_semantic_mapping ada (baru dibuat oleh importOltpSupplement
+     * di atas). Tanpa langkah ini, AlumniFactBuilderService selalu
+     * menghasilkan bulan_sesudah_lulus = null pada instalasi fresh.
+     */
+    private function registerBulanSesudahLulusRole(): void
+    {
+        $db = DB::connection('oltp');
+
+        if (!$db->getSchemaBuilder()->hasTable('semantic_role_registry')) {
+            return;
+        }
+
+        $exists = $db->table('semantic_role_registry')->where('role_key', 'bulan_sesudah_lulus')->exists();
+        if (!$exists) {
+            $db->table('semantic_role_registry')->insert([
+                'role_key'            => 'bulan_sesudah_lulus',
+                'label'               => 'Bulan Sesudah Lulus Mulai Cari Kerja',
+                'category'            => 'waktu_tunggu',
+                'description'         => 'Jumlah bulan sesudah lulus alumni mulai mencari kerja',
+                'expected_kind'       => 'integer',
+                'value_min'           => 0,
+                'value_max'           => 60,
+                'sample_valid_answer' => '2',
+                'target_table'        => 'fact_tracer_study',
+                'target_column'       => 'bulan_sesudah_lulus',
+                'grain'               => 'narrow',
+                'is_active'           => true,
+                'created_at'          => now(),
+                'updated_at'          => now(),
+            ]);
+        }
+
+        $questionnaireIds = $db->table('questionnaire_questions')
+            ->where('code', 'f303')
+            ->pluck('questionnaire_id');
+
+        foreach ($questionnaireIds as $questionnaireId) {
+            $alreadyMapped = $db->table('question_semantic_mapping')
+                ->where('questionnaire_id', $questionnaireId)
+                ->where('question_code', 'f303')
+                ->where('is_active', true)
+                ->exists();
+
+            if ($alreadyMapped) {
+                continue;
+            }
+
+            $db->table('question_semantic_mapping')->insert([
+                'questionnaire_id'       => $questionnaireId,
+                'question_code'          => 'f303',
+                'question_text_snapshot' => 'Kira-kira berapa bulan sesudah lulus Anda mulai mencari pekerjaan?',
+                'semantic_role'          => 'bulan_sesudah_lulus',
+                'grain'                  => 'narrow',
+                'effective_date'         => now()->toDateString(),
+                'is_active'              => true,
+                'created_at'             => now(),
+                'updated_at'             => now(),
+            ]);
+        }
     }
 
     /**
