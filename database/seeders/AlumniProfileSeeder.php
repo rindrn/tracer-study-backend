@@ -22,12 +22,14 @@ class AlumniProfileSeeder extends Seeder
         $graduationYears = [2020, 2021, 2022, 2023, 2024, 2025];
 
         foreach ($programs as $program) {
-            // Sengaja diacak per prodi (15-30 alumni), bukan dibagi rata dari
+            // Sengaja diacak per prodi (120-220 alumni), bukan dibagi rata dari
             // satu total tetap -- supaya jumlah data per prodi bervariasi
-            // (belasan sampai puluhan), grafik yang di-breakdown per kategori
-            // (mis. Sebaran Level Perusahaan) tidak cuma berisi 1-5 responden
-            // yang menghasilkan persentase kasar seperti 100%/75%/50%.
-            $perProgram = $faker->numberBetween(15, 30);
+            // (ratusan, bukan cuma belasan/puluhan). Dengan denominator sebesar
+            // ini, persentase breakdown per kategori (mis. Sebaran Level
+            // Perusahaan) berhenti selalu jatuh ke kelipatan bersih 5/10/25
+            // (25%/50%/75%/100%) dan mulai menghasilkan angka ganjil yang lebih
+            // realistis seperti 23%, 51%, 73%.
+            $perProgram = $faker->numberBetween(120, 220);
 
             for ($i = 0; $i < $perProgram; $i++) {
                 $tahunLulus = $faker->randomElement($graduationYears);
