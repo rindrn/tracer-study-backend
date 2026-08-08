@@ -196,7 +196,9 @@ class ResponseRateRepository
 
         if ($search !== null && $search !== '') {
             $inner->where(function ($q) use ($search) {
-                $q->where('ap.name', 'like', "%{$search}%")
+                // ILIKE (bukan LIKE) supaya pencarian nama case-insensitive di
+                // PostgreSQL -- nama alumni tidak selalu tersimpan ALL-CAPS.
+                $q->where('ap.name', 'ilike', "%{$search}%")
                   ->orWhere('ap.nim', 'like', "%{$search}%");
             });
         }
