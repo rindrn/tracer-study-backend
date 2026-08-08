@@ -131,7 +131,16 @@ class ResponseSeeder extends Seeder
 
             // ── Conditional: Bekerja(1) / Wiraswasta(3) ──────
             if (in_array($statusKerja, [1, 3])) {
-                $salary = $faker->numberBetween(1200000, 20000000);
+                // Dulu uniform(1.2jt, 20jt) -- karena rentangnya lebar dan UMP
+                // provinsi yang dipakai cuma ~1.5jt-5.7jt, proporsi gaji yang
+                // jatuh di bawah 1,2x UMP jadi sangat kecil (~7-12%), bikin
+                // chart "Proporsi Berdasarkan UMP" selalu njomplang ke atas.
+                // Sekarang 30% alumni sengaja digenerate di rentang gaji
+                // rendah (1,2jt-3,5jt) supaya kelompok "< 1,2x UMP" proporsinya
+                // lebih wajar/tidak terlalu kecil di semua tahun.
+                $salary = $faker->boolean(30)
+                    ? $faker->numberBetween(1200000, 3500000)
+                    : $faker->numberBetween(3500001, 20000000);
                 $waitingMonths = $faker->numberBetween(0, 12);
 
                 $answers[] = $this->answer($responseId, 'f502', (string)$waitingMonths, $now);
