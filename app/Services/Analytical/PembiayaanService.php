@@ -205,11 +205,15 @@ class PembiayaanService
                 'nama_prodi' => $namaProdi,
                 'jenjang'    => $first['jenjang'],
                 'total'      => $total,
-                'sumber'     => $rows->map(fn($r) => [
-                    'label' => $r['sumber_biaya'],
-                    'count' => $r['count'],
-                    'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
-                ])->values()->toArray(),
+                'sumber'     => $rows->groupBy('sumber_biaya')
+                    ->map(fn($group, $label) => [
+                        'label' => $label,
+                        'count' => $group->sum('count'),
+                        'pct'   => $total > 0 ? round($group->sum('count') / $total * 100, 1) : 0.0,
+                    ])
+                    ->sortByDesc('count')
+                    ->values()
+                    ->toArray(),
             ];
         }
         return $data;

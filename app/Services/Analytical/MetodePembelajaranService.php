@@ -68,12 +68,19 @@ class MetodePembelajaranService
                 $data[] = [
                     'nama_prodi' => $namaProdi,
                     'jenjang'    => $first['jenjang'],
-                    'metode'     => $rows->map(fn($r) => [
-                        'kode_field'      => $r['kode_field'],
-                        'label'           => $r['label'],
-                        'avg_skor'        => round($r['avg_skor'], 2),
-                        'count_responden' => $r['count'],
-                    ])->values()->toArray(),
+                    'metode'     => $rows->groupBy('kode_field')->map(function ($group) {
+                        $totalCount  = $group->sum('count');
+                        $weightedAvg = $totalCount > 0
+                            ? $group->sum(fn($r) => $r['avg_skor'] * $r['count']) / $totalCount
+                            : 0.0;
+                        $r0 = $group->first();
+                        return [
+                            'kode_field'      => $r0['kode_field'],
+                            'label'           => $r0['label'],
+                            'avg_skor'        => round($weightedAvg, 2),
+                            'count_responden' => $totalCount,
+                        ];
+                    })->values()->toArray(),
                 ];
                 $prodiList[] = $namaProdi;
             }

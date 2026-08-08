@@ -73,17 +73,29 @@ class ResponseSeeder extends Seeder
         $companies = ['PT Telkom Indonesia', 'PT Pertamina', 'PT Astra International', 'Tokopedia', 'GoTo', 'PT PLN', 'Bank BCA', 'Shopee Indonesia', 'Traveloka', 'PT Krakatau Steel'];
         $universities = ['Universitas Indonesia', 'Institut Teknologi Bandung', 'Universitas Gadjah Mada', 'Universitas Padjadjaran', 'Universitas Brawijaya'];
 
-        // Track alumni index per program to skip 4th (testing account)
-        $alumniCountByProgram = [];
+        // Track alumni index per program untuk skip sebagian secara acak,
+        // supaya response rate antar prodi bervariasi (bukan seragam) --
+        // tiap prodi men-skip 5-25% dari alumninya di posisi acak.
+        $alumniCountByProgram   = [];
+        $skipPositionsByProgram = [];
 
         foreach ($alumniList as $alumni) {
             $program = $programs[$alumni->program_id] ?? null;
 
-            // Count alumni per program — skip the 5th (index 4) for testing
             $pid = $alumni->program_id;
             $alumniCountByProgram[$pid] = ($alumniCountByProgram[$pid] ?? 0) + 1;
-            if ($alumniCountByProgram[$pid] > 4) {
-                continue; // Leave this alumni unanswered for testing
+
+            if (!isset($skipPositionsByProgram[$pid])) {
+                $totalDiProdi = $alumniList->where('program_id', $pid)->count();
+                $jumlahSkip   = max(1, (int) round($totalDiProdi * $faker->randomFloat(2, 0.05, 0.25)));
+                $skipPositionsByProgram[$pid] = $faker->randomElements(
+                    range(1, $totalDiProdi),
+                    min($jumlahSkip, $totalDiProdi)
+                );
+            }
+
+            if (in_array($alumniCountByProgram[$pid], $skipPositionsByProgram[$pid], true)) {
+                continue; // Alumni ini sengaja dibiarkan tanpa jawaban (belum mengisi).
             }
 
             // Year-pairing: find matching global questionnaire for this alumni's grad year
@@ -119,7 +131,7 @@ class ResponseSeeder extends Seeder
 
             // ── Conditional: Bekerja(1) / Wiraswasta(3) ──────
             if (in_array($statusKerja, [1, 3])) {
-                $salary = $faker->numberBetween(3000000, 20000000);
+                $salary = $faker->numberBetween(1200000, 20000000);
                 $waitingMonths = $faker->numberBetween(0, 12);
 
                 $answers[] = $this->answer($responseId, 'f502', (string)$waitingMonths, $now);
@@ -129,7 +141,7 @@ class ResponseSeeder extends Seeder
                 $answers[] = $this->answer($responseId, 'f5d', (string)$faker->numberBetween(1, 3), $now);
 
                 if ($statusKerja == 1) {
-                    $f1101 = $faker->randomElement([1, 2, 3, 3, 3, 4, 6, 7]);
+                    $f1101 = $faker->randomElement([1, 1, 2, 3, 3, 3, 4, 5, 6, 7]);
                     $answers[] = $this->answer($responseId, 'f1101', (string)$f1101, $now);
                     if ($f1101 == 5) {
                         $answers[] = $this->answer($responseId, 'f1102', 'Perusahaan Rintisan/Startup', $now);
@@ -140,7 +152,7 @@ class ResponseSeeder extends Seeder
                 }
 
                 if ($statusKerja == 3) {
-                    $answers[] = $this->answer($responseId, 'f5c', (string)$faker->numberBetween(1, 3), $now);
+                    $answers[] = $this->answer($responseId, 'f5c', (string)$faker->numberBetween(1, 4), $now);
                 }
 
                 // Employment record
@@ -180,7 +192,7 @@ class ResponseSeeder extends Seeder
             }
 
             // ── Q10: f1201 — Sumber dana kuliah (wajib) ──────
-            $f1201 = $faker->randomElement([1, 1, 1, 3, 4, 6]);
+            $f1201 = $faker->randomElement([1, 1, 1, 2, 3, 4, 5, 6, 7]);
             $answers[] = $this->answer($responseId, 'f1201', (string)$f1201, $now);
             if ($f1201 == 7) {
                 $answers[] = $this->answer($responseId, 'f1202', 'Beasiswa Daerah', $now);
@@ -220,7 +232,7 @@ class ResponseSeeder extends Seeder
             $answers[] = $this->answer($responseId, 'f7a', (string)$f7a, $now);
 
             // ── Q20: f1001 — Aktivitas cari kerja (wajib) ────
-            $f1001 = $faker->randomElement([1, 2, 3, 4]);
+            $f1001 = $faker->randomElement([1, 2, 3, 4, 5]);
             $answers[] = $this->answer($responseId, 'f1001', (string)$f1001, $now);
             if ($f1001 == 5) {
                 $answers[] = $this->answer($responseId, 'f1002', 'Freelance/remote work', $now);

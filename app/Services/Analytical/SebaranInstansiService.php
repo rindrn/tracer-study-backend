@@ -9,6 +9,7 @@ use App\DTOs\Analytical\SebaranInstansi\SebaranInstansiLokasiDTO;
 use App\DTOs\Analytical\SebaranInstansi\SebaranInstansiDrillDownDTO;
 use App\Repositories\Analytical\SebaranInstansiRepository;
 use App\Traits\WithCache;
+use Illuminate\Support\Collection;
 
 class SebaranInstansiService
 {
@@ -97,11 +98,7 @@ class SebaranInstansiService
                 $data[] = [
                     'nama_prodi' => $namaProdi,
                     'jenjang'    => $first['jenjang'],
-                    'tingkat'    => $rows->map(fn($r) => [
-                        'label' => $r['label_tingkat'],
-                        'count' => $r['count'],
-                        'pct'   => $totalProdi > 0 ? round($r['count'] / $totalProdi * 100, 1) : 0.0,
-                    ])->values()->toArray(),
+                    'tingkat'    => $this->mergeByLabel($rows, 'label_tingkat', $totalProdi),
                 ];
             }
 
@@ -177,16 +174,8 @@ class SebaranInstansiService
                     'nama_prodi' => $namaProdi,
                     'jenjang'    => $first['jenjang'] ?? '',
                     'total'      => $total,
-                    'jenis'      => $jenisRows->map(fn($r) => [
-                        'label' => $r['label_jenis'],
-                        'count' => $r['count'],
-                        'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
-                    ])->values()->toArray(),
-                    'tingkat'    => $tingkatRows->map(fn($r) => [
-                        'label' => $r['label_tingkat'],
-                        'count' => $r['count'],
-                        'pct'   => $total > 0 ? round($r['count'] / $total * 100, 1) : 0.0,
-                    ])->values()->toArray(),
+                    'jenis'      => $this->mergeByLabel($jenisRows, 'label_jenis', $total),
+                    'tingkat'    => $this->mergeByLabel($tingkatRows, 'label_tingkat', $total),
                 ];
 
                 $prodiList[] = $namaProdi;
@@ -298,6 +287,27 @@ class SebaranInstansiService
         $relevant = array_diff_key($params, array_flip(['page', 'per_page', 'search']));
         ksort($relevant);
         return $prefix . ':' . md5(json_encode($relevant));
+    }
+
+    /**
+     * Gabungkan baris yang punya label sama tapi terpisah karena grouping
+     * di query (mis. nama_prodi yang sama dipakai 2 jenjang berbeda,
+     * D3/D4, sehingga label instansi/tingkat muncul dobel per nama_prodi).
+     * Tanpa ini FE menimpa (bukan menjumlahkan) baris berlabel sama saat
+     * membangun row chart, hasilnya data hilang/kosong.
+     */
+    private function mergeByLabel(Collection $rows, string $labelKey, int $total): array
+    {
+        return $rows
+            ->groupBy($labelKey)
+            ->map(fn($group, $label) => [
+                'label' => $label,
+                'count' => $group->sum('count'),
+                'pct'   => $total > 0 ? round($group->sum('count') / $total * 100, 1) : 0.0,
+            ])
+            ->sortByDesc('count')
+            ->values()
+            ->toArray();
     }
 
     private function activeFilters(array $params, array $keys = []): array
