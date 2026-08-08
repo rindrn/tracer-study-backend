@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Transactional\EtlRun;
 use App\Services\ETL\EtlOrchestratorService;
 use Illuminate\Console\Command;
+use Throwable;
 
 /**
  * Entry point ETL. Jalankan via: php artisan etl:run
@@ -13,10 +15,27 @@ use Illuminate\Console\Command;
  *
  * Untuk PRODUCTION (mingguan):
  *   Schedule::command('etl:run')->weeklyOn(1, '01:00');
+ *
+ * PENCATATAN (LAP-08)
+ * -------------------
+ * Setiap eksekusi menulis satu baris tracer_oltp.etl_runs, sama seperti
+ * jalur queue (RunEtlJob). Sebelumnya hanya jalur queue yang mencatat,
+ * sedangkan perintah inilah yang justru jalan rutin tiap Senin — akibatnya
+ * belasan snapshot di dim_waktu tidak punya baris log padanan, dan
+ * pertanyaan sesederhana "ETL Senin kemarin berhasil atau tidak?" tidak
+ * bisa dijawab dari mana pun. Ringkasan 12 tahapnya dulu hanya tercetak ke
+ * terminal lalu hilang bersama sesinya.
+ *
+ * Pencatatan sengaja tidak boleh menggagalkan pemuatan data: barisnya
+ * ditulis lewat koneksi 'oltp', sedangkan ETL bertransaksi di koneksi
+ * 'olap', jadi keduanya transaksi terpisah. Kalau penulisan log gagal,
+ * ETL tetap jalan — lihat catatan di setiap blok try di bawah.
  */
 class RunEtlSnapshot extends Command
 {
-    protected $signature = 'etl:run {--force : Jalankan walau belum ada response baru sejak snapshot terakhir}';
+    protected $signature = 'etl:run
+                            {--force : Jalankan walau belum ada response baru sejak snapshot terakhir}
+                            {--reason=cli_manual : Penanda pemicu yang dicatat di kolom etl_runs.reason}';
 
     protected $description = 'Jalankan ETL snapshot dari tracer_oltp ke OLAP (schema public)';
 
@@ -25,7 +44,28 @@ class RunEtlSnapshot extends Command
         $this->info('=== SmartTracer ETL Snapshot dimulai ===');
         $startedAt = now();
 
-        $result = $orchestrator->run(force: (bool) $this->option('force'));
+        $run = $this->openRun();
+
+        try {
+            $result = $orchestrator->run(force: (bool) $this->option('force'));
+        } catch (Throwable $e) {
+            $this->closeRun($run, [
+                'status'        => 'failed',
+                'error_message' => $e->getMessage(),
+                'finished_at'   => now(),
+            ]);
+
+            // Dilempar ulang supaya penjadwal melihatnya sebagai kegagalan
+            // (onFailure di routes/console.php) dan exit code-nya bukan 0.
+            throw $e;
+        }
+
+        $this->closeRun($run, [
+            'status'      => 'completed',
+            'id_waktu'    => $result->idWaktu,
+            'summary'     => $result->toArray(),
+            'finished_at' => now(),
+        ]);
 
         $this->table(
             ['Tahap', 'Diproses', 'Insert', 'Skip'],
@@ -38,6 +78,46 @@ class RunEtlSnapshot extends Command
             $result->idWaktu
         ));
 
+        if ($run !== null) {
+            $this->info("Tercatat di etl_runs id={$run->id}.");
+        }
+
         return self::SUCCESS;
+    }
+
+    /**
+     * Buka baris pencatatan. Mengembalikan null bila gagal — ETL tetap
+     * dijalankan tanpa catatan, karena kehilangan satu baris log jauh lebih
+     * ringan daripada melewatkan pemuatan data mingguan.
+     *
+     * triggered_by dibiarkan NULL: kolom itu foreign key ke users, dan
+     * eksekusi dari CLI maupun penjadwal memang tidak punya pengguna.
+     */
+    private function openRun(): ?EtlRun
+    {
+        try {
+            return EtlRun::create([
+                'status'     => 'running',
+                'reason'     => (string) $this->option('reason'),
+                'started_at' => now(),
+            ]);
+        } catch (Throwable $e) {
+            $this->warn("Gagal mencatat ke etl_runs: {$e->getMessage()}. ETL tetap dilanjutkan.");
+            return null;
+        }
+    }
+
+    /** @param array<string,mixed> $attributes */
+    private function closeRun(?EtlRun $run, array $attributes): void
+    {
+        if ($run === null) {
+            return;
+        }
+
+        try {
+            $run->update($attributes);
+        } catch (Throwable $e) {
+            $this->warn("Gagal memperbarui etl_runs id={$run->id}: {$e->getMessage()}.");
+        }
     }
 }

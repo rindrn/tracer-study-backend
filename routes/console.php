@@ -31,7 +31,9 @@ Artisan::command('inspire', function () {
 |
 */
 
-Schedule::command('etl:run')
+// --reason membedakan eksekusi terjadwal dari eksekusi manual di CLI saat
+// riwayat etl_runs dibaca; tanpa itu keduanya tercatat sebagai 'cli_manual'.
+Schedule::command('etl:run --reason=scheduled_weekly')
     ->weeklyOn(1, '01:00') // setiap Senin jam 01:00
     ->withoutOverlapping()
     ->onSuccess(function () {
