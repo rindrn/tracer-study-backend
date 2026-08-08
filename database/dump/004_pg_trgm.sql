@@ -1,0 +1,21 @@
+-- 004_pg_trgm.sql — ekstensi pg_trgm untuk deteksi pertanyaan bermakna sama.
+--
+-- Dipakai SemanticMappingRepository::findSimilarQuestions() (Constraint D):
+-- sebelum petugas memetakan sebuah kode pertanyaan ke peran semantik, sistem
+-- memperingatkan bila ada pertanyaan lain di kuesioner yang sama dengan teks
+-- mirip. Tanpa ekstensi ini, GET /api/question-semantic-mappings/similar
+-- membalas 500 dengan "function similarity(text, text) does not exist" dan
+-- panel saran menggantung selamanya.
+--
+-- DIPASANG DI SCHEMA public, DAN ITU DISENGAJA. Koneksi 'oltp' punya
+-- search_path 'tracer_oltp' saja (config/database.php), sehingga pemanggilnya
+-- WAJIB menulis public.similarity(...) dengan qualifier lengkap. Lihat catatan
+-- di SemanticMappingRepository sebelum menghapus qualifier itu.
+--
+-- HARUS dijalankan SESUDAH importOlapSchema(): langkah itu melakukan
+-- DROP SCHEMA public CASCADE, yang ikut menjatuhkan ekstensi ini bila
+-- urutannya dibalik.
+--
+-- Additive dan idempotent — aman dijalankan berulang kali.
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA public;

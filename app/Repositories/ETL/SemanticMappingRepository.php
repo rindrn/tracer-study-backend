@@ -257,11 +257,11 @@ class SemanticMappingRepository
     public function findSimilarQuestions(int $questionnaireId, string $questionText, ?string $excludeCode, float $threshold = 0.3, int $limit = 5): Collection
     {
         return $this->oltp()->table('questionnaire_questions as qq')
-            ->selectRaw('qq.code as question_code, qq.question_text, similarity(qq.question_text, ?) as similarity', [$questionText])
+            ->selectRaw('qq.code as question_code, qq.question_text, public.similarity(qq.question_text, ?) as similarity', [$questionText])
             ->where('qq.questionnaire_id', $questionnaireId)
-            ->whereRaw('similarity(qq.question_text, ?) >= ?', [$questionText, $threshold])
+            ->whereRaw('public.similarity(qq.question_text, ?) >= ?', [$questionText, $threshold])
             ->when($excludeCode !== null, fn ($query) => $query->where('qq.code', '!=', $excludeCode))
-            ->orderByRaw('similarity(qq.question_text, ?) DESC', [$questionText])
+            ->orderByRaw('public.similarity(qq.question_text, ?) DESC', [$questionText])
             ->limit($limit)
             ->get();
     }

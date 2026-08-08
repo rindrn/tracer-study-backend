@@ -41,6 +41,14 @@ class DatabaseSeeder extends Seeder
     {
         $this->importOlapSchema();
 
+        // Sesudah importOlapSchema(), bukan sebelum: langkah itu melakukan
+        // DROP SCHEMA public CASCADE, yang ikut menjatuhkan ekstensinya.
+        $this->importSql(
+            'dump/004_pg_trgm.sql',
+            'ekstensi pg_trgm (deteksi pertanyaan bermakna sama)',
+            'OLAP',
+        );
+
         $this->call([
             ProgramSeeder::class,
             // Setelah ProgramSeeder: daftar induk jurusan diturunkan dari
