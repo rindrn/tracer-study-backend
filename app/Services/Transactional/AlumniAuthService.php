@@ -94,6 +94,14 @@ class AlumniAuthService
             'name'            => $alumni->name,
             'email'           => $alumni->email,
             'phone'           => $alumni->phone,
+            // NIK dan NPWP ikut karena keduanya dipakai mengisi ulang bagian
+            // identitas formulir. Nilainya tidak pernah tersimpan di
+            // response_answers (IDENTITY_KEYS membuangnya — tempatnya memang di
+            // alumni_profiles), jadi tanpa dikirim di sini isiannya kembali
+            // kosong setiap kali pengisian dimuat ulang, termasuk setelah
+            // Ketua Tracer mengembalikan status ke Ongoing.
+            'nik'             => $alumni->nik,
+            'npwp'            => $alumni->npwp,
             'program_id'      => $alumni->program_id,
             'program_name'    => $alumni->program_name,
             'program_code'    => $alumni->program_code,

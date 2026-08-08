@@ -44,6 +44,7 @@ class AlumniProfileRepository
                 'alumni_profiles.graduation_year',
                 'alumni_profiles.is_active',
                 'alumni_profiles.nik',
+                'alumni_profiles.npwp',
                 // Cincangan kata sandi, dipakai AlumniAuthService::login().
                 // Tanpa kolom ini Hash::check() selalu membandingkan dengan
                 // null dan SETIAP alumni gagal masuk — tanpa gejala lain
