@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\DB;
  * merujuk f5c juga tidak terpengaruh.
  *
  * Setelah migrasi ini dijalankan, ETL perlu dijalankan ulang (php artisan
- * etl:run --force) supaya dim_wirausaha.jabatan terisi label, bukan kode.
+ * etl:run) supaya dim_wirausaha.jabatan terisi label, bukan kode.
  */
 return new class extends Migration
 {

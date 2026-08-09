@@ -30,14 +30,33 @@ use Throwable;
  * ditulis lewat koneksi 'oltp', sedangkan ETL bertransaksi di koneksi
  * 'olap', jadi keduanya transaksi terpisah. Kalau penulisan log gagal,
  * ETL tetap jalan — lihat catatan di setiap blok try di bawah.
+ *
+ * FULL SNAPSHOT SECARA DEFAULT (bukan lagi incremental)
+ * ------------------------------------------------------
+ * FR-063 (SRS) mengharuskan ETL mingguan "memperbarui data fakta" dan
+ * "pembaruan agregasi data yang digunakan dashboard" -- dibaca sebagai:
+ * hasil satu run ETL harus jadi potret LENGKAP & terkini, bukan cuma
+ * tempelan response yang baru masuk sejak run sebelumnya.
+ *
+ * Sebelum ini, defaultnya incremental (force=false): fact_tracer_study
+ * untuk id_waktu terbaru cuma berisi beberapa baris (alumni yang baru
+ * submit), sedangkan dashboard Luaran Pekerjaan/Analisis Capaian Lulusan
+ * DEFAULT memilih snapshot TERBARU itu -- hasilnya KPI dihitung dari
+ * sampel kecil yang menyesatkan (mis. 92,9% dari 14 alumni, padahal
+ * populasi sebenarnya ~5.200 dan angka aslinya 88%), walau
+ * tracer_oltp.etl_runs correctly menunjukkan status completed.
+ *
+ * --incremental tetap disediakan untuk kasus performa (histori sangat
+ * besar) di mana admin SADAR snapshot itu bukan potret lengkap dan
+ * memang hanya ingin memproses delta -- bukan lagi perilaku default.
  */
 class RunEtlSnapshot extends Command
 {
     protected $signature = 'etl:run
-                            {--force : Jalankan walau belum ada response baru sejak snapshot terakhir}
+                            {--incremental : Hanya proses response baru sejak snapshot terakhir -- snapshot hasilnya TIDAK lengkap, lihat catatan class ini}
                             {--reason=cli_manual : Penanda pemicu yang dicatat di kolom etl_runs.reason}';
 
-    protected $description = 'Jalankan ETL snapshot dari tracer_oltp ke OLAP (schema public)';
+    protected $description = 'Jalankan ETL snapshot penuh dari tracer_oltp ke OLAP (schema public)';
 
     public function handle(EtlOrchestratorService $orchestrator): int
     {
@@ -47,7 +66,7 @@ class RunEtlSnapshot extends Command
         $run = $this->openRun();
 
         try {
-            $result = $orchestrator->run(force: (bool) $this->option('force'));
+            $result = $orchestrator->run(force: ! $this->option('incremental'));
         } catch (Throwable $e) {
             $this->closeRun($run, [
                 'status'        => 'failed',

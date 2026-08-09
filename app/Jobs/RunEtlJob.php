@@ -9,7 +9,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -55,9 +54,9 @@ class RunEtlJob implements ShouldQueue
                 'finished_at' => now(),
             ]);
 
-            // Fact/dim baru saja berubah -- paksa dashboard membaca data
-            // segar di request berikutnya, jangan tunggu TTL cache habis.
-            Cache::store('redis')->tags(['analytics-dashboard'])->flush();
+            // Cache dashboard sudah di-flush di dalam EtlOrchestratorService::run()
+            // itu sendiri -- berlaku untuk jalur ini MAUPUN jalur CLI etl:run,
+            // supaya tidak ada lagi jalur trigger ETL yang lupa membersihkannya.
         } catch (Throwable $e) {
             Log::error("RunEtlJob gagal (etl_runs id={$this->etlRunId}): {$e->getMessage()}", ['exception' => $e]);
 

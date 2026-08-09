@@ -5,6 +5,7 @@ namespace App\Services\ETL;
 use App\DTOs\ETL\EtlRunSummaryDTO;
 use App\Repositories\ETL\OlapLoadRepository;
 use App\Repositories\ETL\OltpExtractRepository;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -50,7 +51,7 @@ class EtlOrchestratorService
         $snapshotDate = now();
         $lastSnapshot = $force ? null : $this->getLastSnapshotDate();
 
-        return DB::connection('olap')->transaction(function () use ($summary, $snapshotDate, $lastSnapshot) {
+        $result = DB::connection('olap')->transaction(function () use ($summary, $snapshotDate, $lastSnapshot) {
 
             // ── Tahap 1: dim_waktu ──
             $idWaktu = $this->olapRepo->insertNewSnapshot($snapshotDate);
@@ -128,6 +129,16 @@ class EtlOrchestratorService
 
             return $summary;
         });
+
+        // Fact/dim baru saja berubah -- paksa dashboard membaca data segar
+        // di request berikutnya, jangan tunggu TTL cache habis. Ditaruh di
+        // SATU tempat di sini (bukan lagi diduplikasi di tiap pemanggil:
+        // RunEtlJob dan perintah CLI etl:run) supaya kedua jalur trigger
+        // ETL -- auto-trigger via queue MAUPUN manual/terjadwal via CLI --
+        // sama-sama menghapus cache-nya, bukan cuma salah satu.
+        Cache::store('redis')->tags(['analytics-dashboard'])->flush();
+
+        return $result;
     }
 
     /**
