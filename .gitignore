@@ -29,3 +29,9 @@ Thumbs.db
 CLAUDE.md
 docs/*
 docs/
+
+# Dump berisi data pribadi alumni asli (nama, NIM, jawaban) -- jangan pernah
+# di-commit. Dibangun ulang lewat scripts/rebuild-data-dumps.sh.
+/database/dump/oltp_real_data.sql
+/database/dump/*.bak
+.env.bak*

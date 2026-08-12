@@ -276,9 +276,92 @@ class AlumniProfileRepository
      * dijamin unik oleh indeks. Jadi leftJoin tetap dipakai — kolom
      * response_id dan submitted_at memang perlu ditampilkan.
      *
-     * @param array{program_id?: int, search?: string, questionnaire_id: int} $filters
+     * @param array{program_id?: int, search?: string, questionnaire_id: int,
+     *              jurusan?: string, graduation_year?: int,
+     *              response_status?: string} $filters
      */
     public function paginateRespondentsByQuestionnaire(array $filters, int $perPage): LengthAwarePaginator
+    {
+        $query = $this->respondentsBaseQuery($filters)
+            ->select(
+                'alumni_profiles.id',
+                'alumni_profiles.nim',
+                'alumni_profiles.name',
+                'alumni_profiles.email',
+                'alumni_profiles.program_id',
+                'alumni_profiles.graduation_year',
+                'programs.name as program_name',
+                'programs.degree as program_degree',
+                'programs.jurusan as jurusan_name',
+                'responses.id as response_id',
+                DB::raw(self::RESPONSE_STATUS_SQL . ' as response_status'),
+                'responses.submitted_at as response_submitted_at',
+                'responses.created_at as response_created_at',
+                'responses.updated_at as response_updated_at',
+            );
+
+        return $query->orderByRaw("CASE WHEN responses.status IN ('submitted','verified') THEN 2 ELSE 1 END")
+            ->orderBy('alumni_profiles.name')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Jumlah responden per status untuk SATU kuesioner, tunduk pada penyaring
+     * yang sama dengan paginateRespondentsByQuestionnaire().
+     *
+     * Dipakai kartu ringkasan di halaman Daftar Responden. Kartu itu tidak
+     * boleh dihitung dari baris yang kebetulan termuat di halaman aktif:
+     * begitu daftarnya dipaginasi, angkanya hanya akan mencerminkan satu
+     * halaman dan berubah-ubah tiap kali pengguna berpindah halaman.
+     *
+     * Penyaring response_status sengaja TIDAK ikut diterapkan — kartunya
+     * memang harus tetap menampilkan ketiga angka meski daftarnya sedang
+     * disaring ke salah satu status.
+     *
+     * @param array{program_id?: int, search?: string, questionnaire_id: int,
+     *              jurusan?: string, graduation_year?: int} $filters
+     *
+     * @return array{total: int, finished: int, ongoing: int, not_started: int}
+     */
+    public function countRespondentStatusByQuestionnaire(array $filters): array
+    {
+        unset($filters['response_status']);
+
+        $rows = $this->respondentsBaseQuery($filters)
+            ->select(DB::raw(self::RESPONSE_STATUS_SQL . ' as response_status'), DB::raw('count(*) as jumlah'))
+            ->groupBy(DB::raw(self::RESPONSE_STATUS_SQL))
+            ->pluck('jumlah', 'response_status');
+
+        $finished   = (int) ($rows['finished'] ?? 0);
+        $ongoing    = (int) ($rows['ongoing'] ?? 0);
+        $notStarted = (int) ($rows['not_started'] ?? 0);
+
+        return [
+            'total'       => $finished + $ongoing + $notStarted,
+            'finished'    => $finished,
+            'ongoing'     => $ongoing,
+            'not_started' => $notStarted,
+        ];
+    }
+
+    /**
+     * Turunan status responden dari baris responses hasil LEFT JOIN.
+     * Satu definisi dipakai bersama oleh daftar dan kartu ringkasan supaya
+     * keduanya tidak bisa berbeda pendapat soal arti "sedang mengisi".
+     */
+    private const RESPONSE_STATUS_SQL = "CASE
+        WHEN responses.status IN ('submitted','verified') THEN 'finished'
+        WHEN responses.status = 'started' THEN 'ongoing'
+        ELSE 'not_started'
+    END";
+
+    /**
+     * Rangka query responden satu kuesioner: scope target kuesioner plus
+     * seluruh penyaring dari request. Tanpa select dan tanpa urutan — pemanggil
+     * yang menentukan, karena daftar butuh kolom lengkap sedangkan kartu
+     * ringkasan hanya butuh hitungan.
+     */
+    private function respondentsBaseQuery(array $filters): Builder
     {
         $conn = DB::connection(self::CONN);
         $questionnaireId = $filters['questionnaire_id'];
@@ -294,27 +377,7 @@ class AlumniProfileRepository
             ->leftJoin('responses', function ($join) use ($questionnaireId) {
                 $join->on('responses.alumni_id', '=', 'alumni_profiles.id')
                      ->where('responses.questionnaire_id', '=', $questionnaireId);
-            })
-            ->select(
-                'alumni_profiles.id',
-                'alumni_profiles.nim',
-                'alumni_profiles.name',
-                'alumni_profiles.email',
-                'alumni_profiles.program_id',
-                'alumni_profiles.graduation_year',
-                'programs.name as program_name',
-                'programs.degree as program_degree',
-                'programs.jurusan as jurusan_name',
-                'responses.id as response_id',
-                DB::raw("CASE
-                    WHEN responses.status IN ('submitted','verified') THEN 'finished'
-                    WHEN responses.status = 'started' THEN 'ongoing'
-                    ELSE 'not_started'
-                END as response_status"),
-                'responses.submitted_at as response_submitted_at',
-                'responses.created_at as response_created_at',
-                'responses.updated_at as response_updated_at',
-            );
+            });
 
         // Scope berdasarkan target kuesioner
         if ($questionnaire && $questionnaire->program_id) {
@@ -337,6 +400,22 @@ class AlumniProfileRepository
             $query->where('programs.jurusan', $filters['jurusan']);
         }
 
+        if (!empty($filters['graduation_year'])) {
+            $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
+        }
+
+        // Penyaring status dijalankan di basis data, bukan di frontend. Selama
+        // daftarnya belum dipaginasi hal ini tidak terasa; sesudahnya, menyaring
+        // di sisi klien hanya menyaring halaman yang sedang terbuka.
+        if (!empty($filters['response_status'])) {
+            match ($filters['response_status']) {
+                'finished'    => $query->whereIn('responses.status', ['submitted', 'verified']),
+                'ongoing'     => $query->where('responses.status', 'started'),
+                'not_started' => $query->whereNull('responses.id'),
+                default       => null,
+            };
+        }
+
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
@@ -345,9 +424,7 @@ class AlumniProfileRepository
             });
         }
 
-        return $query->orderByRaw("CASE WHEN responses.status IN ('submitted','verified') THEN 2 ELSE 1 END")
-            ->orderBy('alumni_profiles.name')
-            ->paginate($perPage);
+        return $query;
     }
 
     /**

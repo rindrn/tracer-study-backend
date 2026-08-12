@@ -168,7 +168,11 @@ class ResponseSeeder extends Seeder
                 $conn->table('employment_records')->insert([
                     'alumni_id'         => $alumni->id,
                     'questionnaire_id'  => $matchedGlobal->id,
-                    'employment_status' => $statusKerja == 1 ? 'employed' : 'entrepreneur',
+                    // Harus label opsi f8 apa adanya -- kolomnya dibatasi CHECK
+                    // constraint yang hanya menerima frasa Indonesia.
+                    'employment_status' => $statusKerja == 1
+                        ? 'Bekerja (full time / part time)'
+                        : 'Wiraswasta',
                     'company_name'      => $statusKerja == 1 ? $faker->randomElement($companies) : 'Usaha Sendiri',
                     'job_title'         => $faker->jobTitle,
                     'salary_current'    => $salary,

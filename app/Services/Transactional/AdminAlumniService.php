@@ -35,6 +35,19 @@ class AdminAlumniService
         return $this->alumniRepo->paginateForAdminWithResponseStatus($filters, $perPage);
     }
 
+    /**
+     * Ringkasan status responden satu kuesioner (total / finished / ongoing /
+     * not_started), tunduk pada scope role dan penyaring yang sama dengan
+     * list(). Dipakai kartu di halaman Daftar Responden, yang harus tetap
+     * benar meski daftarnya sedang menampilkan satu halaman saja.
+     */
+    public function respondentStats(User $user, array $filters): array
+    {
+        return $this->alumniRepo->countRespondentStatusByQuestionnaire(
+            $this->applyRoleScope($user, $filters),
+        );
+    }
+
     // ═══════════════════════════════════════════════════════════
     // STATS — total / sudah mengisi / belum mengisi / response rate
     // ═══════════════════════════════════════════════════════════

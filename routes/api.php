@@ -350,6 +350,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Alumni management
     Route::get('alumni/stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
+    // Harus di atas apiResource('alumni'): tanpa itu 'respondent-stats'
+    // tertangkap sebagai {alumni} di route show.
+    Route::get('alumni/respondent-stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'respondentStats']);
     Route::get('alumni/template', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'downloadTemplate']);
     Route::post('alumni/import', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'importAlumni']);
     Route::apiResource('alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);

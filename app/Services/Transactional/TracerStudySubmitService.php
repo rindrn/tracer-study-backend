@@ -333,28 +333,60 @@ class TracerStudySubmitService
     }
 
     /**
+     * Nilai f8 → employment_records.employment_status.
+     *
+     * Harus persis sama dengan label opsi f8 di kuesioner: kolomnya dibatasi
+     * CHECK constraint yang hanya menerima ketujuh frasa ini, dan seluruh data
+     * alumni yang sudah ada memakai frasa yang sama. Menulis nilai lain
+     * (dulu 'employed' / 'entrepreneur') membuat submit ditolak basis data.
+     */
+    private const EMPLOYMENT_STATUS_BY_F8 = [
+        1 => 'Bekerja (full time / part time)',
+        2 => 'Belum memungkinkan bekerja',
+        3 => 'Wiraswasta',
+        4 => 'Melanjutkan Pendidikan',
+        5 => 'Tidak kerja tetapi sedang mencari kerja',
+        6 => 'Melanjutkan pendidikan sambil bekerja',
+        7 => 'Melanjutkan pendidikan sambil wiraswasta',
+    ];
+
+    /** f8 yang berarti alumni sedang menempuh pendidikan lanjut. */
+    private const FURTHER_STUDY_STATUSES = [4, 6, 7];
+
+    /**
      * Berdasarkan f8 (status alumni) — replace employment / education record.
-     *   f8 = 1 (pekerja)      → employment_records
-     *   f8 = 3 (wiraswasta)   → employment_records
-     *   f8 = 4 (lanjut studi) → education_records
+     *
+     * employment_records diisi untuk SEMUA nilai f8, bukan hanya yang bekerja.
+     * Tabel itu memang berperan sebagai catatan status terakhir alumni: data
+     * yang sudah ada menyimpan baris untuk ketujuh status, termasuk "Belum
+     * memungkinkan bekerja" dan "Tidak kerja tetapi sedang mencari kerja".
+     * Kolom pekerjaan (gaji, perusahaan, kota) tetap null di status itu karena
+     * pertanyaannya memang tidak ditampilkan.
+     *
+     * f8 = 6 dan 7 ("sambil bekerja" / "sambil wiraswasta") menghasilkan dua
+     * baris sekaligus: employment_records dan education_records.
      */
     private function persistNormalizedRecords(array $validated, int $alumniId, int $questionnaireId): void
     {
         $status = (int) ($validated['f8'] ?? 0);
 
-        if (in_array($status, [1, 3], strict: true)) {
+        $employmentStatus = self::EMPLOYMENT_STATUS_BY_F8[$status] ?? null;
+
+        if ($employmentStatus !== null) {
             $this->employmentRepo->deleteByAlumniId($alumniId);
             $this->employmentRepo->create([
                 'alumni_id'         => $alumniId,
                 'questionnaire_id'  => $questionnaireId,
-                'employment_status' => $status === 1 ? 'employed' : 'entrepreneur',
+                'employment_status' => $employmentStatus,
                 'waiting_months'    => $validated['f502'] ?? null,
                 'salary_current'    => $validated['f505'] ?? null,
                 'work_city'         => $validated['f5a2'] ?? null,
                 'company_name'      => $validated['f5b']  ?? null,
                 'job_title'         => $validated['f5c']  ?? null,
             ]);
-        } elseif ($status === 4) {
+        }
+
+        if (in_array($status, self::FURTHER_STUDY_STATUSES, strict: true)) {
             $this->educationRepo->deleteByAlumniId($alumniId);
             $this->educationRepo->create([
                 'alumni_id'        => $alumniId,

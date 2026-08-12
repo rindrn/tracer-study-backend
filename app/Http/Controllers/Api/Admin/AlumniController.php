@@ -37,11 +37,42 @@ class AlumniController extends Controller
                 'jurusan' => $request->query('jurusan'),
                 'program_id' => $request->query('program_id') ? (int) $request->query('program_id') : null,
                 'graduation_year' => $request->query('graduation_year') ? (int) $request->query('graduation_year') : null,
+                'response_status' => $request->query('response_status'),
             ],
             perPage: (int) $request->query('per_page', 15),
         );
 
         return response()->json(['success' => true, 'data' => $result]);
+    }
+
+    /**
+     * GET /api/admin/alumni/respondent-stats?questionnaire_id=…
+     *
+     * Hitungan finished / ongoing / not_started untuk satu kuesioner.
+     * Terpisah dari index() karena kartu ringkasan harus menghitung SELURUH
+     * responden, bukan hanya halaman yang sedang dibuka.
+     */
+    public function respondentStats(Request $request): JsonResponse
+    {
+        $questionnaireId = $request->query('questionnaire_id');
+
+        if (!$questionnaireId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter questionnaire_id wajib diisi.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->respondentStats($request->user(), [
+                'questionnaire_id' => (int) $questionnaireId,
+                'search'           => $request->query('search'),
+                'jurusan'          => $request->query('jurusan'),
+                'program_id'       => $request->query('program_id') ? (int) $request->query('program_id') : null,
+                'graduation_year'  => $request->query('graduation_year') ? (int) $request->query('graduation_year') : null,
+            ]),
+        ]);
     }
 
     /**
