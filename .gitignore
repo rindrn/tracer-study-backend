@@ -30,8 +30,10 @@ CLAUDE.md
 docs/*
 docs/
 
-# Dump berisi data pribadi alumni asli (nama, NIM, jawaban) -- jangan pernah
-# di-commit. Dibangun ulang lewat scripts/rebuild-data-dumps.sh.
-/database/dump/oltp_real_data.sql
+# oltp_real_data.sql SENGAJA ikut repositori supaya yang men-deploy cukup
+# `migrate` + `db:seed` tanpa perlu dikirimi berkas terpisah. Isinya data
+# pribadi alumni asli (nama, NIM, jawaban), jadi repositori ini HARUS tetap
+# privat. Bangun ulang lewat scripts/rebuild-data-dumps.sh kalau datanya
+# berubah.
 /database/dump/*.bak
 .env.bak*
