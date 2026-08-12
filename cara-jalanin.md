@@ -11,13 +11,17 @@ ganti dengan nama yang sama persis di setiap langkah, termasuk di `.env`.
 - `psql` bisa dipanggil dari terminal — seeder memakainya untuk mengimpor
   berkas `.sql`. Di Windows biasanya perlu ditambahkan ke PATH:
   `C:\Program Files\PostgreSQL\17\bin`
-- `database/dump/oltp_real_data.sql` (52 MB, data alumni asli).
-  **Tidak ada di repositori** karena berisi data pribadi. Minta ke tim, atau
-  bangun dari basis data yang sudah terisi:
-  `bash scripts/rebuild-data-dumps.sh {nama_db}`
+Seluruh berkas data sudah ikut di repositori, termasuk
+`database/dump/oltp_real_data.sql` (51 MB) yang berisi profil dan jawaban
+alumni. Tidak ada yang perlu diminta ke siapa pun — cukup `clone` lalu
+ikuti langkah di bawah.
 
-Tanpa berkas itu instalasi tetap berhasil — hasilnya basis data berisi master
-data saja (prodi, kuesioner, akun staf), siap diisi lewat aplikasi.
+> Karena berkas itu memuat data pribadi asli (nama, NIM, jawaban),
+> **repositori ini harus tetap privat.**
+
+Kalau berkas itu sengaja dihapus, instalasi tetap berhasil — hasilnya basis
+data berisi master data saja (prodi, kuesioner, akun staf), siap diisi lewat
+aplikasi.
 
 ## Langkah
 
@@ -86,6 +90,20 @@ php artisan db:seed
 
 `migrate:fresh` hanya membersihkan `tracer_oltp`; schema `public` dijatuhkan
 dan dibuat ulang oleh seeder, jadi aman diulang berkali-kali.
+
+## Kalau datanya berubah
+
+Berkas dump di `database/dump/` adalah cerminan sebuah basis data, bukan
+berkas yang disunting tangan. Sesudah mengubah data di basis data, bangun
+ulang supaya repositori ikut terbarui:
+
+```bash
+bash scripts/rebuild-data-dumps.sh {nama_db}
+```
+
+Skrip ini **membaca** dari basis data yang sudah terisi — bukan membuat data
+dari nol. Jadi jalankan di komputer yang basis datanya sudah lengkap, lalu
+commit berkas yang berubah.
 
 ## Data karangan untuk pengembangan
 
