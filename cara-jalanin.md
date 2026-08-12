@@ -25,11 +25,18 @@ aplikasi.
 
 ## Langkah
 
-**1. Buat basis data**
+**1. Buat basis data dan schema OLTP**
 
 ```bash
 psql -U postgres -c "CREATE DATABASE {nama_db}"
+psql -U postgres -d {nama_db} -c "CREATE SCHEMA IF NOT EXISTS tracer_oltp"
 ```
+
+Baris kedua wajib. Koneksi `oltp` memakai `search_path = tracer_oltp`, jadi
+`migrate` butuh schema itu sudah ada sebelum bisa membuat tabel `migrations`
+sekalipun. Tidak ada migration yang bisa membuatnya sendiri — mereka semua
+sudah berjalan di dalam schema tersebut. Tanpa baris ini `migrate` berhenti
+dengan `SQLSTATE[3F000]: no schema has been selected to create in`.
 
 **2. Arahkan `.env`**
 
