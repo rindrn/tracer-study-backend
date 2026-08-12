@@ -2,6 +2,9 @@
 
 Panduan singkat menyiapkan basis data SmartTracer dari nol.
 
+`{nama_db}` di seluruh perintah adalah nama basis data pilihan Anda —
+ganti dengan nama yang sama persis di setiap langkah, termasuk di `.env`.
+
 ## Yang perlu ada dulu
 
 - PostgreSQL 15+ jalan di `127.0.0.1:5432`
@@ -11,7 +14,7 @@ Panduan singkat menyiapkan basis data SmartTracer dari nol.
 - `database/dump/oltp_real_data.sql` (52 MB, data alumni asli).
   **Tidak ada di repositori** karena berisi data pribadi. Minta ke tim, atau
   bangun dari basis data yang sudah terisi:
-  `bash scripts/rebuild-data-dumps.sh nama_basis_data`
+  `bash scripts/rebuild-data-dumps.sh {nama_db}`
 
 Tanpa berkas itu instalasi tetap berhasil — hasilnya basis data berisi master
 data saja (prodi, kuesioner, akun staf), siap diisi lewat aplikasi.
@@ -21,7 +24,7 @@ data saja (prodi, kuesioner, akun staf), siap diisi lewat aplikasi.
 **1. Buat basis data**
 
 ```bash
-psql -U postgres -c "CREATE DATABASE tracer_recon"
+psql -U postgres -c "CREATE DATABASE {nama_db}"
 ```
 
 **2. Arahkan `.env`**
@@ -30,8 +33,8 @@ OLTP dan OLAP menempati satu basis data yang sama, dibedakan oleh schema
 (`tracer_oltp` dan `public`):
 
 ```
-OLTP_DB_DATABASE=tracer_recon
-OLAP_DB_DATABASE=tracer_recon
+OLTP_DB_DATABASE={nama_db}
+OLAP_DB_DATABASE={nama_db}
 ```
 
 **3. Bangun schema**
@@ -67,7 +70,7 @@ sekitar 7 menit.
 **6. Schema untuk Cube.js**
 
 ```bash
-psql -U postgres -d tracer_recon -c "CREATE SCHEMA IF NOT EXISTS dev_pre_aggregations"
+psql -U postgres -d {nama_db} -c "CREATE SCHEMA IF NOT EXISTS dev_pre_aggregations"
 ```
 
 Cube.js mengisinya sendiri saat query pertama datang. Pastikan
@@ -104,9 +107,9 @@ jadi basis data tidak akan menolaknya.
 tertinggal beberapa langkah, jadi urutannya berbeda:
 
 ```bash
-psql -U postgres -d nama_db -c "DROP SCHEMA IF EXISTS public CASCADE"
-psql -U postgres -d nama_db -f database/dump/init.sql
-psql -U postgres -d nama_db -f database/dump/005_reconcile_init.sql
+psql -U postgres -d {nama_db} -c "DROP SCHEMA IF EXISTS public CASCADE"
+psql -U postgres -d {nama_db} -f database/dump/init.sql
+psql -U postgres -d {nama_db} -f database/dump/005_reconcile_init.sql
 php artisan migrate
 ```
 

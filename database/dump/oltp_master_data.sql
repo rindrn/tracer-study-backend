@@ -1312,9 +1312,9 @@ bulan_sesudah_lulus	Bulan Sesudah Lulus Mulai Cari Kerja	waktu_tunggu	Jumlah bul
 
 
 COPY tracer_oltp.questionnaires (id, code, title, period_year, version, status, published_at, created_by, created_at, updated_at, program_id, description, target, sample_respondents, target_graduation_years) FROM stdin;
-1	DIKTI_2026_v1	Kuesioner Tracer Study Nasional 2026 — Lulusan 2022	2026	1	published	2026-06-01 10:16:26	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	\N	Kuesioner wajib dari Kementerian Pendidikan untuk seluruh lulusan perguruan tinggi.	\N	\N	[2022]
 2	DIKTI_2026_v2	Kuesioner Tracer Study Nasional 2026 — Lulusan 2023	2026	2	published	2026-06-01 10:16:26	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	\N	Kuesioner wajib dari Kementerian Pendidikan untuk seluruh lulusan perguruan tinggi.	\N	\N	[2023]
 3	DIKTI_2026_v3	Kuesioner Tracer Study Nasional 2026 — Lulusan 2024	2026	3	published	2026-06-01 10:16:26	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	\N	Kuesioner wajib dari Kementerian Pendidikan untuk seluruh lulusan perguruan tinggi.	\N	\N	[2024]
+1	DIKTI_2026_v1	Kuesioner Tracer Study Nasional 2026 — Lulusan 2019–2022	2026	1	published	2026-06-01 10:16:26	\N	2026-06-01 10:16:26	2026-08-12 10:45:55	\N	Kuesioner wajib dari Kementerian Pendidikan untuk seluruh lulusan perguruan tinggi.	\N	\N	[2019, 2020, 2021, 2022]
 \.
 
 
