@@ -13,7 +13,9 @@ class QuestionnaireSeeder extends Seeder
         $now = Carbon::now();
         $conn = DB::connection('oltp');
 
-        $targetYears = [2022, 2023, 2024];
+        // Ikut daftar angkatan yang benar-benar dibuat AlumniProfileSeeder.
+        // Jangan ditulis ulang di sini -- lihat catatan di konstantanya.
+        $targetYears = AlumniProfileSeeder::GRADUATION_YEARS;
         $globalIds = [];
 
         foreach ($targetYears as $tIdx => $targetYear) {
@@ -459,12 +461,12 @@ class QuestionnaireSeeder extends Seeder
                 ['q_sertifikasi', 'Apakah Anda memiliki sertifikasi profesional yang relevan dengan bidang studi?', 'boolean'],
             ];
 
-            $prodiTargetYears = [2022, 2023, 2024];
+            $prodiTargetYears = AlumniProfileSeeder::GRADUATION_YEARS;
             foreach ($prodiTargetYears as $ptIdx => $ptYear) {
                 $qLokalId = $conn->table('questionnaires')->insertGetId([
                     'code'                    => strtoupper($program->code) . '_2026_v' . ($ptIdx + 1),
                     'title'                   => "Kuesioner Tambahan Lulusan {$program->name} — Lulusan {$ptYear}",
-                    'description'             => "Pertanyaan khusus dari Program Studi {$program->name} POLBAN.",
+                    'description'             => "Pertanyaan khusus dari Program Studi {$program->name}.",
                     'period_year'             => 2026,
                     'version'                 => $ptIdx + 1,
                     'status'                  => 'published',

@@ -54,6 +54,10 @@ class ResponseSeeder extends Seeder
             }
         }
 
+        // Alumni yang angkatannya tidak disasar kuesioner mana pun, dihitung
+        // per tahun supaya bisa dilaporkan di akhir alih-alih hilang diam-diam.
+        $lewatTanpaKuesioner = [];
+
         // Prodi-specific answer generators (keyed by jurusan)
         $prodiAnswerMap = [
             'Teknik Sipil' => ['q_software_desain' => ['AutoCAD', 'SAP2000', 'Revit', 'SketchUp', 'ETABS']],
@@ -98,9 +102,24 @@ class ResponseSeeder extends Seeder
                 continue; // Alumni ini sengaja dibiarkan tanpa jawaban (belum mengisi).
             }
 
-            // Year-pairing: find matching global questionnaire for this alumni's grad year
+            // Pasangkan alumni dengan kuesioner yang memang menyasar angkatannya.
+            //
+            // JANGAN kembalikan fallback "?? $qGlobal" di sini. Dulu barisnya
+            // begitu, dan akibatnya alumni yang angkatannya tidak disasar
+            // kuesioner mana pun tetap dibuatkan respons -- yang nyantol ke
+            // kuesioner angkatan lain. Kesalahannya tidak kelihatan di seeder,
+            // baru muncul di halaman Manajemen Kuisioner sebagai angkatan
+            // berlabel "Belum digarap" yang anehnya punya ratusan pengisi.
+            // Melewati alumninya membuat ketimpangan daftar tahun langsung
+            // terlihat sebagai angkatan yang benar-benar kosong.
             $alumniYear = (int) $alumni->graduation_year;
-            $matchedGlobal = $globalByYear[$alumniYear] ?? $qGlobal;
+
+            if (!isset($globalByYear[$alumniYear])) {
+                $lewatTanpaKuesioner[$alumniYear] = ($lewatTanpaKuesioner[$alumniYear] ?? 0) + 1;
+                continue;
+            }
+
+            $matchedGlobal = $globalByYear[$alumniYear];
 
             // 1. Buat Header Response
             $responseId = $conn->table('responses')->insertGetId([
@@ -298,6 +317,20 @@ class ResponseSeeder extends Seeder
             foreach (array_chunk($answers, 50) as $chunk) {
                 $conn->table('response_answers')->insert($chunk);
             }
+        }
+
+        if ($lewatTanpaKuesioner !== []) {
+            ksort($lewatTanpaKuesioner);
+            $rincian = [];
+            foreach ($lewatTanpaKuesioner as $tahun => $jumlah) {
+                $rincian[] = "{$tahun}: {$jumlah} alumni";
+            }
+
+            $this->command?->warn(
+                'Angkatan tanpa kuesioner yang menyasarnya, dilewati -- '
+                . implode(', ', $rincian)
+                . '. Samakan AlumniProfileSeeder::GRADUATION_YEARS dengan target kuesioner di QuestionnaireSeeder.'
+            );
         }
     }
 

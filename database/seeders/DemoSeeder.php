@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use Database\Seeders\Concerns\ImportsSqlDumps;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -26,9 +27,16 @@ use Illuminate\Support\Facades\DB;
 class DemoSeeder extends Seeder
 {
     use WithoutModelEvents;
+    use ImportsSqlDumps;
 
     public function run(): void
     {
+        // Rangka star schema OLAP tidak punya migration sama sekali, jadi
+        // tanpa langkah ini seluruh query dashboard error di basis data yang
+        // baru. Jalur demo harus bisa berdiri sendiri: satu perintah ini saja
+        // sesudah `php artisan migrate`, tanpa psql manual.
+        $this->prepareOlapSchema();
+
         $this->call([
             ProgramSeeder::class,
             // Setelah ProgramSeeder: daftar induk jurusan diturunkan dari
@@ -51,9 +59,134 @@ class DemoSeeder extends Seeder
         // oltp_master_data.sql. Berkas master berisi programs, users, dan
         // template kuesioner yang di jalur demo justru sudah dibuat seeder
         // Faker di atas, jadi memuatnya akan menggandakan semuanya.
-        $this->importSql('dump/oltp_config_data.sql');
+        $this->importSqlFile('dump/oltp_config_data.sql', 'konfigurasi LAM, ambang, dan UMP', 'OLTP');
 
+        // Urutannya penting: ratakan dulu pemetaan bawaan dump ke seluruh
+        // kuesioner global, baru daftarkan peran f303 yang memang tidak ada
+        // di dump mana pun.
+        $this->replicateSemanticMappings();
         $this->registerBulanSesudahLulusRole();
+    }
+
+    /**
+     * Salin pemetaan semantik dump ke SELURUH kuesioner global.
+     *
+     * oltp_config_data.sql memasang 51 baris question_semantic_mapping yang
+     * questionnaire_id-nya ditulis mati sebagai 1, 2, 3 -- angka yang cuma
+     * benar selama QuestionnaireSeeder kebetulan membuat tepat tiga kuesioner
+     * global. Begitu jumlah angkatan berubah, kuesioner ke-4 dan seterusnya
+     * lahir tanpa pemetaan apa pun.
+     *
+     * Akibatnya tidak kelihatan sebagai error: AlumniFactBuilderService butuh
+     * peran `status_pekerjaan` untuk mengisi status_alumni_sk yang NOT NULL,
+     * tidak menemukannya, lalu MELEWATI response itu diam-diam. ETL tetap
+     * "sukses", hanya angkanya yang diam-diam tinggal separuh.
+     *
+     * Karena seluruh kuesioner global dibuat seedGlobalQuestions() dengan
+     * daftar pertanyaan yang identik, pemetaan itu sah disalin apa adanya
+     * berdasarkan question_code.
+     */
+    private function replicateSemanticMappings(): void
+    {
+        $db = DB::connection('oltp');
+
+        if (!$db->getSchemaBuilder()->hasTable('question_semantic_mapping')) {
+            return;
+        }
+
+        // Kuesioner global = tanpa program_id. Yang punya pemetaan terbanyak
+        // dijadikan contoh; sisanya menyusul.
+        $globalIds = $db->table('questionnaires')->whereNull('program_id')->pluck('id');
+
+        if ($globalIds->count() < 2) {
+            return;
+        }
+
+        $templateId = $db->table('question_semantic_mapping')
+            ->whereIn('questionnaire_id', $globalIds)
+            ->where('is_active', true)
+            ->select('questionnaire_id', DB::raw('count(*) as jml'))
+            ->groupBy('questionnaire_id')
+            ->orderByDesc('jml')
+            ->value('questionnaire_id');
+
+        if ($templateId === null) {
+            return;
+        }
+
+        $template = $db->table('question_semantic_mapping')
+            ->where('questionnaire_id', $templateId)
+            ->where('is_active', true)
+            ->get();
+
+        $ditambahkan = 0;
+
+        foreach ($globalIds as $targetId) {
+            if ((int) $targetId === (int) $templateId) {
+                continue;
+            }
+
+            // Pertanyaan yang benar-benar ada di kuesioner tujuan. Menyalin
+            // pemetaan untuk kode yang tidak ada di sana hanya akan jadi baris
+            // yatim yang tidak pernah terpakai.
+            $kodeTersedia = $db->table('questionnaire_questions')
+                ->where('questionnaire_id', $targetId)
+                ->pluck('code')
+                ->flip();
+
+            // Indeks uq_qsm_active_code dan uq_qsm_active_narrow_role menolak
+            // duplikat, jadi keduanya disaring lebih dulu.
+            $kodeTerpakai = $db->table('question_semantic_mapping')
+                ->where('questionnaire_id', $targetId)
+                ->where('is_active', true)
+                ->pluck('question_code')
+                ->flip();
+
+            $peranNarrowTerpakai = $db->table('question_semantic_mapping')
+                ->where('questionnaire_id', $targetId)
+                ->where('is_active', true)
+                ->where('grain', 'narrow')
+                ->pluck('semantic_role')
+                ->flip();
+
+            $baris = [];
+
+            foreach ($template as $map) {
+                if (!$kodeTersedia->has($map->question_code) || $kodeTerpakai->has($map->question_code)) {
+                    continue;
+                }
+
+                if ($map->grain === 'narrow' && $peranNarrowTerpakai->has($map->semantic_role)) {
+                    continue;
+                }
+
+                if ($map->grain === 'narrow') {
+                    $peranNarrowTerpakai[$map->semantic_role] = true;
+                }
+
+                $baris[] = [
+                    'questionnaire_id'       => $targetId,
+                    'question_code'          => $map->question_code,
+                    'question_text_snapshot' => $map->question_text_snapshot,
+                    'semantic_role'          => $map->semantic_role,
+                    'grain'                  => $map->grain,
+                    'effective_date'         => $map->effective_date,
+                    'is_active'              => true,
+                    'created_at'             => now(),
+                    'updated_at'             => now(),
+                ];
+            }
+
+            if ($baris !== []) {
+                $db->table('question_semantic_mapping')->insert($baris);
+                $ditambahkan += count($baris);
+            }
+        }
+
+        $this->command?->info(
+            "Pemetaan semantik disalin ke kuesioner global lain: {$ditambahkan} baris "
+            . "(contoh diambil dari questionnaire_id {$templateId})."
+        );
     }
 
     /**
@@ -123,30 +256,4 @@ class DemoSeeder extends Seeder
         }
     }
 
-    /**
-     * Muat satu berkas .sql lewat psql pada koneksi OLTP.
-     */
-    private function importSql(string $relative): void
-    {
-        $path = database_path($relative);
-
-        if (!is_file($path)) {
-            $this->command?->warn("Lewati {$relative} -- berkasnya tidak ada.");
-
-            return;
-        }
-
-        putenv('PGPASSWORD=' . env('OLTP_DB_PASSWORD'));
-
-        $dsn = sprintf(
-            '-h %s -p %s -U %s -d %s',
-            escapeshellarg(env('OLTP_DB_HOST', '127.0.0.1')),
-            escapeshellarg(env('OLTP_DB_PORT', '5432')),
-            escapeshellarg(env('OLTP_DB_USERNAME', 'postgres')),
-            escapeshellarg(env('OLTP_DB_DATABASE', 'study_tracer')),
-        );
-
-        $this->command?->info("Mengimpor {$relative}...");
-        passthru("psql {$dsn} -v ON_ERROR_STOP=1 -q -f " . escapeshellarg($path), $status);
-    }
 }

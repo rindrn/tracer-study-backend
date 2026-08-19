@@ -9,6 +9,19 @@ use Carbon\Carbon;
 
 class AlumniProfileSeeder extends Seeder
 {
+    /**
+     * Angkatan lulusan yang dibuat di data demo.
+     *
+     * SATU SUMBER KEBENARAN. QuestionnaireSeeder membaca konstanta ini untuk
+     * menentukan angkatan mana yang disasar kuesioner. Dulu kedua daftar itu
+     * ditulis terpisah dan sempat melenceng: alumni dibuat untuk 2020-2025
+     * tapi kuesioner cuma menyasar 2022-2024, sehingga respons lulusan 2020,
+     * 2021, dan 2025 nyasar ke kuesioner angkatan 2022. Halaman Manajemen
+     * Kuisioner lalu menampilkan angkatan yang "belum digarap" padahal
+     * ratusan alumninya tercatat sudah mengisi.
+     */
+    public const GRADUATION_YEARS = [2020, 2021, 2022, 2023, 2024, 2025];
+
     public function run(): void
     {
         $faker = Faker::create('id_ID');
@@ -19,7 +32,7 @@ class AlumniProfileSeeder extends Seeder
 
         $alumniData = [];
         $nimCounter = 1;
-        $graduationYears = [2020, 2021, 2022, 2023, 2024, 2025];
+        $graduationYears = self::GRADUATION_YEARS;
 
         foreach ($programs as $program) {
             // Sengaja diacak per prodi (120-220 alumni), bukan dibagi rata dari
