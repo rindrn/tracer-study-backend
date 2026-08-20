@@ -132,4 +132,63 @@ class OrgUnitRepository
             ->where('name', $name)
             ->first();
     }
+
+    /** Seluruh org_units, dipakai membangun tree (DFR-08) di sisi service. */
+    public function all(): Collection
+    {
+        return collect(
+            DB::connection(self::CONN)->table(self::TABLE)->orderBy('name')->get()
+        );
+    }
+
+    /** Total baris org_units -- dasar guard DFR-01 (template hanya dipilih sebelum ada data). */
+    public function countAll(): int
+    {
+        return DB::connection(self::CONN)->table(self::TABLE)->count();
+    }
+
+    /** Seluruh unit pada satu level, dipakai wizard migrasi struktur (DFR-06). */
+    public function unitsByTypeId(int $orgUnitTypeId): Collection
+    {
+        return collect(
+            DB::connection(self::CONN)->table(self::TABLE)
+                ->where('org_unit_type_id', $orgUnitTypeId)
+                ->get()
+        );
+    }
+
+    /**
+     * Pindahkan seluruh anak $oldParentId supaya menjadi anak $newParentId
+     * (bisa null = jadi root) -- dipakai wizard migrasi struktur (DFR-06)
+     * saat menghapus level di tengah pohon: anak level yang dihapus
+     * "naik" ke induk level yang dihapus, bukan ikut terhapus.
+     */
+    public function reparentChildrenTo(int $oldParentId, ?int $newParentId): void
+    {
+        DB::connection(self::CONN)->table(self::TABLE)
+            ->where('parent_id', $oldParentId)
+            ->update(['parent_id' => $newParentId, 'updated_at' => now()]);
+    }
+
+    /**
+     * Pencarian unit organisasi (DFR-11) berdasarkan nama (ILIKE, cocok
+     * sebagian) dan/atau level. Mengembalikan beserta label level supaya
+     * frontend tidak perlu join terpisah.
+     */
+    public function search(?string $query, ?int $orgUnitTypeId): Collection
+    {
+        $builder = DB::connection(self::CONN)->table(self::TABLE . ' as ou')
+            ->join('org_unit_types as t', 't.id', '=', 'ou.org_unit_type_id')
+            ->select(['ou.*', 't.label as level_label', 't.level_index as level_index', 't.institution_type as institution_type']);
+
+        if ($query !== null && trim($query) !== '') {
+            $builder->where('ou.name', 'ILIKE', '%' . trim($query) . '%');
+        }
+
+        if ($orgUnitTypeId !== null) {
+            $builder->where('ou.org_unit_type_id', $orgUnitTypeId);
+        }
+
+        return collect($builder->orderBy('t.level_index')->orderBy('ou.name')->get());
+    }
 }

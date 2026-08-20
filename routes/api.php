@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\Transactional\ThresholdController;
 use App\Http\Controllers\Api\Transactional\LamController;
 use App\Http\Controllers\Api\Transactional\LamVersionController;
 use App\Http\Controllers\Api\Transactional\JurusanController;
+use App\Http\Controllers\Api\Transactional\OrgUnitTypeController;
+use App\Http\Controllers\Api\Transactional\OrgUnitController;
 use App\Http\Controllers\Api\Transactional\LamProgramController;
 use App\Http\Controllers\Api\Transactional\ProgramController;
 use App\Http\Controllers\Api\Transactional\RefUmpController;
@@ -207,6 +209,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('jurusans',        [JurusanController::class, 'store']);
         Route::put('jurusans/{id}',    [JurusanController::class, 'update']);
         Route::delete('jurusans/{id}', [JurusanController::class, 'destroy']);
+
+        // ── Struktur Institusi (Fase 4: DFR-01/04/06/07/08/09/10/11) ─────
+        // Struktur dinamis (org_unit_types / org_units), head_tracer-only
+        // sesuai kesepakatan (lihat cetak-biru-struktur-dinamis.md).
+        Route::get('org-unit-types',                       [OrgUnitTypeController::class, 'index']);
+        Route::get('org-unit-types/active-template',       [OrgUnitTypeController::class, 'activeTemplate']);
+        Route::post('org-unit-types/select-template',      [OrgUnitTypeController::class, 'selectTemplate']);
+        Route::post('org-unit-types/custom-template',      [OrgUnitTypeController::class, 'defineCustomTemplate']);
+        Route::post('org-unit-types/insert-level',         [OrgUnitTypeController::class, 'insertLevel']);
+        Route::post('org-unit-types/{id}/remove-level',    [OrgUnitTypeController::class, 'removeLevel'])->whereNumber('id');
+        Route::put('org-unit-types/{id}',                  [OrgUnitTypeController::class, 'update'])->whereNumber('id');
+        Route::delete('org-unit-types/{id}',                [OrgUnitTypeController::class, 'destroy'])->whereNumber('id');
+
+        Route::get('org-units/tree',            [OrgUnitController::class, 'tree']);
+        Route::get('org-units/search',          [OrgUnitController::class, 'search']);
+        Route::post('org-units',                [OrgUnitController::class, 'store']);
+        Route::put('org-units/{id}',            [OrgUnitController::class, 'update'])->whereNumber('id');
+        Route::patch('org-units/{id}/reparent', [OrgUnitController::class, 'reparent'])->whereNumber('id');
+        Route::delete('org-units/{id}',         [OrgUnitController::class, 'destroy'])->whereNumber('id');
 
         // Provinces CRUD
         Route::post('provinces', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'storeProvince']);
