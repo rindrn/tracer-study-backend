@@ -59,13 +59,28 @@ return [
     | Application Timezone
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | Zona waktu aplikasi. Menentukan nilai yang ditulis now() ke seluruh kolom
+    | waktu, dan jam berapa penjadwal ETL benar-benar berjalan.
+    |
+    | BUKAN 'UTC', dan itu keputusan sadar. Kolom waktu di basis data ini
+    | bertipe `timestamp without time zone`, sehingga tidak membawa keterangan
+    | zona apa pun. Antarmuka menerima teks polos seperti "2026-08-20 04:37:38"
+    | lalu memanggil new Date() atasnya — dan JavaScript menafsirkan teks tanpa
+    | penanda zona sebagai waktu LOKAL peramban. Artinya angka apa pun yang
+    | tersimpan akan ditampilkan apa adanya seolah sudah WIB. Menyimpan UTC
+    | membuat setiap waktu tampil tujuh jam lebih awal.
+    |
+    | Dibaca dari env supaya pemasangan di Indonesia timur maupun tengah cukup
+    | mengganti isian .env: Asia/Jakarta (WIB), Asia/Makassar (WITA), atau
+    | Asia/Jayapura (WIT).
+    |
+    | CATATAN: nilai ini pernah diperbaiki pada 8 Agustus 2026 lalu kembali ke
+    | UTC karena perbaikannya tidak pernah masuk riwayat git — hanya hidup di
+    | working tree. Pastikan perubahan ini ikut ter-commit.
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Jakarta'),
 
     /*
     |--------------------------------------------------------------------------
