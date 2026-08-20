@@ -24,6 +24,9 @@ use App\Http\Controllers\Api\PublicAccess\PublicReportController as PublicReport
 use App\Http\Controllers\Api\PublicAccess\PublicStatisticsController;
 use App\Http\Controllers\Api\Admin\PublicReportController;
 use App\Http\Controllers\Api\Admin\PublicDisplaySettingController;
+use App\Http\Controllers\Api\Admin\AuditLogController;
+use App\Http\Controllers\Api\Admin\DataSubjectRequestController;
+use App\Http\Controllers\Api\Alumni\SelfServiceController;
 
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireController;
@@ -128,6 +131,16 @@ Route::middleware('auth:alumni')->group(function () {
     Route::get('tracer-study/draft',    [TracerStudyDraftController::class, 'show']);
     Route::post('tracer-study/draft',   [TracerStudyDraftController::class, 'store']);
     Route::delete('tracer-study/draft', [TracerStudyDraftController::class, 'destroy']);
+
+    // ── Portal "Data Saya" (UU 27/2022) ──────────────────────────────
+    // Tidak satu pun rute di sini menerima alumni_id: identitasnya selalu
+    // diambil dari token. Lihat catatan di SelfServiceController.
+    Route::get('alumni/me',              [SelfServiceController::class, 'me']);
+    Route::get('alumni/me/consent',      [SelfServiceController::class, 'consentState']);
+    Route::post('alumni/me/consent',     [SelfServiceController::class, 'grantConsent']);
+    Route::delete('alumni/me/consent',   [SelfServiceController::class, 'withdrawConsent']);
+    Route::get('alumni/me/requests',     [SelfServiceController::class, 'listRequests']);
+    Route::post('alumni/me/requests',    [SelfServiceController::class, 'storeRequest']);
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -294,6 +307,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('admin/public-settings',  [PublicDisplaySettingController::class, 'show']);
         Route::put('admin/public-settings',  [PublicDisplaySettingController::class, 'update']);
+
+        // ── Perlindungan Data Pribadi ────────────────────────────────
+        // Dibatasi ke Ketua Tracer, bukan ke seluruh admin. Jejak audit
+        // memuat siapa berbuat apa atas data siapa, dan antrean permintaan
+        // memuat kalimat bebas alumni tentang keadaan pribadinya — keduanya
+        // bukan bacaan yang pantas bagi setiap pengelola prodi.
+        Route::get('admin/audit-logs', [AuditLogController::class, 'index']);
+
+        Route::get('admin/data-subject-requests',        [DataSubjectRequestController::class, 'index']);
+        Route::patch('admin/data-subject-requests/{id}', [DataSubjectRequestController::class, 'update'])->whereNumber('id');
     });
 
     Route::middleware('role:head_tracer')->group(function () {
