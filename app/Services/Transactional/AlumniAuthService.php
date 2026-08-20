@@ -40,6 +40,8 @@ class AlumniAuthService
 
     public function __construct(
         private readonly AlumniProfileRepository $alumniRepo,
+        private readonly ConsentService          $consent,
+        private readonly AuditLogService         $audit,
     ) {}
 
     /**
@@ -75,6 +77,18 @@ class AlumniAuthService
         }
 
         if (!Hash::check($password, $alumni->password)) {
+            // Percobaan gagal dicatat dengan pelaku eksplisit: belum ada sesi
+            // pada titik ini, jadi resolveActor() tidak punya apa pun untuk
+            // disimpulkan. Yang dicatat identitas yang DICOBA, bukan yang
+            // terbukti — itulah gunanya bagi penelusuran serangan tebak sandi.
+            $this->audit->record('auth.alumni_login_failed', [
+                'actor_type'        => 'system',
+                'entity_type'       => 'alumni_profiles',
+                'entity_id'         => $alumni->id,
+                'subject_alumni_id' => $alumni->id,
+                'context'           => ['identifier' => $identifier],
+            ]);
+
             throw new BusinessException('Kata sandi salah.', 401);
         }
 
@@ -86,6 +100,15 @@ class AlumniAuthService
             ['alumni'],
             now()->addHours(self::TOKEN_TTL_HOURS),
         )->plainTextToken;
+
+        $this->audit->record('auth.alumni_login', [
+            'actor_type'        => 'alumni',
+            'actor_id'          => $alumni->id,
+            'actor_label'       => trim("{$alumni->name} ({$alumni->nim})"),
+            'entity_type'       => 'alumni_profiles',
+            'entity_id'         => $alumni->id,
+            'subject_alumni_id' => $alumni->id,
+        ]);
 
         return [
             'token'           => $token,
@@ -108,6 +131,13 @@ class AlumniAuthService
             'program_degree'  => $alumni->program_degree,
             'entry_year'      => $alumni->entry_year,
             'graduation_year' => $alumni->graduation_year,
+            // Keadaan persetujuan ikut di respons masuk supaya frontend bisa
+            // membuka layar persetujuan SEBELUM formulir dimuat. Tanpa ini
+            // alumni baru tahu persetujuannya kurang setelah selesai mengisi
+            // dan ditolak 451 — seluruh pekerjaannya terbuang, dan itu
+            // langsung memukul response rate yang justru jadi tolok ukur
+            // keberhasilan sistem ini.
+            'consent'         => $this->consent->state($alumni),
         ];
     }
 

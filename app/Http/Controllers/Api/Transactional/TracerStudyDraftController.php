@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Transactional;
 
 use App\Http\Controllers\Controller;
+use App\Services\Transactional\ConsentService;
 use App\Services\Transactional\TracerStudyDraftService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,9 +19,16 @@ class TracerStudyDraftController extends Controller
 {
     public function __construct(
         private readonly TracerStudyDraftService $service,
+        private readonly ConsentService          $consent,
     ) {}
 
-    /** GET /api/tracer-study/draft — muat draf tersimpan. */
+    /**
+     * GET /api/tracer-study/draft — muat draf tersimpan.
+     *
+     * SENGAJA tidak menuntut persetujuan. Alumni yang menarik persetujuannya
+     * tetap boleh melihat apa yang sudah pernah ia tulis; yang dihentikan
+     * adalah penulisan baru, bukan aksesnya sendiri atas datanya sendiri.
+     */
     public function show(Request $request): JsonResponse
     {
         return response()->json([
@@ -37,6 +45,13 @@ class TracerStudyDraftController extends Controller
         $request->validate([
             'answers' => ['required', 'array'],
         ]);
+
+        // Autosave juga pemrosesan data pribadi, jadi ia tunduk pada dasar
+        // hukum yang sama dengan pengiriman. Menjaga submit saja akan
+        // menyisakan jalur yang menuliskan jawaban alumni ke basis data tanpa
+        // persetujuan — dan justru jalur itu yang paling sering dilewati,
+        // karena autosave berjalan sendiri tanpa alumni menekan apa pun.
+        $this->consent->assertGranted($request->user('alumni'));
 
         return response()->json([
             'success' => true,
