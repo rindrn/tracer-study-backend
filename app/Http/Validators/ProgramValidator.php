@@ -28,6 +28,12 @@ class ProgramValidator
             'code'      => ['required', 'string', 'max:20', $codeRule],
             'degree'    => ['required', 'in:S1,D3,D4,S2'],
             'is_active' => ['sometimes', 'boolean'],
+            // Bebas teksnya: peringkat berbeda antar lembaga dan antar zaman
+            // (A/B/C, Unggul/Baik Sekali/Baik, atau istilah khas tiap LAM).
+            // Daftar tertutup akan memaksa perubahan kode tiap kali ada
+            // lembaga yang memakai istilah lain.
+            'accreditation'    => ['sometimes', 'nullable', 'string', 'max:30'],
+            'accredited_until' => ['sometimes', 'nullable', 'date'],
         ], [
             'name.required'   => 'Nama program studi wajib diisi.',
             'code.required'   => 'Kode program studi wajib diisi.',

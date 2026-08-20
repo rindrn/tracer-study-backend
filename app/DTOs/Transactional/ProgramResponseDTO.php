@@ -11,6 +11,8 @@ class ProgramResponseDTO
         public readonly string  $code,
         public readonly string  $degree,
         public readonly ?string $jurusan,
+        public readonly ?string $accreditation,
+        public readonly ?string $accreditedUntil,
         public readonly bool    $isActive,
         public readonly string  $createdAt,
     ) {}
@@ -23,6 +25,8 @@ class ProgramResponseDTO
             code:      $model->code,
             degree:    $model->degree,
             jurusan:   $model->jurusan,
+            accreditation:   $model->accreditation,
+            accreditedUntil: $model->accredited_until?->toDateString(),
             isActive:  (bool) $model->is_active,
             createdAt: $model->created_at->toISOString(),
         );
@@ -36,6 +40,8 @@ class ProgramResponseDTO
             'code'       => $this->code,
             'degree'     => $this->degree,
             'jurusan'    => $this->jurusan,
+            'accreditation'    => $this->accreditation,
+            'accredited_until' => $this->accreditedUntil,
             'is_active'  => $this->isActive,
             'created_at' => $this->createdAt,
         ];

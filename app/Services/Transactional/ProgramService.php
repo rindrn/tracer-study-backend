@@ -48,6 +48,8 @@ class ProgramService
             'code'      => strtoupper($validated['code']),
             'degree'    => $validated['degree'],
             'is_active' => $validated['is_active'] ?? true,
+            'accreditation'    => $validated['accreditation'] ?? null,
+            'accredited_until' => $validated['accredited_until'] ?? null,
         ]);
 
         $this->forgetTag('programs');
@@ -67,6 +69,12 @@ class ProgramService
             'code'      => strtoupper($validated['code']),
             'degree'    => $validated['degree'],
             'is_active' => $validated['is_active'] ?? $program->is_active,
+            // ?? mempertahankan nilai lama saat kunci tidak dikirim; itu yang
+            // membuat form yang belum punya isian akreditasi tidak menghapus
+            // data yang sudah ada. Mengosongkan tetap bisa, dengan mengirim
+            // null secara eksplisit.
+            'accreditation'    => $validated['accreditation'] ?? $program->accreditation,
+            'accredited_until' => $validated['accredited_until'] ?? $program->accredited_until,
         ]);
 
         $this->forget("programs:show:{$id}");
