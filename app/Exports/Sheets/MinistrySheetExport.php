@@ -20,6 +20,7 @@ use App\Exports\Support\AnswerValueResolver;
 use App\Exports\Support\ColumnLetter;
 use App\Repositories\Transactional\ResponseRepository;
 use App\Repositories\Transactional\QuestionnaireRepository;
+use App\Support\PersonalData;
 
 /**
  * Sheet "Data Kementrian" -- berisi SEMUA alumni yang lolos filter.
@@ -173,8 +174,15 @@ class MinistrySheetExport extends DefaultValueBinder implements FromQuery, WithH
             $alumni->phone ?: '-',
             $alumni->email ?: '-',
             $alumni->graduation_year,
-            $alumni->nik ?: '-',
-            $alumni->npwp ?: '-',
+            // Didekripsi di sini, bukan di repository. Lembar ini memakai
+            // FromQuery + WithChunkReading: maatwebsite/excel yang menjalankan
+            // query-nya sendiri secara bertahap, sehingga
+            // AlumniProfileRepository::getForReportQuery() tidak pernah
+            // memegang barisnya dan tidak punya kesempatan mendekripsi.
+            // Tanpa dua panggilan ini, kolom NIK dan NPWP di berkas yang
+            // diunggah ke portal Kementerian berisi ciphertext.
+            PersonalData::reveal($alumni->nik) ?: '-',
+            PersonalData::reveal($alumni->npwp) ?: '-',
         ];
 
         foreach (self::MINISTRY_QUESTION_CODES as $code) {

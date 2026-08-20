@@ -7,6 +7,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Query\Builder;
+use App\Support\PersonalData;
 
 /**
  * AlumniProfileRepository — query persistence untuk aggregate root AlumniProfile.
@@ -15,6 +16,21 @@ use Illuminate\Database\Query\Builder;
  * (employment_records, education_records, responses) di-delegasikan ke
  * repository masing-masing. Repo ini hanya bertugas persistence, tidak tahu
  * soal business rules atau role-based filtering.
+ *
+ * BATAS ENKRIPSI DATA PRIBADI
+ * ---------------------------
+ * NIK dan NPWP tersimpan terenkripsi (lihat App\Support\PersonalData beserta
+ * alasan lengkapnya). Repository inilah batasnya: setiap method tulis
+ * memanggil PersonalData::protectAttributes(), setiap method baca yang
+ * mengembalikan baris memanggil PersonalData::revealRow(). Di luar berkas ini
+ * kedua kolom itu selalu sudah polos, sehingga tidak ada service maupun
+ * controller yang perlu tahu soal enkripsi sama sekali.
+ *
+ * SATU LUBANG YANG DISENGAJA: getForReportQuery() mengembalikan query builder
+ * yang belum dijalankan, sehingga tidak ada baris untuk didekripsi di sini.
+ * Pemanggilnya — MinistrySheetExport — yang wajib memanggil
+ * PersonalData::reveal() sendiri. Kalau menambah pemanggil baru untuk method
+ * itu, ingat kewajiban yang sama.
  */
 class AlumniProfileRepository
 {
@@ -30,7 +46,7 @@ class AlumniProfileRepository
      */
     public function findByNimOrEmailWithProgram(string $identifier): ?object
     {
-        return DB::connection(self::CONN)
+        $row = DB::connection(self::CONN)
             ->table('alumni_profiles')
             ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
             ->select(
@@ -60,21 +76,25 @@ class AlumniProfileRepository
                   ->orWhere('alumni_profiles.email', $identifier);
             })
             ->first();
+
+        return PersonalData::revealRow($row);
     }
 
     /** Alumni by NIM — dipakai saat submit kuesioner (upsert check). */
     public function findByNim(string $nim): ?object
     {
-        return DB::connection(self::CONN)
+        $row = DB::connection(self::CONN)
             ->table('alumni_profiles')
             ->where('nim', $nim)
             ->first();
+
+        return PersonalData::revealRow($row);
     }
 
     /** Detail alumni + info prodi untuk halaman admin. */
     public function findByIdWithProgram(int $id): ?object
     {
-        return DB::connection(self::CONN)
+        $row = DB::connection(self::CONN)
             ->table('alumni_profiles')
             ->leftJoin('programs', 'alumni_profiles.program_id', '=', 'programs.id')
             ->select(
@@ -85,6 +105,8 @@ class AlumniProfileRepository
             )
             ->where('alumni_profiles.id', $id)
             ->first();
+
+        return PersonalData::revealRow($row);
     }
 
     /**
@@ -125,7 +147,13 @@ class AlumniProfileRepository
             });
         }
 
-        return $query->paginate($perPage);
+        $page = $query->paginate($perPage);
+
+        // Isi halaman didekripsi di tempat; objek paginator-nya sendiri yang
+        // dikembalikan supaya metadata halaman (total, tautan) tidak hilang.
+        PersonalData::revealRows($page->items());
+
+        return $page;
     }
 
     /**
@@ -252,7 +280,13 @@ class AlumniProfileRepository
             });
         }
 
-        return $query->orderByDesc('alumni_profiles.graduation_year')->orderByDesc('alumni_profiles.id')->paginate($perPage);
+        $page = $query->orderByDesc('alumni_profiles.graduation_year')
+            ->orderByDesc('alumni_profiles.id')
+            ->paginate($perPage);
+
+        PersonalData::revealRows($page->items());
+
+        return $page;
     }
 
     /**
@@ -611,7 +645,7 @@ class AlumniProfileRepository
             $query->where('programs.jurusan', $filters['jurusan']);
         }
 
-        return collect($query->get());
+        return PersonalData::revealRows(collect($query->get()));
     }
 
     /**
@@ -671,7 +705,7 @@ class AlumniProfileRepository
     {
         $now = now();
         return DB::connection(self::CONN)->table('alumni_profiles')->insertGetId(
-            array_merge($data, ['created_at' => $now, 'updated_at' => $now])
+            array_merge(PersonalData::protectAttributes($data), ['created_at' => $now, 'updated_at' => $now])
         );
     }
 
@@ -679,7 +713,7 @@ class AlumniProfileRepository
     {
         return DB::connection(self::CONN)->table('alumni_profiles')
             ->where('id', $id)
-            ->update(array_merge($data, ['updated_at' => now()])) > 0;
+            ->update(array_merge(PersonalData::protectAttributes($data), ['updated_at' => now()])) > 0;
     }
 
     public function deleteById(int $id): bool
@@ -697,6 +731,7 @@ class AlumniProfileRepository
     {
         $existing = $this->findByNim($nim);
         $now = now();
+        $data = PersonalData::protectAttributes($data);
 
         if ($existing) {
             DB::connection(self::CONN)->table('alumni_profiles')
@@ -714,7 +749,10 @@ class AlumniProfileRepository
     public function bulkInsert(array $rows): void
     {
         $now = now();
-        $records = array_map(fn ($row) => array_merge($row, ['created_at' => $now, 'updated_at' => $now]), $rows);
+        $records = array_map(
+            fn ($row) => array_merge(PersonalData::protectAttributes($row), ['created_at' => $now, 'updated_at' => $now]),
+            $rows,
+        );
 
         foreach (array_chunk($records, 100) as $chunk) {
             DB::connection(self::CONN)->table('alumni_profiles')->insert($chunk);
