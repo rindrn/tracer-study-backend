@@ -166,7 +166,13 @@ class OltpExtractRepository
     public function getAllPrograms(): Collection
     {
         return $this->oltp()->table('programs')
-            ->select(['id', 'name', 'code', 'degree', 'jurusan', 'is_active', 'updated_at'])
+            ->select([
+                'id', 'name', 'code', 'degree', 'jurusan', 'is_active', 'updated_at',
+                // Sumber dim_prodi.akreditasi_prodi (Gambar 5.3). Ikut di sini,
+                // bukan di query terpisah, supaya deteksi perubahan SCD Type 2
+                // di ProdiDimService melihat seluruh atribut sekaligus.
+                'accreditation',
+            ])
             ->get();
     }
 

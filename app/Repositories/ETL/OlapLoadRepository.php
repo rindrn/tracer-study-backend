@@ -37,14 +37,16 @@ class OlapLoadRepository
     public function insertNewProdiVersion(array $attributes, \DateTimeInterface $validFrom): int
     {
         return $this->olap()->table('dim_prodi')->insertGetId([
-            'id_prodi'   => $attributes['id_prodi'],
-            'kode_prodi' => $attributes['kode_prodi'],
-            'nama_prodi' => $attributes['nama_prodi'],
-            'jurusan'    => $attributes['jurusan'],
-            'jenjang'    => $attributes['jenjang'],
-            'valid_from' => $validFrom->format('Y-m-d'),
-            'valid_to'   => null,
-            'flag_prodi' => true,
+            'id_prodi'         => $attributes['id_prodi'],
+            'kode_prodi'       => $attributes['kode_prodi'],
+            'nama_prodi'       => $attributes['nama_prodi'],
+            'jurusan'          => $attributes['jurusan'],
+            'jenjang'          => $attributes['jenjang'],
+            'nama_pt'          => $attributes['nama_pt'] ?? null,
+            'akreditasi_prodi' => $attributes['akreditasi_prodi'] ?? null,
+            'valid_from'       => $validFrom->format('Y-m-d'),
+            'valid_to'         => null,
+            'flag_prodi'       => true,
         ], 'prodi_sk');
     }
 

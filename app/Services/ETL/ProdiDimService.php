@@ -23,6 +23,10 @@ class ProdiDimService
     {
         $programs = $this->oltpRepo->getAllPrograms();
 
+        // Dibaca sekali di luar perulangan: nilainya konfigurasi, bukan data,
+        // jadi tidak akan berubah di tengah satu jalannya ETL.
+        $namaPt = config('institution.name');
+
         $processed = 0;
         $inserted = 0;
         $updated = 0;
@@ -33,11 +37,16 @@ class ProdiDimService
             $active = $this->olapRepo->getActiveProdiVersion($program->id);
 
             $newAttributes = [
-                'id_prodi'   => $program->id,
-                'kode_prodi' => $program->code,
-                'nama_prodi' => $program->name,
-                'jurusan'    => $program->jurusan,
-                'jenjang'    => $program->degree,
+                'id_prodi'         => $program->id,
+                'kode_prodi'       => $program->code,
+                'nama_prodi'       => $program->name,
+                'jurusan'          => $program->jurusan,
+                'jenjang'          => $program->degree,
+                // Sama untuk seluruh baris pada satu pemasangan (single-tenant),
+                // tapi tetap disimpan per baris supaya dimensi ini sudah siap
+                // kalau kelak satu pemasangan melayani lebih dari satu PT.
+                'nama_pt'          => $namaPt,
+                'akreditasi_prodi' => $program->accreditation,
             ];
 
             if ($active === null) {
@@ -46,10 +55,18 @@ class ProdiDimService
                 continue;
             }
 
+            // Perbandingan menentukan kapan versi lama ditutup dan versi baru
+            // dibuka. Atribut yang tidak ikut dibandingkan berarti perubahannya
+            // hilang diam-diam -- karena itu nama_pt dan akreditasi_prodi WAJIB
+            // ada di sini, bukan hanya di $newAttributes. Kenaikan peringkat
+            // akreditasi memang seharusnya melahirkan versi baru: itulah yang
+            // membuat dashboard bisa membandingkan capaian sebelum dan sesudah.
             $hasChanged = $active->kode_prodi !== $newAttributes['kode_prodi']
                 || $active->nama_prodi !== $newAttributes['nama_prodi']
                 || $active->jurusan !== $newAttributes['jurusan']
-                || $active->jenjang !== $newAttributes['jenjang'];
+                || $active->jenjang !== $newAttributes['jenjang']
+                || $active->nama_pt !== $newAttributes['nama_pt']
+                || $active->akreditasi_prodi !== $newAttributes['akreditasi_prodi'];
 
             if ($hasChanged) {
                 $this->olapRepo->closeProdiVersion($active->prodi_sk, $snapshotDate);
