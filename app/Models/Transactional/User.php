@@ -13,7 +13,7 @@ class User extends Authenticatable
 
     protected $connection = 'oltp';
     protected $table      = 'users';
-    protected $fillable   = ['name', 'email', 'password', 'role', 'program_id', 'jurusan', 'status'];
+    protected $fillable   = ['name', 'email', 'password', 'role', 'program_id', 'jurusan', 'org_unit_id', 'status'];
     protected $hidden     = ['password'];
     protected $casts      = ['password' => 'hashed', 'status' => 'boolean'];
 

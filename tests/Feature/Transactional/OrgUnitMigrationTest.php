@@ -26,6 +26,11 @@ class OrgUnitMigrationTest extends TestCase
     private const PATHS = [
         'database/migrations/transactional/tables/2026_08_20_000007_create_org_unit_types_table.php',
         'database/migrations/transactional/tables/2026_08_20_000008_create_org_units_table.php',
+        // Fase 2 (DFR-12/13/14) menambahkan FK users.org_unit_id/programs.org_unit_id
+        // -> org_units. Migration itu WAJIB ikut di-rollback di sini juga --
+        // tanpanya, DROP TABLE org_units gagal karena masih direferensikan
+        // FK dari users/programs, dan rollback test ini gagal senyap.
+        'database/migrations/transactional/tables/2026_08_20_000009_add_org_unit_id_to_users_and_programs.php',
     ];
 
     public function test_rollback_then_remigrate_is_clean(): void
@@ -34,7 +39,18 @@ class OrgUnitMigrationTest extends TestCase
         $this->assertTrue(Schema::connection(self::CONN)->hasTable('org_units'));
 
         try {
-            Artisan::call('migrate:rollback', ['--path' => self::PATHS, '--database' => self::CONN, '--force' => true]);
+            // migrate:rollback tanpa --step hanya membongkar batch TERAKHIR,
+            // difilter oleh --path. Migration Fase 2 (2026_08_20_000009,
+            // FK users/programs.org_unit_id -> org_units) sering berada di
+            // batch terpisah dari 007/008 (Fase 1) kalau dijalankan di waktu
+            // berbeda -- satu panggilan rollback saja bisa cuma membongkar
+            // satu batch dan meninggalkan org_units masih ber-FK, gagal DROP
+            // TABLE secara senyap. Panggil berulang (dibatasi jumlah migration
+            // di PATHS) sampai org_units benar-benar hilang, supaya tes ini
+            // tidak bergantung pada asumsi batch tertentu.
+            for ($i = 0; $i < count(self::PATHS) && Schema::connection(self::CONN)->hasTable('org_units'); $i++) {
+                Artisan::call('migrate:rollback', ['--path' => self::PATHS, '--database' => self::CONN, '--force' => true]);
+            }
 
             $this->assertFalse(Schema::connection(self::CONN)->hasTable('org_units'), 'org_units harus hilang setelah rollback');
             $this->assertFalse(Schema::connection(self::CONN)->hasTable('org_unit_types'), 'org_unit_types harus hilang setelah rollback');

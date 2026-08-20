@@ -72,6 +72,33 @@ class OrgUnitRepository
     }
 
     /**
+     * ID unit itu sendiri + seluruh keturunannya di bawah pohon (DFR-14),
+     * dipakai RBAC generik untuk menentukan cakupan user level-menengah
+     * (mis. Dekan) tanpa hardcode nama role. BFS iteratif, bukan recursive
+     * CTE -- konsisten dengan OrgUnitService::assertNoCycle() yang memilih
+     * pendekatan sama untuk skala pohon puluhan baris di proyek ini.
+     *
+     * @return int[]
+     */
+    public function descendantIds(int $rootId): array
+    {
+        $ids   = [$rootId];
+        $queue = [$rootId];
+
+        while ($queue !== []) {
+            $currentId = array_shift($queue);
+
+            foreach ($this->children($currentId) as $child) {
+                $childId = (int) $child->id;
+                $ids[]   = $childId;
+                $queue[] = $childId;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Nama seluruh unit milik satu org_unit_type, dipakai backfill DFR-24
      * untuk mengecek unit yang sudah pernah dibuat (idempoten).
      *

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api\Analytical\Concerns;
 
+use App\Models\Transactional\Role;
 use App\Models\Transactional\User;
+use App\Repositories\Transactional\OrgUnitRepository;
 use Illuminate\Http\Request;
 
 /**
@@ -33,11 +35,42 @@ use Illuminate\Http\Request;
  *           ...
  *       }
  *   }
+ *
+ * ── Dual-mode (Fase 2, DFR-13/DFR-25) ───────────────────────────────────
+ *
+ * scopedParams() sekarang bercabang di config('institution.structure_template'):
+ *
+ *   - "politeknik" (bawaan, POLBAN produksi) → scopedParamsLegacy(), badan
+ *     metode ASLI yang tidak diubah sedikit pun. Nol regresi terjamin
+ *     karena baris kodenya sama persis dengan sebelum Fase 2.
+ *   - selain itu (universitas/institut/custom) → scopedParamsGeneric(),
+ *     scoping berbasis roles.scope + org_units, tanpa nama role hardcoded.
+ *     Belum ada instalasi produksi yang memakai jalur ini -- POLBAN selalu
+ *     "politeknik" -- tapi jalurnya sudah nyata dan diuji terhadap pohon
+ *     org_units sintetis (lihat EnforcesProdiScopeGenericTest).
  */
 trait EnforcesProdiScope
 {
     /**
-     * Ambil semua query params + enforce scope kaprodi.
+     * Ambil semua query params + enforce scope, dipilih berdasarkan
+     * template struktur institusi aktif (DFR-25).
+     *
+     * @return array<string, mixed>
+     */
+    protected function scopedParams(Request $request): array
+    {
+        if (config('institution.structure_template', 'politeknik') !== 'politeknik') {
+            return $this->scopedParamsGeneric($request);
+        }
+
+        return $this->scopedParamsLegacy($request);
+    }
+
+    /**
+     * Jalur lama (mode "politeknik") — badan metode identik dengan
+     * scopedParams() sebelum Fase 2. JANGAN ubah tanpa retest regresi penuh
+     * seluruh endpoint analytical, ini satu-satunya jalur yang benar-benar
+     * dipakai produksi POLBAN saat ini.
      *
      * Mengembalikan array params yang aman diteruskan ke repository:
      *   - jenjang
@@ -49,7 +82,7 @@ trait EnforcesProdiScope
      *
      * @return array<string, mixed>
      */
-    protected function scopedParams(Request $request): array
+    protected function scopedParamsLegacy(Request $request): array
     {
         /** @var User $user */
         $user   = $request->user();
@@ -100,6 +133,110 @@ trait EnforcesProdiScope
 
             $params['jurusan'] = $user->jurusan;
         }
+
+        return $params;
+    }
+
+    /**
+     * Jalur baru (mode generik, DFR-12/13/14/15) — scoping berbasis level
+     * unit, dibaca dari roles.scope, TANPA nama role hardcoded di mana pun
+     * di metode ini.
+     *
+     * roles.scope (kolom yang sudah ada sejak RoleSeeder, sebelumnya tidak
+     * pernah dibaca) berisi salah satu dari tiga nilai kanonik:
+     *
+     *   - "Seluruh Jurusan" → tidak dibatasi (setara head_tracer/tracer_team/
+     *     wadir saat ini).
+     *   - "Jurusan"         → dibatasi ke satu org_unit (level menengah,
+     *     mis. Fakultas/Departemen) + seluruh keturunannya (DFR-14),
+     *     generalisasi dari kajur.
+     *   - "Program Studi"   → dibatasi dengan composite-key org_unit_id +
+     *     jenjang (DFR-13), generalisasi dari kaprodi.
+     *
+     * Nilai lain (typo, atau scope custom yang belum didukung) GAGAL
+     * TERANG-TERANGAN (403) alih-alih diam-diam meloloskan akses tanpa
+     * batas — pola yang sama dengan precondition kaprodi/kajur di
+     * scopedParamsLegacy().
+     *
+     * @return array<string, mixed>
+     */
+    protected function scopedParamsGeneric(Request $request): array
+    {
+        /** @var User $user */
+        $user   = $request->user();
+        $params = $request->query();
+
+        $role = Role::where('name', $user->role)->first();
+
+        if ($role === null || $role->scope === null || $role->scope === '') {
+            abort(403, 'Role akun ini belum memiliki pemetaan level akses. Hubungi pengelola.');
+        }
+
+        return match ($role->scope) {
+            'Seluruh Jurusan' => $params,
+            'Jurusan'         => $this->scopedParamsGenericUnit($user, $params),
+            'Program Studi'   => $this->scopedParamsGenericProdi($user, $params),
+            default           => abort(403, 'Level akses role ini tidak dikenali sistem. Hubungi pengelola.'),
+        };
+    }
+
+    /**
+     * Generalisasi kajur: user dibatasi ke org_unit yang ditautkan padanya
+     * (users.org_unit_id) beserta seluruh keturunannya (DFR-14).
+     *
+     * Repository analytical existing (BaseAnalyticalRepository dkk.) baru
+     * menerima satu nilai `jurusan` (equality, bukan whereIn) -- diisi
+     * dengan nama unit sendiri supaya topologi 2 level yang sama dengan
+     * kajur (satu org_unit langsung menaungi banyak prodi) tetap tersaring
+     * benar. `org_unit_id` dan `org_unit_ids` (self + descendant) ikut
+     * disertakan untuk konsumen masa depan yang mendukung filter banyak
+     * unit sekaligus -- itu pekerjaan Fase 3/5 (hierarchy path, whereIn),
+     * SENGAJA belum dikerjakan di sini.
+     *
+     * @param array<string, mixed> $params
+     * @return array<string, mixed>
+     */
+    private function scopedParamsGenericUnit(User $user, array $params): array
+    {
+        if ($user->org_unit_id === null) {
+            abort(403, 'Akun ini belum tertaut ke unit organisasi mana pun. Hubungi pengelola.');
+        }
+
+        /** @var OrgUnitRepository $orgUnitRepo */
+        $orgUnitRepo = app(OrgUnitRepository::class);
+        $unit        = $orgUnitRepo->find((int) $user->org_unit_id);
+
+        if ($unit === null) {
+            abort(403, 'Unit organisasi akun ini tidak ditemukan. Hubungi pengelola.');
+        }
+
+        $params['org_unit_id']  = (int) $unit->id;
+        $params['org_unit_ids'] = $orgUnitRepo->descendantIds((int) $unit->id);
+        $params['jurusan']      = $unit->name;
+
+        return $params;
+    }
+
+    /**
+     * Generalisasi kaprodi: user dibatasi dengan composite-key org_unit_id
+     * (kalau program sudah ditautkan) + jenjang (DFR-13) -- nama prodi TIDAK
+     * unik, jenjang WAJIB ikut dipasang persis seperti scopedParamsLegacy().
+     *
+     * @param array<string, mixed> $params
+     * @return array<string, mixed>
+     */
+    private function scopedParamsGenericProdi(User $user, array $params): array
+    {
+        $program = $user->program;
+
+        if ($program === null) {
+            abort(403, 'Akun ini belum tertaut ke program studi mana pun. Hubungi pengelola.');
+        }
+
+        $params['nama_prodi']  = $program->name;
+        $params['jenjang']     = $program->degree;
+        $params['jurusan']     = $program->jurusan;
+        $params['org_unit_id'] = $program->org_unit_id;
 
         return $params;
     }
