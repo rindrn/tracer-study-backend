@@ -34,6 +34,10 @@ class AlumniCredentialService
 {
     private const CONN = 'oltp';
 
+    public function __construct(
+        private readonly AuditLogService $audit,
+    ) {}
+
     /**
      * Abjad kata sandi. Karakter yang mudah tertukar saat dibaca atau diketik
      * ulang sengaja dibuang seluruhnya: tidak ada 0/O, 1/l/I. Alumni menerima
@@ -131,6 +135,20 @@ class AlumniCredentialService
         });
 
         $lastNim = (string) $targets->last()->nim;
+
+        // Penerbitan kredensial mengubah siapa yang bisa masuk sebagai
+        // alumni, jadi ia dicatat. Yang disimpan CACAHNYA saja: daftar NIM
+        // beserta kata sandi memang beredar di berkas unduhan petugas, tapi
+        // tidak boleh ikut mengendap di tabel yang dibaca lewat API.
+        $this->audit->record('alumni.credentials_issued', [
+            'entity_type' => 'alumni_profiles',
+            'context'     => [
+                'count'           => $issued->count(),
+                'graduation_year' => $filters['graduation_year'] ?? null,
+                'program_id'      => $filters['program_id'] ?? null,
+                'jurusan'         => $filters['jurusan'] ?? null,
+            ],
+        ]);
 
         return [
             'issued'    => $issued,

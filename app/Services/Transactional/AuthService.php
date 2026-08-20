@@ -8,11 +8,27 @@ use Illuminate\Validation\ValidationException;
  
 class AuthService
 {
+    public function __construct(
+        private readonly AuditLogService $audit,
+    ) {}
+
     public function login(string $email, string $password): ResponseAuthDTO
     {
         $user = User::where('email', $email)->first();
  
         if (! $user || ! Hash::check($password, $user->password)) {
+            // Akun staf memegang akses ke data pribadi seluruh alumni dalam
+            // cakupannya, jadi percobaan masuk yang gagal padanya jauh lebih
+            // berarti daripada pada akun biasa. Surel yang dicoba ikut
+            // dicatat -- itu yang membedakan salah ketik sesekali dari
+            // penebakan beruntun terhadap satu akun tertentu.
+            $this->audit->record('auth.login_failed', [
+                'actor_type'  => 'system',
+                'entity_type' => 'users',
+                'entity_id'   => $user?->id,
+                'context'     => ['email' => $email],
+            ]);
+
             throw ValidationException::withMessages([
                 'email' => ['Email atau password salah.'],
             ]);
@@ -28,6 +44,15 @@ class AuthService
         $user->tokens()->delete();
         $token = $user->createToken('auth_token')->plainTextToken;
  
+        $this->audit->record('auth.login', [
+            'actor_type'  => 'user',
+            'actor_id'    => $user->id,
+            'actor_label' => trim("{$user->name} <{$user->email}>"),
+            'entity_type' => 'users',
+            'entity_id'   => $user->id,
+            'context'     => ['role' => $user->role],
+        ]);
+
         // Load relasi program (null jika admin/p2mpp)
         $user->load('program');
  

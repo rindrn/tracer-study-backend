@@ -50,6 +50,7 @@ class ReportService
         private readonly ResponseRepository      $responseRepo,
         private readonly QuestionnaireRepository $questionnaireRepo,
         private readonly ProgramRepository       $programRepo,
+        private readonly AuditLogService         $audit,
     ) {}
 
     /**
@@ -70,6 +71,27 @@ class ReportService
         $questionnaire = $questionnaireId !== null
             ? $this->questionnaireRepo->findHeaderById($questionnaireId)
             : null;
+
+        // Ekspor adalah perbuatan yang memindahkan data pribadi KELUAR dari
+        // sistem: satu berkas bisa membawa ribuan NIK ke perangkat siapa pun
+        // yang mengunduhnya, dan sejak itu sistem tidak lagi mengendalikannya.
+        // Karena itu ia dicatat setara dengan perubahan data, bukan dianggap
+        // pembacaan biasa yang tak perlu jejak. Dicatat SEBELUM berkasnya
+        // dirakit supaya percobaan yang gagal di tengah pun tetap terlihat.
+        $this->audit->record('export.ministry', [
+            'entity_type' => 'alumni_profiles',
+            'context'     => [
+                'questionnaire_id' => $questionnaireId,
+                'tahun_lulus'      => $tahunLulus,
+                // Ikut dicatat karena inilah yang membedakan berkas untuk
+                // dibaca manusia dari berkas berisi kode mentah yang siap
+                // diunggah ke portal Kementerian.
+                'format'           => $rawCode ? 'code' : 'label',
+                'scope'            => $user->isKaprodi()
+                    ? 'prodi'
+                    : ($user->isKajur() ? 'jurusan' : 'institusi'),
+            ],
+        ]);
 
         [$includeMinistry, $includeProdi] = $this->resolveScope($questionnaire);
 

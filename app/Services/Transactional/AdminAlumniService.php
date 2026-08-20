@@ -5,6 +5,7 @@ namespace App\Services\Transactional;
 use App\Exceptions\BusinessException;
 use App\Models\Transactional\User;
 use App\Repositories\Transactional\AlumniProfileRepository;
+use App\Support\PersonalData;
 use App\Support\PhoneNumber;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -20,6 +21,7 @@ class AdminAlumniService
 {
     public function __construct(
         private readonly AlumniProfileRepository $alumniRepo,
+        private readonly AuditLogService         $audit,
     ) {}
 
     // ═══════════════════════════════════════════════════════════
@@ -119,7 +121,16 @@ class AdminAlumniService
 
         $data = $this->normalizePhone($data);
 
-        return $this->alumniRepo->create($data);
+        $id = $this->alumniRepo->create($data);
+
+        $this->audit->record('alumni.created', [
+            'entity_type'       => 'alumni_profiles',
+            'entity_id'         => $id,
+            'subject_alumni_id' => $id,
+            'context'           => ['nim' => $data['nim'] ?? null],
+        ]);
+
+        return $id;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -144,6 +155,17 @@ class AdminAlumniService
         $data = $this->normalizePhone($data);
 
         $this->alumniRepo->updateById($id, $data);
+
+        // Yang dicatat NAMA KOLOM yang berubah, bukan nilainya. Menyimpan
+        // nilai lama dan baru akan menjadikan tabel audit salinan kedua data
+        // pribadi — salinan yang justru tidak terenkripsi, sehingga
+        // mencatatnya melemahkan perlindungan yang sedang dibangun.
+        $this->audit->record('alumni.updated', [
+            'entity_type'       => 'alumni_profiles',
+            'entity_id'         => $id,
+            'subject_alumni_id' => $id,
+            'context'           => ['fields' => array_keys($data)],
+        ]);
     }
 
     /**
@@ -183,6 +205,16 @@ class AdminAlumniService
         $this->assertKaprodiCanAccessProgram($user, $alumni->program_id, forWrite: true);
 
         $this->alumniRepo->deleteById($id);
+
+        // NIM disamarkan: barisnya sudah hilang, jadi log inilah satu-satunya
+        // jejak yang tersisa, dan jejak yang memuat pengenal utuh dari data
+        // yang baru saja dihapus mengalahkan tujuan penghapusannya.
+        $this->audit->record('alumni.deleted', [
+            'entity_type'       => 'alumni_profiles',
+            'entity_id'         => $id,
+            'subject_alumni_id' => $id,
+            'context'           => ['nim' => PersonalData::mask($alumni->nim ?? null)],
+        ]);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -196,6 +228,14 @@ class AdminAlumniService
     {
         $import = new \App\Imports\AlumniImport($this->alumniRepo);
         \Maatwebsite\Excel\Facades\Excel::import($import, $file);
+
+        $this->audit->record('alumni.imported', [
+            'entity_type' => 'alumni_profiles',
+            'context'     => [
+                'imported' => $import->getImportedCount(),
+                'errors'   => count($import->getErrors()),
+            ],
+        ]);
 
         return [
             'imported' => $import->getImportedCount(),
