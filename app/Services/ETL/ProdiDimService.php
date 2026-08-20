@@ -14,6 +14,10 @@ class ProdiDimService
     public function __construct(
         private readonly OltpExtractRepository $oltpRepo,
         private readonly OlapLoadRepository $olapRepo,
+        // DFR-19: hierarchy resolver dipanggil DI DALAM langkah SCD2 yang
+        // sama (bukan proses terpisah), supaya level_1_name..level_5_name
+        // tidak pernah out-of-sync dengan versi dim_prodi yang baru dibuat.
+        private readonly OrgUnitHierarchyResolverService $hierarchyResolver,
     ) {}
 
     /**
@@ -36,6 +40,13 @@ class ProdiDimService
 
             $active = $this->olapRepo->getActiveProdiVersion($program->id);
 
+            // DFR-17: resolve level_1_name..level_5_name dari pohon
+            // org_units SAAT INI (snapshot-aware -- nilainya mencerminkan
+            // struktur organisasi pada saat ETL run ini jalan, bukan versi
+            // lama yang mungkin sudah di-reparent/rename).
+            $orgUnitId = $program->org_unit_id !== null ? (int) $program->org_unit_id : null;
+            $hierarchyLevels = $this->hierarchyResolver->resolve($orgUnitId, $program->jurusan);
+
             $newAttributes = [
                 'id_prodi'         => $program->id,
                 'kode_prodi'       => $program->code,
@@ -47,7 +58,7 @@ class ProdiDimService
                 // kalau kelak satu pemasangan melayani lebih dari satu PT.
                 'nama_pt'          => $namaPt,
                 'akreditasi_prodi' => $program->accreditation,
-            ];
+            ] + $hierarchyLevels;
 
             if ($active === null) {
                 $this->olapRepo->insertNewProdiVersion($newAttributes, $snapshotDate);
@@ -66,7 +77,16 @@ class ProdiDimService
                 || $active->jurusan !== $newAttributes['jurusan']
                 || $active->jenjang !== $newAttributes['jenjang']
                 || $active->nama_pt !== $newAttributes['nama_pt']
-                || $active->akreditasi_prodi !== $newAttributes['akreditasi_prodi'];
+                || $active->akreditasi_prodi !== $newAttributes['akreditasi_prodi']
+                // DFR-19: rename/reparent unit organisasi (yang mengubah
+                // hasil resolve level_1_name..level_5_name) juga wajib
+                // melahirkan versi baru -- kalau tidak, riwayat SCD2 diam-diam
+                // berhenti mencerminkan struktur organisasi yang sedang berlaku.
+                || $active->level_1_name !== $newAttributes['level_1_name']
+                || $active->level_2_name !== $newAttributes['level_2_name']
+                || $active->level_3_name !== $newAttributes['level_3_name']
+                || $active->level_4_name !== $newAttributes['level_4_name']
+                || $active->level_5_name !== $newAttributes['level_5_name'];
 
             if ($hasChanged) {
                 $this->olapRepo->closeProdiVersion($active->prodi_sk, $snapshotDate);

@@ -44,6 +44,16 @@ class OlapLoadRepository
             'jenjang'          => $attributes['jenjang'],
             'nama_pt'          => $attributes['nama_pt'] ?? null,
             'akreditasi_prodi' => $attributes['akreditasi_prodi'] ?? null,
+            // DFR-17/18: hasil resolve OrgUnitHierarchyResolverService.
+            // Hanya versi aktif yang pernah lewat sini -- versi tertutup
+            // (flag_prodi=false) TIDAK PERNAH di-update ulang oleh method
+            // manapun di kelas ini, jadi tetap NULL sesuai pola SCD2 yang
+            // sudah ada (lihat migration 2026_08_20_000002).
+            'level_1_name'     => $attributes['level_1_name'] ?? null,
+            'level_2_name'     => $attributes['level_2_name'] ?? null,
+            'level_3_name'     => $attributes['level_3_name'] ?? null,
+            'level_4_name'     => $attributes['level_4_name'] ?? null,
+            'level_5_name'     => $attributes['level_5_name'] ?? null,
             'valid_from'       => $validFrom->format('Y-m-d'),
             'valid_to'         => null,
             'flag_prodi'       => true,

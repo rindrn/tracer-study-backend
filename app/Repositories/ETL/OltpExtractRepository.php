@@ -172,6 +172,10 @@ class OltpExtractRepository
                 // bukan di query terpisah, supaya deteksi perubahan SCD Type 2
                 // di ProdiDimService melihat seluruh atribut sekaligus.
                 'accreditation',
+                // DFR-17: FK ke org_units (Fase 2, boleh NULL -- lihat catatan
+                // dual-mode di OrgUnitHierarchyResolverService). Dipakai
+                // ProdiDimService untuk resolve level_1_name..level_5_name.
+                'org_unit_id',
             ])
             ->get();
     }

@@ -111,4 +111,25 @@ class OrgUnitRepository
             ->pluck('name')
             ->all();
     }
+
+    /**
+     * Cari satu unit berdasarkan level + nama, TANPA memandang parent-nya
+     * (berbeda dari findSibling() yang butuh $parentId eksak).
+     *
+     * Dipakai OrgUnitHierarchyResolverService (DFR-17) sebagai jalur
+     * dual-mode: begitu programs.org_unit_id belum diisi (mis. POLBAN
+     * sebelum backfill FK selesai), resolver jatuh kembali ke pencocokan
+     * nama teks lama (`programs.jurusan`) -- pola yang sama dengan
+     * EnforcesProdiScope dual-mode. Nama hanya unik per (type, parent),
+     * bukan global, jadi ini best-effort: mengambil kecocokan pertama.
+     * Cukup untuk template politeknik (1 level, root, nama sudah
+     * terverifikasi identik ke org_units lewat OrgUnitBackfillSeederTest).
+     */
+    public function findFirstByTypeAndName(int $orgUnitTypeId, string $name): ?object
+    {
+        return DB::connection(self::CONN)->table(self::TABLE)
+            ->where('org_unit_type_id', $orgUnitTypeId)
+            ->where('name', $name)
+            ->first();
+    }
 }
