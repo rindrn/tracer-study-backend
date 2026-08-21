@@ -259,7 +259,7 @@ class TracerStudySubmitService
             'program_id'      => $programId,
             'graduation_year' => $validated['tahun_lulus'],
             'kode_pt'         => $validated['kode_pt'] ?? null,
-            'nik'             => $validated['nik'],
+            'nik'             => $validated['nik'] ?? null,
             'npwp'            => $validated['npwp'] ?? null,
         ]);
     }
