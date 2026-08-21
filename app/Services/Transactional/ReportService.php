@@ -61,13 +61,28 @@ class ReportService
      * @param bool $rawCode    true = tampilkan option_code/angka mentah
      *             (format untuk diunggah ke portal Kementerian);
      *             false (default) = tampilkan teks jawaban.
+     * @param string|null $jurusan TIDAK LAGI DIPAKAI -- dipertahankan hanya
+     *             supaya signature tetap kompatibel dengan ReportController
+     *             yang masih boleh mengirim param `jurusan` lama. Scope
+     *             Kajur & Ketua Fakultas sekarang murni dari
+     *             User::scopedProgramIds() (keanggotaan FK eksplisit),
+     *             sehingga keduanya langsung mengekspor data gabungan
+     *             seluruh prodi dalam cakupannya tanpa perlu memilih satu
+     *             jurusan dulu (Fase 5).
      */
     public function buildAlumniResponsesExport(
         User $user,
         ?int $questionnaireId,
         int $tahunLulus,
         bool $rawCode = false,
+        ?string $jurusan = null,
     ): TracerStudyMultiSheetExport {
+        $programIdIn = ($user->isKajur() || $user->isKetuaFakultas()) ? $user->scopedProgramIds() : null;
+        if ($programIdIn !== null && empty($programIdIn)) {
+            $label = $user->isKajur() ? 'jurusan' : 'fakultas';
+            abort(403, "Akun ini belum memiliki {$label} dengan prodi yang di-assign. Hubungi pengelola.");
+        }
+
         $questionnaire = $questionnaireId !== null
             ? $this->questionnaireRepo->findHeaderById($questionnaireId)
             : null;
@@ -89,7 +104,7 @@ class ReportService
                 'format'           => $rawCode ? 'code' : 'label',
                 'scope'            => $user->isKaprodi()
                     ? 'prodi'
-                    : ($user->isKajur() ? 'jurusan' : 'institusi'),
+                    : ($user->isKajur() || $user->isKetuaFakultas() ? 'jurusan' : 'institusi'),
             ],
         ]);
 
@@ -97,7 +112,7 @@ class ReportService
 
         $filters = array_filter([
             'program_id'       => $user->isKaprodi() ? $user->program_id : null,
-            'jurusan'          => $user->isKajur() ? $user->jurusan : null,
+            'program_id_in'    => $programIdIn,
             'questionnaire_id' => $questionnaireId,
             'graduation_year'  => $tahunLulus,
         ], fn ($v) => $v !== null);

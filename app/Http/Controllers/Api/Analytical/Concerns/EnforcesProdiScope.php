@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Analytical\Concerns;
 
+use App\Models\Transactional\Program;
 use App\Models\Transactional\User;
 use Illuminate\Http\Request;
 
@@ -83,22 +84,71 @@ trait EnforcesProdiScope
             $params['jenjang']    = $program->degree;
             $params['jurusan']    = $program->jurusan;
         } elseif ($user->isKajur()) {
-            // Kajur dibatasi ke jurusannya, sejalan dengan lapisan
-            // transaksional yang sudah melakukannya sejak awal — lihat
-            // RingkasanTahunController dan AdminAlumniService. Lapisan
-            // analitik satu-satunya yang tertinggal: sebelum ini kajur
-            // melihat angka seluruh institusi (505 alumni) padahal
-            // jurusannya hanya 29.
-            //
-            // Nama prodi dan jenjang TIDAK dipaksa: kajur memang berhak
-            // menyaring antar prodi di dalam jurusannya. Penyaring jurusan
-            // tetap terpasang, jadi permintaan ke prodi luar jurusan
-            // menghasilkan irisan kosong, bukan data prodi lain.
-            if ($user->jurusan === null || $user->jurusan === '') {
-                abort(403, 'Akun kajur ini belum tertaut ke jurusan mana pun. Hubungi pengelola.');
+            // Kajur dibatasi ke jurusan yang di-assign admin (FK
+            // `users.jurusan_id` → keanggotaan eksplisit lewat
+            // `jurusan_program_scopes`), bukan lagi cocokkan teks
+            // `users.jurusan`. `id_prodi_in` dikirim ke repository
+            // analitik sebagai filter whereIn — kajur otomatis melihat
+            // gabungan seluruh prodi dalam jurusannya (agregat), dan
+            // permintaan ke prodi luar jurusan menghasilkan irisan kosong,
+            // bukan data prodi lain.
+            $ids = $user->scopedProgramIds();
+            if (empty($ids)) {
+                abort(403, 'Akun kajur ini belum tertaut ke jurusan dengan prodi yang di-assign. Hubungi pengelola.');
             }
 
-            $params['jurusan'] = $user->jurusan;
+            $params['id_prodi_in'] = $ids;
+
+            // Kompatibilitas mundur: 9 repository Cube.js (Keterserapan,
+            // Kesesuaian, Pendapatan, MasaTunggu, Pembiayaan, KompetensiGap,
+            // MetodePembelajaran, Wirausaha, SebaranInstansi -- dashboard
+            // Overview/Employment/Education/KPI) memanggil buildGlobalFilters()
+            // langsung dengan argumen bernama per repo method, BUKAN lewat
+            // buildGlobalFiltersFromArray() yang membaca id_prodi_in. Mengubah
+            // ~48 titik pemanggilan di 9 berkas itu di luar cakupan sesi ini.
+            // Supaya dashboard itu TIDAK meregresi (kajur melihat data
+            // institusi), `jurusan` scalar tetap dipasang seperti sebelumnya
+            // -- nilainya sekarang diambil dari relasi FK `jurusanEntity`
+            // (nama Jurusan yang di-assign admin), bukan lagi kolom teks
+            // `users.jurusan` mentah. Endpoint yang SUDAH dikonversi ke
+            // id_prodi_in (RingkasanTahun, AdminAlumniService) mengabaikan
+            // key ini.
+            $params['jurusan'] = $user->jurusanEntity?->name;
+        } elseif ($user->isKetuaFakultas()) {
+            // Ketua Fakultas membawahi BEBERAPA jurusan sekaligus lewat
+            // fakultas yang di-assign admin (`users.fakultas_id` →
+            // `fakultas_jurusan_scopes` → `jurusan_program_scopes`).
+            // Sama seperti kajur, scope-nya sekarang berupa daftar
+            // program_id nyata (bukan cocokkan nama).
+            $ids = $user->scopedProgramIds();
+            if (empty($ids)) {
+                abort(403, 'Akun ketua fakultas ini belum memiliki fakultas dengan prodi yang di-assign. Hubungi pengelola.');
+            }
+
+            $params['id_prodi_in'] = $ids;
+
+            // Sama seperti catatan kompatibilitas kajur di atas: 9 repository
+            // Cube.js belum dikonversi ke id_prodi_in dalam sesi ini, dan
+            // filter scalar `jurusan` hanya menerima SATU nilai (tidak bisa
+            // menampung >1 jurusan seperti cakupan Ketua Fakultas). Supaya
+            // endpoint-endpoint ITU tidak berjalan tanpa batas sama sekali
+            // (melihat data seluruh institusi), Ketua Fakultas untuk
+            // endpoint-endpoint tersebut TETAP wajib memilih satu jurusan
+            // dari cakupannya -- perilaku lama sebelum redesain ini.
+            //
+            // Endpoint yang SUDAH dikonversi ke id_prodi_in (RingkasanTahun,
+            // AdminAlumniService) TIDAK memerlukan pilihan ini -- keduanya
+            // langsung menampilkan agregat dari seluruh scopedProgramIds()
+            // tanpa perlu memilih jurusan, sesuai tujuan Fase 5.
+            $scopeNames = $user->fakultas?->jurusans->pluck('name')->all() ?? [];
+            $requested  = $params['jurusan'] ?? null;
+            if ($requested === null || $requested === '') {
+                abort(422, 'Pilih salah satu jurusan yang menjadi cakupan Anda.');
+            }
+            if (!in_array($requested, $scopeNames, true)) {
+                abort(403, 'Anda tidak memiliki akses ke jurusan tersebut.');
+            }
+            $params['jurusan'] = $requested;
         }
 
         return $params;
@@ -134,6 +184,20 @@ trait EnforcesProdiScope
 
         if ($user->isKaprodi() && $user->program?->name !== $requestedProdi) {
             abort(403, 'Anda hanya dapat mengakses data program studi Anda sendiri.');
+        }
+
+        if ($user->isKajur() || $user->isKetuaFakultas()) {
+            // Drill-down masih menerima nama_prodi sebagai path/query param,
+            // jadi pencocokan tetap harus lewat nama -- tapi daftar yang
+            // dibandingkan sekarang berasal dari scopedProgramIds() (FK
+            // eksplisit), bukan lagi cocokkan teks jurusan.
+            $allowedIds = $user->scopedProgramIds();
+            $program    = Program::where('name', $requestedProdi)->first();
+
+            if ($program === null || !in_array($program->id, $allowedIds, true)) {
+                $label = $user->isKajur() ? 'jurusan' : 'fakultas';
+                abort(403, "Anda hanya dapat mengakses data program studi dalam {$label} yang menjadi cakupan Anda.");
+            }
         }
     }
 }

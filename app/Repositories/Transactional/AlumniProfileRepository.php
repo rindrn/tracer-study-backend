@@ -264,7 +264,9 @@ class AlumniProfileRepository
             $query->where('alumni_profiles.program_id', $filters['program_id']);
         }
 
-        if (!empty($filters['jurusan'])) {
+        if (!empty($filters['program_id_in'])) {
+            $query->whereIn('alumni_profiles.program_id', $filters['program_id_in']);
+        } elseif (!empty($filters['jurusan'])) {
             $query->where('programs.jurusan', $filters['jurusan']);
         }
 
@@ -430,7 +432,9 @@ class AlumniProfileRepository
             $query->where('alumni_profiles.program_id', $filters['program_id']);
         }
 
-        if (!empty($filters['jurusan'])) {
+        if (!empty($filters['program_id_in'])) {
+            $query->whereIn('alumni_profiles.program_id', $filters['program_id_in']);
+        } elseif (!empty($filters['jurusan'])) {
             $query->where('programs.jurusan', $filters['jurusan']);
         }
 
@@ -473,7 +477,12 @@ class AlumniProfileRepository
      * hanya 'answered' dan 'unanswered'. Nama diseragamkan supaya dialeknya
      * tinggal satu dan medan yang sudah dideklarasikan FE benar-benar terisi.
      */
-    public function countStatsByProgram(?int $programId, ?string $jurusan = null, ?int $graduationYear = null): array
+    /**
+     * @param array<int>|null $programIdIn Scope Kajur/Ketua Fakultas (daftar
+     *        program_id dari User::scopedProgramIds()) -- diprioritaskan di
+     *        atas $jurusan kalau keduanya somehow terisi.
+     */
+    public function countStatsByProgram(?int $programId, ?int $graduationYear = null, ?array $programIdIn = null): array
     {
         $conn = DB::connection(self::CONN);
 
@@ -481,9 +490,8 @@ class AlumniProfileRepository
         $totalQuery = $conn->table('alumni_profiles');
         if ($programId !== null) {
             $totalQuery->where('program_id', $programId);
-        } elseif ($jurusan !== null) {
-            $totalQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-                ->where('programs.jurusan', $jurusan);
+        } elseif (!empty($programIdIn)) {
+            $totalQuery->whereIn('program_id', $programIdIn);
         }
         if ($graduationYear !== null) {
             $totalQuery->where('alumni_profiles.graduation_year', $graduationYear);
@@ -507,9 +515,8 @@ class AlumniProfileRepository
             ->whereIn('responses.status', ['submitted', 'verified']);
         if ($programId !== null) {
             $finishQuery->where('alumni_profiles.program_id', $programId);
-        } elseif ($jurusan !== null) {
-            $finishQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-                ->where('programs.jurusan', $jurusan);
+        } elseif (!empty($programIdIn)) {
+            $finishQuery->whereIn('alumni_profiles.program_id', $programIdIn);
         }
         if ($graduationYear !== null) {
             $finishQuery->where('alumni_profiles.graduation_year', $graduationYear);
@@ -523,9 +530,8 @@ class AlumniProfileRepository
             ->where('responses.status', 'started');
         if ($programId !== null) {
             $ongoingQuery->where('alumni_profiles.program_id', $programId);
-        } elseif ($jurusan !== null) {
-            $ongoingQuery->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-                ->where('programs.jurusan', $jurusan);
+        } elseif (!empty($programIdIn)) {
+            $ongoingQuery->whereIn('alumni_profiles.program_id', $programIdIn);
         }
         if ($graduationYear !== null) {
             $ongoingQuery->where('alumni_profiles.graduation_year', $graduationYear);
@@ -544,16 +550,16 @@ class AlumniProfileRepository
         ];
     }
 
-    public function getAvailableGraduationYears(?int $programId, ?string $jurusan = null): array
+    /** @param array<int>|null $programIdIn Scope Kajur/Ketua Fakultas. */
+    public function getAvailableGraduationYears(?int $programId, ?array $programIdIn = null): array
     {
         $query = DB::connection(self::CONN)->table('alumni_profiles')
             ->whereNotNull('graduation_year');
 
         if ($programId !== null) {
             $query->where('program_id', $programId);
-        } elseif ($jurusan !== null) {
-            $query->join('programs', 'alumni_profiles.program_id', '=', 'programs.id')
-                ->where('programs.jurusan', $jurusan);
+        } elseif (!empty($programIdIn)) {
+            $query->whereIn('program_id', $programIdIn);
         }
 
         return $query->distinct()->orderByDesc('graduation_year')->pluck('graduation_year')->toArray();
@@ -638,11 +644,12 @@ class AlumniProfileRepository
         if (!empty($filters['graduation_year'])) {
             $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
         }
-        // Scope kajur, sama seperti di getForReportQuery(). Tanpa klausa ini
-        // filter 'jurusan' yang dikirim ReportService diabaikan diam-diam dan
-        // kajur ikut melihat alumni jurusan lain di sheet per-prodi.
-        if (!empty($filters['jurusan'])) {
-            $query->where('programs.jurusan', $filters['jurusan']);
+        // Scope kajur/ketua_fakultas, sama seperti di getForReportQuery().
+        // Tanpa klausa ini filter 'program_id_in' yang dikirim ReportService
+        // diabaikan diam-diam dan kajur/ketua_fakultas ikut melihat alumni
+        // di luar cakupannya di sheet per-prodi.
+        if (!empty($filters['program_id_in'])) {
+            $query->whereIn('alumni_profiles.program_id', $filters['program_id_in']);
         }
 
         return PersonalData::revealRows(collect($query->get()));
@@ -686,11 +693,12 @@ class AlumniProfileRepository
         if (!empty($filters['graduation_year'])) {
             $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
         }
-        // Scope kajur: dibatasi ke jurusannya sendiri. Tanpa klausa ini filter
-        // 'jurusan' yang dikirim ReportService diabaikan diam-diam dan kajur
-        // ikut melihat alumni jurusan lain.
-        if (!empty($filters['jurusan'])) {
-            $query->where('programs.jurusan', $filters['jurusan']);
+        // Scope kajur/ketua_fakultas: dibatasi ke cakupannya sendiri (daftar
+        // program_id dari User::scopedProgramIds()). Tanpa klausa ini filter
+        // 'program_id_in' yang dikirim ReportService diabaikan diam-diam dan
+        // kajur/ketua_fakultas ikut melihat alumni di luar cakupannya.
+        if (!empty($filters['program_id_in'])) {
+            $query->whereIn('alumni_profiles.program_id', $filters['program_id_in']);
         }
 
         return $query;

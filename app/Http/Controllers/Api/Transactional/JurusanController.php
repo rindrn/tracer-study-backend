@@ -71,4 +71,25 @@ class JurusanController extends Controller
 
         return response()->json(['success' => true, 'message' => 'Jurusan berhasil dihapus.']);
     }
+
+    /**
+     * PUT /api/jurusans/{id}/programs
+     *
+     * Ganti seluruh keanggotaan program studi jurusan ini lewat
+     * jurusan_program_scopes -- inilah yang menentukan cakupan Kajur
+     * (bukan lagi cocokkan teks programs.jurusan).
+     */
+    public function syncPrograms(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'program_ids'   => ['present', 'array'],
+            'program_ids.*' => ['integer', 'exists:oltp.programs,id'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Keanggotaan program studi jurusan berhasil disimpan.',
+            'data'    => $this->service->syncScopedPrograms($id, $validated['program_ids']),
+        ]);
+    }
 }

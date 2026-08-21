@@ -1,6 +1,8 @@
 <?php
 namespace Database\Seeders;
 
+use App\Models\Transactional\Fakultas;
+use App\Models\Transactional\Jurusan;
 use App\Models\Transactional\Program;
 use App\Models\Transactional\User;
 use Illuminate\Database\Seeder;
@@ -38,12 +40,17 @@ class UserSeeder extends Seeder
         }
 
         // ── 4. Kajur — 1 per jurusan (10 jurusan dari ProgramSeeder) ─────
+        // `jurusan_id` ditautkan ke entity Jurusan (jurusan_program_scopes
+        // adalah sumber otorisasi sekarang) selain kolom teks `jurusan` yang
+        // dipertahankan untuk konsumen lain.
         $jurusanList = Program::distinct()->whereNotNull('jurusan')->pluck('jurusan');
         foreach ($jurusanList as $jurusan) {
-            $slug = Str::slug($jurusan, '.');
+            $slug          = Str::slug($jurusan, '.');
+            $jurusanEntity = Jurusan::firstWhere('name', $jurusan);
             User::updateOrCreate(['email' => "kajur.{$slug}@test.com"], [
                 'name' => "Kajur {$jurusan}", 'role' => User::ROLE_KAJUR,
-                'program_id' => null, 'jurusan' => $jurusan, 'password' => $pw,
+                'program_id' => null, 'jurusan' => $jurusan,
+                'jurusan_id' => $jurusanEntity?->id, 'password' => $pw,
             ]);
         }
 
@@ -54,6 +61,21 @@ class UserSeeder extends Seeder
             User::updateOrCreate(['email' => "prodi.{$slug}@test.com"], [
                 'name' => "Kaprodi {$program->name}", 'role' => User::ROLE_KAPRODI,
                 'program_id' => $program->id, 'jurusan' => null, 'password' => $pw,
+            ]);
+        }
+
+        // ── 6. Ketua Fakultas — 1 akun demo, fakultas dibuat mencakup 2-3
+        //      jurusan pertama lewat fakultas_jurusan_scopes ──────────────
+        $fakultasScopeNames = $jurusanList->take(3);
+        if ($fakultasScopeNames->isNotEmpty()) {
+            $fakultas = Fakultas::firstOrCreate(['name' => 'Fakultas Demo']);
+            $jurusanIds = Jurusan::whereIn('name', $fakultasScopeNames)->pluck('id');
+            $fakultas->jurusans()->sync($jurusanIds);
+
+            User::updateOrCreate(['email' => 'ketua.fakultas@test.com'], [
+                'name' => 'Ketua Fakultas Demo', 'role' => User::ROLE_KETUA_FAKULTAS,
+                'program_id' => null, 'jurusan' => null,
+                'fakultas_id' => $fakultas->id, 'password' => $pw,
             ]);
         }
     }

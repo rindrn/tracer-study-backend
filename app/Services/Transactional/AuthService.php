@@ -53,20 +53,24 @@ class AuthService
             'context'     => ['role' => $user->role],
         ]);
 
-        // Load relasi program (null jika admin/p2mpp)
-        $user->load('program');
- 
+        // Load relasi program + jurusan/fakultas entity (null kalau tidak relevan)
+        $user->load(['program', 'jurusanEntity.programs', 'fakultas.jurusans.programs']);
+
         return new ResponseAuthDTO(
-            userId:        $user->id,
-            name:          $user->name,
-            email:         $user->email,
-            role:          $user->role,
-            programId:     $user->program_id,
-            programName:   $user->program?->name,
-            programCode:   $user->program?->code,
-            programDegree: $user->program?->degree,
-            jurusan:       $user->jurusan,
-            token:         $token,
+            userId:           $user->id,
+            name:             $user->name,
+            email:            $user->email,
+            role:             $user->role,
+            programId:        $user->program_id,
+            programName:      $user->program?->name,
+            programCode:      $user->program?->code,
+            programDegree:    $user->program?->degree,
+            jurusan:          $user->jurusan,
+            jurusanName:      $user->jurusanEntity?->name,
+            fakultasName:     $user->fakultas?->name,
+            fakultasJurusanNames: $user->fakultas?->jurusans->pluck('name')->all() ?? [],
+            scopedProgramIds: $user->scopedProgramIds(),
+            token:            $token,
         );
     }
  
@@ -107,18 +111,22 @@ class AuthService
  
     public function me(User $user): array
     {
-        $user->load('program');
- 
+        $user->load(['program', 'jurusanEntity.programs', 'fakultas.jurusans.programs']);
+
         return [
-            'id'             => $user->id,
-            'name'           => $user->name,
-            'email'          => $user->email,
-            'role'           => $user->role,
-            'program_id'     => $user->program_id,
-            'program_name'   => $user->program?->name,
-            'program_code'   => $user->program?->code,
-            'program_degree' => $user->program?->degree,
-            'jurusan'        => $user->jurusan,
+            'id'                 => $user->id,
+            'name'               => $user->name,
+            'email'              => $user->email,
+            'role'               => $user->role,
+            'program_id'         => $user->program_id,
+            'program_name'       => $user->program?->name,
+            'program_code'       => $user->program?->code,
+            'program_degree'     => $user->program?->degree,
+            'jurusan'            => $user->jurusan,
+            'jurusan_name'       => $user->jurusanEntity?->name,
+            'fakultas_name'      => $user->fakultas?->name,
+            'fakultas_jurusan_names' => $user->fakultas?->jurusans->pluck('name')->all() ?? [],
+            'scoped_program_ids' => $user->scopedProgramIds(),
         ];
     }
 }

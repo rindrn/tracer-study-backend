@@ -90,6 +90,74 @@ class JurusanRepository
     }
 
     /**
+     * Berapa staf (Kajur) yang lingkupnya dipatok ke jurusan ini lewat FK
+     * `users.jurusan_id` -- beda dari userCount() di atas yang masih
+     * mencocokkan teks `users.jurusan` lama. Dicek terpisah karena akun yang
+     * dibuat/diedit lewat form baru sejak redesain scope hanya mengisi FK
+     * ini, tidak lagi menyentuh kolom teks -- kalau tidak dicek, jurusan itu
+     * lolos delete dan cascade diam-diam mencabut akses Kajur tersebut.
+     */
+    public function scopedUserCount(int $jurusanId): int
+    {
+        return DB::connection(self::CONN)->table('users')->where('jurusan_id', $jurusanId)->count();
+    }
+
+    /** Berapa Fakultas berbeda yang mencakup jurusan ini lewat fakultas_jurusan_scopes. */
+    public function fakultasUsageCount(int $jurusanId): int
+    {
+        return DB::connection(self::CONN)->table('fakultas_jurusan_scopes')
+            ->where('jurusan_id', $jurusanId)
+            ->distinct('fakultas_id')
+            ->count('fakultas_id');
+    }
+
+    /**
+     * program_id anggota jurusan lewat `jurusan_program_scopes` (keanggotaan
+     * EKSPLISIT, sumber otorisasi Kajur sejak redesain scope) -- beda dari
+     * programCount() di atas yang menghitung dari cocokkan teks
+     * `programs.jurusan`, dan dipertahankan terpisah untuk itu.
+     *
+     * @return array<int>
+     */
+    public function scopedProgramIds(int $jurusanId): array
+    {
+        return DB::connection(self::CONN)->table('jurusan_program_scopes')
+            ->where('jurusan_id', $jurusanId)
+            ->pluck('program_id')
+            ->all();
+    }
+
+    /**
+     * Ganti seluruh keanggotaan prodi jurusan ini (hapus lalu insert ulang).
+     *
+     * Dibungkus transaksi: tanpa ini, kegagalan di tengah insert (jarang,
+     * tapi bisa terjadi) meninggalkan keanggotaan KOSONG -- setiap Kajur yang
+     * bergantung pada jurusan ini kehilangan seluruh cakupannya secara diam-diam
+     * sampai admin sync ulang.
+     */
+    public function syncPrograms(int $jurusanId, array $programIds): void
+    {
+        $conn = DB::connection(self::CONN);
+
+        $conn->transaction(function () use ($conn, $jurusanId, $programIds) {
+            $conn->table('jurusan_program_scopes')->where('jurusan_id', $jurusanId)->delete();
+
+            if (empty($programIds)) {
+                return;
+            }
+
+            $now = now();
+            $conn->table('jurusan_program_scopes')->insert(
+                array_map(fn (int $programId) => [
+                    'jurusan_id' => $jurusanId,
+                    'program_id' => $programId,
+                    'created_at' => $now,
+                ], array_unique($programIds))
+            );
+        });
+    }
+
+    /**
      * Rambatkan penggantian nama ke seluruh kolom teks yang menyimpannya.
      *
      * @return array{programs: int, users: int} jumlah baris yang tersentuh

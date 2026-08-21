@@ -17,6 +17,7 @@ abstract class BaseAnalyticalRepository
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
         array   $extra          = [],
+        ?array  $idProdiIn      = null,
     ): array {
         $filters = [];
 
@@ -28,7 +29,20 @@ abstract class BaseAnalyticalRepository
             ];
         }
 
-        if ($jurusan !== null && $jurusan !== '') {
+        // Scope Kajur/Ketua Fakultas: daftar id_prodi eksplisit (dari
+        // User::scopedProgramIds(), lihat EnforcesProdiScope::scopedParams).
+        // Menggantikan filter scalar `jurusan` di bawah -- teks itu bisa
+        // drift dari keanggotaan FK sesungguhnya begitu admin memindahkan
+        // prodi antar jurusan di Master Data, sedangkan id_prodi_in selalu
+        // mengikuti keanggotaan yang sebenarnya. Cube.js `equals` menerima
+        // array = semantik IN, jadi tidak perlu operator terpisah.
+        if ($idProdiIn !== null && $idProdiIn !== []) {
+            $filters[] = [
+                'member'   => 'DimProdi.id_prodi',
+                'operator' => 'equals',
+                'values'   => array_map('strval', $idProdiIn),
+            ];
+        } elseif ($jurusan !== null && $jurusan !== '') {
             $filters[] = [
                 'member'   => 'DimProdi.jurusan',
                 'operator' => 'equals',
@@ -96,6 +110,7 @@ abstract class BaseAnalyticalRepository
             tahunLulus:     $params['tahun_lulus']     ?? null,
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
             extra:          $extra,
+            idProdiIn:      $params['id_prodi_in']     ?? null,
         );
     }
 

@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Transactional\ThresholdController;
 use App\Http\Controllers\Api\Transactional\LamController;
 use App\Http\Controllers\Api\Transactional\LamVersionController;
 use App\Http\Controllers\Api\Transactional\JurusanController;
+use App\Http\Controllers\Api\Transactional\FakultasController;
 use App\Http\Controllers\Api\Transactional\LamProgramController;
 use App\Http\Controllers\Api\Transactional\ProgramController;
 use App\Http\Controllers\Api\Transactional\RefUmpController;
@@ -207,6 +208,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('jurusans',        [JurusanController::class, 'store']);
         Route::put('jurusans/{id}',    [JurusanController::class, 'update']);
         Route::delete('jurusans/{id}', [JurusanController::class, 'destroy']);
+        Route::put('jurusans/{id}/programs', [JurusanController::class, 'syncPrograms']);
+
+        // Fakultas CRUD + keanggotaan jurusan (redesain scope Ketua Fakultas).
+        // Pembacaannya ada di kelompok data viewer -- dipakai dropdown
+        // Fakultas di form Kelola Staff.
+        Route::post('fakultas',              [FakultasController::class, 'store']);
+        Route::put('fakultas/{id}',          [FakultasController::class, 'update']);
+        Route::delete('fakultas/{id}',       [FakultasController::class, 'destroy']);
+        Route::put('fakultas/{id}/jurusans', [FakultasController::class, 'syncJurusans']);
 
         // Provinces CRUD
         Route::post('provinces', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'storeProvince']);
@@ -370,6 +380,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Daftar jurusan: mengisi penyaring di halaman Responden, Kelola Staff,
     // dan Kelola Mahasiswa, jadi tidak dibatasi peran admin.
     Route::get('jurusans', [JurusanController::class, 'index']);
+    Route::get('fakultas', [FakultasController::class, 'index']);
 
     // Alumni management
     Route::get('alumni/stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);

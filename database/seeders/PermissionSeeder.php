@@ -65,6 +65,11 @@ class PermissionSeeder extends Seeder
             User::ROLE_KAPRODI => [
                 'data.view_prodi', 'data.download',
             ],
+            // Sama seperti kajur (viewer read-only): satu-satunya beda adalah
+            // cakupannya meliputi lebih dari satu jurusan sekaligus.
+            User::ROLE_KETUA_FAKULTAS => [
+                'data.view_jurusan', 'data.download',
+            ],
         ];
 
         // Clear existing and re-seed

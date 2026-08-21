@@ -15,9 +15,13 @@ use Illuminate\Http\Request;
  * dipanggil setiap kali halaman dibuka tanpa terasa.
  *
  * Cakupan data mengikuti jabatan pemanggil:
- *   - Kaprodi : hanya program studinya
- *   - Kajur   : hanya jurusannya
- *   - lainnya : seluruh institusi
+ *   - Kaprodi        : hanya program studinya
+ *   - Kajur          : gabungan seluruh prodi dalam jurusan yang di-assign
+ *                      admin (User::scopedProgramIds())
+ *   - Ketua Fakultas : gabungan seluruh prodi dalam fakultas yang di-assign
+ *                      admin -- langsung agregat, tidak perlu memilih satu
+ *                      jurusan dulu (Fase 5)
+ *   - lainnya        : seluruh institusi
  *
  * Pembatasan dilakukan di sini, bukan di frontend, supaya sejalan dengan
  * pembatasan pada endpoint daftar alumni dan laporan.
@@ -32,9 +36,18 @@ class RingkasanTahunController extends Controller
     {
         $user = $request->user();
 
+        $programIdIn = null;
+        if ($user->isKajur() || $user->isKetuaFakultas()) {
+            $programIdIn = $user->scopedProgramIds();
+            if (empty($programIdIn)) {
+                $label = $user->isKajur() ? 'jurusan' : 'fakultas';
+                abort(403, "Akun ini belum memiliki {$label} dengan prodi yang di-assign. Hubungi pengelola.");
+            }
+        }
+
         $scope = [
-            'program_id' => $user->isKaprodi() ? $user->program_id : null,
-            'jurusan'    => $user->isKajur() ? $user->jurusan : null,
+            'program_id'    => $user->isKaprodi() ? $user->program_id : null,
+            'program_id_in' => $programIdIn,
         ];
 
         return response()->json([

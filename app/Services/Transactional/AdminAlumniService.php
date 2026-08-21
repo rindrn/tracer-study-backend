@@ -62,16 +62,16 @@ class AdminAlumniService
      */
     public function getStats(User $user, ?int $graduationYear = null): array
     {
-        $programId = $user->isKaprodi() ? $user->program_id : null;
-        $jurusan = $user->isKajur() ? $user->jurusan : null;
+        $programId   = $user->isKaprodi() ? $user->program_id : null;
+        $programIdIn = ($user->isKajur() || $user->isKetuaFakultas()) ? $user->scopedProgramIds() : null;
 
-        $stats = $this->alumniRepo->countStatsByProgram($programId, $jurusan, $graduationYear);
+        $stats = $this->alumniRepo->countStatsByProgram($programId, $graduationYear, $programIdIn);
 
         $stats['response_rate'] = $stats['total'] > 0
             ? round($stats['answered'] / $stats['total'] * 100, 1)
             : 0.0;
 
-        $stats['graduation_years'] = $this->alumniRepo->getAvailableGraduationYears($programId, $jurusan);
+        $stats['graduation_years'] = $this->alumniRepo->getAvailableGraduationYears($programId, $programIdIn);
 
         return $stats;
     }
@@ -247,21 +247,37 @@ class AdminAlumniService
     // Helpers (private)
     // ═══════════════════════════════════════════════════════════
 
-    /** Tambahkan filter scope berdasarkan role user. */
+    /**
+     * Tambahkan filter scope berdasarkan role user.
+     *
+     * Kajur & Ketua Fakultas dibatasi lewat `program_id_in` (daftar
+     * program_id dari User::scopedProgramIds(), berdasar keanggotaan FK
+     * eksplisit di jurusan_program_scopes / fakultas_jurusan_scopes) --
+     * bukan lagi cocokkan teks `jurusan`. Efek sampingnya sekaligus jadi
+     * tujuan Fase 5: kedua role langsung melihat data gabungan seluruh
+     * prodi dalam cakupannya, tanpa wajib memilih satu jurusan dulu.
+     */
     private function applyRoleScope(User $user, array $filters): array
     {
         if ($user->isKaprodi() && $user->program_id) {
             $filters['program_id'] = $user->program_id;
-        } elseif ($user->isKajur() && $user->jurusan) {
-            $filters['jurusan'] = $user->jurusan;
+        } elseif ($user->isKajur() || $user->isKetuaFakultas()) {
+            $ids = $user->scopedProgramIds();
+
+            if (empty($ids)) {
+                $label = $user->isKajur() ? 'jurusan' : 'fakultas';
+                throw new BusinessException("Akun ini belum memiliki {$label} dengan prodi yang di-assign. Hubungi pengelola.", 403);
+            }
+
+            $filters['program_id_in'] = $ids;
         }
         return $filters;
     }
 
-    /** Viewer roles (wadir, kajur, kaprodi) — block semua operasi tulis. */
+    /** Viewer roles (wadir, kajur, kaprodi, ketua_fakultas) — block semua operasi tulis. */
     private function assertCanWrite(User $user): void
     {
-        if ($user->isWadir() || $user->isKajur() || $user->isKaprodi()) {
+        if ($user->isWadir() || $user->isKajur() || $user->isKaprodi() || $user->isKetuaFakultas()) {
             throw new BusinessException('Role Anda tidak diizinkan mengubah data alumni.', 403);
         }
     }

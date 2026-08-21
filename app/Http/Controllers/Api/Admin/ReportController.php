@@ -49,6 +49,9 @@ class ReportController extends Controller
             'tahun_lulus'      => ['required', 'integer', 'min:2000', 'max:2100'],
             'questionnaire_id' => ['nullable', 'integer'],
             'format'           => ['nullable', 'in:label,code'],
+            // Hanya dipakai (dan divalidasi terhadap scope) untuk ketua_fakultas
+            // -- lihat ReportService::buildAlumniResponsesExport().
+            'jurusan'          => ['nullable', 'string', 'max:100'],
         ]);
 
         set_time_limit(300);
@@ -59,6 +62,7 @@ class ReportController extends Controller
             questionnaireId: $validated['questionnaire_id'] ?? null,
             tahunLulus:      $validated['tahun_lulus'],
             rawCode:         ($validated['format'] ?? 'label') === 'code',
+            jurusan:         $validated['jurusan'] ?? null,
         );
 
         return Excel::download(

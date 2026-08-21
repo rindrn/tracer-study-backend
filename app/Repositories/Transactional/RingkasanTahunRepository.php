@@ -34,13 +34,13 @@ class RingkasanTahunRepository
     private const CONN = 'oltp';
 
     /**
-     * @param array{program_id?: int|null, jurusan?: string|null} $scope
+     * @param array{program_id?: int|null, program_id_in?: array<int>|null} $scope
      * @return array<int, array{tahun:int, alumni:int, sudah_mengisi:int, belum_mengisi:int, response_rate:float, kuesioner:int, periode:array<int,int>}>
      */
     public function byGraduationYear(array $scope = []): array
     {
-        $programId = $scope['program_id'] ?? null;
-        $jurusan   = $scope['jurusan'] ?? null;
+        $programId   = $scope['program_id'] ?? null;
+        $programIdIn = $scope['program_id_in'] ?? null;
 
         // ── 1. Sisi alumni: total & yang sudah mengisi, per tahun lulus ──
         $alumniQuery = DB::connection(self::CONN)
@@ -59,8 +59,8 @@ class RingkasanTahunRepository
 
         if ($programId !== null) {
             $alumniQuery->where('ap.program_id', $programId);
-        } elseif ($jurusan !== null) {
-            $alumniQuery->where('p.jurusan', $jurusan);
+        } elseif (!empty($programIdIn)) {
+            $alumniQuery->whereIn('ap.program_id', $programIdIn);
         }
 
         $alumniRows = $alumniQuery->get()->keyBy('tahun');
@@ -93,12 +93,10 @@ class RingkasanTahunRepository
             $questionnaireQuery->where(function ($w) use ($programId) {
                 $w->whereNull('q.program_id')->orWhere('q.program_id', $programId);
             });
-        } elseif ($jurusan !== null) {
-            $questionnaireQuery->where(function ($w) use ($jurusan) {
+        } elseif (!empty($programIdIn)) {
+            $questionnaireQuery->where(function ($w) use ($programIdIn) {
                 $w->whereNull('q.program_id')
-                  ->orWhereIn('q.program_id', function ($sub) use ($jurusan) {
-                      $sub->from('programs')->select('id')->where('jurusan', $jurusan);
-                  });
+                  ->orWhereIn('q.program_id', $programIdIn);
             });
         }
 
@@ -130,10 +128,8 @@ class RingkasanTahunRepository
         // sudah ada di alumni_profiles, jadi juga tidak memerlukannya.
         if ($programId !== null) {
             $kontakQuery->where('ap.program_id', $programId);
-        } elseif ($jurusan !== null) {
-            $kontakQuery->whereIn('ap.program_id', function ($sub) use ($jurusan) {
-                $sub->from('programs')->select('id')->where('jurusan', $jurusan);
-            });
+        } elseif (!empty($programIdIn)) {
+            $kontakQuery->whereIn('ap.program_id', $programIdIn);
         }
 
         $kontakRows = $kontakQuery->get()->keyBy('tahun');

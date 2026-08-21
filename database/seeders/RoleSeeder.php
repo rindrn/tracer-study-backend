@@ -15,6 +15,7 @@ class RoleSeeder extends Seeder
             ['name' => 'wadir', 'label' => 'Pimpinan (Direktur/Wadir/P2MPP)', 'description' => 'Viewer seluruh data institusi', 'scope' => 'Seluruh Jurusan'],
             ['name' => 'kajur', 'label' => 'Ketua Jurusan', 'description' => 'Viewer data jurusan', 'scope' => 'Jurusan'],
             ['name' => 'kaprodi', 'label' => 'Ketua Program Studi', 'description' => 'Viewer data program studi', 'scope' => 'Program Studi'],
+            ['name' => 'ketua_fakultas', 'label' => 'Ketua Fakultas', 'description' => 'Viewer data beberapa jurusan sekaligus', 'scope' => 'Beberapa Jurusan'],
         ];
 
         foreach ($roles as $role) {

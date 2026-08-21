@@ -30,6 +30,12 @@ class JurusanService
             'is_active'     => (bool) $row->is_active,
             'program_count' => (int) $row->program_count,
             'user_count'    => (int) $row->user_count,
+            // Keanggotaan EKSPLISIT lewat jurusan_program_scopes (sumber
+            // otorisasi Kajur) -- beda dari program_count di atas yang
+            // masih dari cocokkan teks programs.jurusan. Dikirim sekalian
+            // di sini supaya FE Master Data bisa prefill checkbox tanpa
+            // request tambahan per baris.
+            'program_ids'   => $this->jurusanRepo->scopedProgramIds((int) $row->id),
         ])->all();
     }
 
@@ -102,21 +108,67 @@ class JurusanService
             throw new BusinessException('Jurusan tidak ditemukan.', 404);
         }
 
-        $programs = $this->jurusanRepo->programCount($jurusan->name);
-        $users    = $this->jurusanRepo->userCount($jurusan->name);
+        // Dua jalur pemakaian harus dicek sekaligus: teks lama (programs.jurusan
+        // / users.jurusan, warisan sebelum redesain scope) DAN keanggotaan FK
+        // baru (jurusan_program_scopes / users.jurusan_id / fakultas_jurusan_scopes,
+        // sumber otorisasi Kajur/Ketua Fakultas sejak redesain). Akun yang
+        // dibuat lewat form Master Data baru cuma mengisi FK, tidak pernah
+        // menyentuh kolom teks -- kalau cuma jalur teks yang dicek, jurusan
+        // itu lolos delete dan cascade FK diam-diam mencabut akses Kajur/
+        // menyusutkan cakupan Ketua Fakultas yang bergantung padanya.
+        $programs        = $this->jurusanRepo->programCount($jurusan->name);
+        $users           = $this->jurusanRepo->userCount($jurusan->name);
+        $scopedPrograms  = count($this->jurusanRepo->scopedProgramIds($id));
+        $scopedUsers     = $this->jurusanRepo->scopedUserCount($id);
+        $fakultasUsage   = $this->jurusanRepo->fakultasUsageCount($id);
 
-        if ($programs > 0 || $users > 0) {
+        if ($programs > 0 || $users > 0 || $scopedPrograms > 0 || $scopedUsers > 0 || $fakultasUsage > 0) {
             $bagian = [];
-            if ($programs > 0) $bagian[] = "{$programs} program studi";
-            if ($users > 0)    $bagian[] = "{$users} akun staf";
+            if ($programs > 0 || $scopedPrograms > 0) {
+                $bagian[] = max($programs, $scopedPrograms) . ' program studi';
+            }
+            if ($users > 0 || $scopedUsers > 0) {
+                $bagian[] = max($users, $scopedUsers) . ' akun staf';
+            }
+            if ($fakultasUsage > 0) {
+                $bagian[] = "{$fakultasUsage} fakultas";
+            }
 
             throw new BusinessException(
-                "Jurusan \"{$jurusan->name}\" masih dipakai " . implode(' dan ', $bagian)
+                "Jurusan \"{$jurusan->name}\" masih dipakai " . implode(', ', $bagian)
                 . '. Pindahkan dulu pemakainya sebelum menghapus.',
                 422,
             );
         }
 
         $this->jurusanRepo->delete($id);
+    }
+
+    /**
+     * program_id anggota jurusan ini lewat jurusan_program_scopes -- inilah
+     * yang menentukan cakupan Kajur, dikelola terpisah dari CRUD nama
+     * jurusan di atas.
+     *
+     * @return array<int>
+     */
+    public function scopedProgramIds(int $id): array
+    {
+        if ($this->jurusanRepo->find($id) === null) {
+            throw new BusinessException('Jurusan tidak ditemukan.', 404);
+        }
+
+        return $this->jurusanRepo->scopedProgramIds($id);
+    }
+
+    /** Ganti seluruh keanggotaan prodi jurusan ini. */
+    public function syncScopedPrograms(int $id, array $programIds): array
+    {
+        if ($this->jurusanRepo->find($id) === null) {
+            throw new BusinessException('Jurusan tidak ditemukan.', 404);
+        }
+
+        $this->jurusanRepo->syncPrograms($id, $programIds);
+
+        return ['id' => $id, 'program_ids' => $this->jurusanRepo->scopedProgramIds($id)];
     }
 }
