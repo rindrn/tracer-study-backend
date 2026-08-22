@@ -57,6 +57,20 @@ class DatabaseSeeder extends Seeder
             'OLTP',
         );
 
+        // Daftar role (termasuk yang belum ikut di dump lama seperti
+        // ketua_fakultas). updateOrCreate, aman diulang.
+        $this->call(RoleSeeder::class);
+
+        // Backfill jurusan_program_scopes dari programs.jurusan (teks) --
+        // harus jalan SESUDAH jurusans/programs terisi lewat import di atas.
+        // Lihat komentar di JurusanProgramScopeSeeder.
+        $this->call(JurusanProgramScopeSeeder::class);
+
+        // Backfill users.jurusan_id (FK) dari users.jurusan (teks lama) --
+        // dump master data dibuat sebelum kolom jurusan_id ada. Lihat
+        // komentar di UserJurusanLinkSeeder.
+        $this->call(UserJurusanLinkSeeder::class);
+
         // Profil alumni dan seluruh jawaban tracer study. Opsional: berkas ini
         // berisi data pribadi nyata sehingga tidak ikut di repositori. Kalau
         // tidak ada, instalasi tetap berhasil -- hasilnya basis data berisi

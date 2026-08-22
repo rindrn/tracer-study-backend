@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -23,6 +22,12 @@ use Illuminate\Support\Facades\Schema;
  * tabel ini IDENTIK dengan hasil text-matching lama (dan tidak
  * meregresi 10 akun Kajur demo yang sudah ada). Admin bisa menyesuaikan
  * manual sesudahnya lewat Master Data.
+ *
+ * Backfill-nya sendiri TIDAK dijalankan di sini -- migration berjalan
+ * sebelum seeder mengisi `jurusans`/`programs`, jadi query itu akan
+ * selalu menyisipkan 0 baris di instalasi fresh. Lihat
+ * `database\Seeders\JurusanProgramScopeSeeder`, dipanggil dari
+ * `DatabaseSeeder` setelah data master ter-import.
  */
 return new class extends Migration
 {
@@ -41,22 +46,6 @@ return new class extends Migration
             $table->timestamp('created_at')->useCurrent();
             $table->unique(['jurusan_id', 'program_id']);
         });
-
-        $now = now();
-        $rows = DB::connection('oltp')->table('jurusans as j')
-            ->join('programs as p', 'p.jurusan', '=', 'j.name')
-            ->select('j.id as jurusan_id', 'p.id as program_id')
-            ->get();
-
-        foreach ($rows->chunk(500) as $chunk) {
-            DB::connection('oltp')->table('jurusan_program_scopes')->insert(
-                $chunk->map(fn ($r) => [
-                    'jurusan_id' => $r->jurusan_id,
-                    'program_id' => $r->program_id,
-                    'created_at' => $now,
-                ])->all()
-            );
-        }
     }
 
     public function down(): void
