@@ -14,6 +14,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     public function getBarData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -21,6 +22,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -56,6 +58,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     public function getPieData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -63,6 +66,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -86,6 +90,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
     public function getAlasanData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -94,6 +99,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -126,6 +132,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         array|string|null $labelKesesuaian,
         ?string           $jenjang        = null,
         ?string           $namaProdi      = null,
+        ?array            $idProdiIn      = null,
         ?string           $tahunLulus     = null,
         ?string           $mingguSnapshot = null,
         ?string           $search         = null,
@@ -141,6 +148,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         $filters = array_merge(
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -203,6 +211,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         string  $labelPertanyaan,
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
         ?string $search         = null,
@@ -212,6 +221,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         $filters = array_merge(
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -279,6 +289,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
@@ -294,6 +305,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,

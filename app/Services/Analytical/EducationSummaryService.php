@@ -31,6 +31,7 @@ class EducationSummaryService
             $kompetensiRaw = $this->kompetensiRepo->getGapData(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in']     ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -39,6 +40,7 @@ class EducationSummaryService
             $metodeRaw = $this->metodeRepo->getMetodeData(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in']     ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -47,6 +49,7 @@ class EducationSummaryService
             $pembiayaanRaw = $this->pembiayaanRepo->getPieData(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in']     ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,

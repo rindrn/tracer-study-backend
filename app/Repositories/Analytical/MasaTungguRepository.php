@@ -26,6 +26,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
     public function getBarData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -34,6 +35,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -96,6 +98,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
     public function getPolaPencarianKerja(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -103,6 +106,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -186,12 +190,14 @@ class MasaTungguRepository extends BaseAnalyticalRepository
     public function getMedianTrendPerTahun(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $mingguSnapshot = null,
     ): Collection {
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             mingguSnapshot: $mingguSnapshot,
             extra: [[
@@ -229,6 +235,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
     public function getDistribusiData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -236,6 +243,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -284,6 +292,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         string  $rentang,
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -297,6 +306,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -365,6 +375,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
         float   $batasCepatBulan = self::BATAS_CEPAT_DEFAULT,
@@ -381,6 +392,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,

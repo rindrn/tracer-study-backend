@@ -36,13 +36,21 @@ abstract class BaseAnalyticalRepository
         // prodi antar jurusan di Master Data, sedangkan id_prodi_in selalu
         // mengikuti keanggotaan yang sebenarnya. Cube.js `equals` menerima
         // array = semantik IN, jadi tidak perlu operator terpisah.
+        // KEDUANYA dipasang bila sama-sama ada, bukan salah satu. id_prodi_in
+        // adalah BATAS cakupan (apa yang boleh dilihat), sedangkan `jurusan`
+        // adalah PENYEMPIT yang dipilih pengguna di dalam batas itu. Sempat
+        // ditulis sebagai elseif, dan akibatnya Ketua Fakultas yang memilih
+        // satu jurusan tetap melihat angka seluruh fakultas -- penyaringnya
+        // tampak tidak berfungsi, tanpa galat apa pun.
         if ($idProdiIn !== null && $idProdiIn !== []) {
             $filters[] = [
                 'member'   => 'DimProdi.id_prodi',
                 'operator' => 'equals',
                 'values'   => array_map('strval', $idProdiIn),
             ];
-        } elseif ($jurusan !== null && $jurusan !== '') {
+        }
+
+        if ($jurusan !== null && $jurusan !== '') {
             $filters[] = [
                 'member'   => 'DimProdi.jurusan',
                 'operator' => 'equals',

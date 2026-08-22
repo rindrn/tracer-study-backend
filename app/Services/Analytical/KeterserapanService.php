@@ -66,6 +66,7 @@ class KeterserapanService
             $raw = $this->repo->getDistribusiStatusPerTahun(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
@@ -94,6 +95,7 @@ class KeterserapanService
             $raw   = $this->repo->getDistribusiStatusSnapshot(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -132,6 +134,7 @@ class KeterserapanService
                 prodiFilter:    $prodiFilter,
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
@@ -164,6 +167,7 @@ class KeterserapanService
             statusLabel:    $params['status']          ?? '',
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
+            idProdiIn:      $params['id_prodi_in'] ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
             tahunLulus:     $params['tahun_lulus']     ?? null,
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -193,6 +197,7 @@ class KeterserapanService
             statusFilter:   $statusFilter,
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
+            idProdiIn:      $params['id_prodi_in'] ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
             search:         $params['search']          ?? null,

@@ -20,6 +20,7 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
     public function getMetodeData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -28,6 +29,7 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -63,6 +65,7 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
@@ -79,6 +82,7 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
                 extra:          $extra,
@@ -128,6 +132,7 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
         string  $kodeField,
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -139,6 +144,7 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,

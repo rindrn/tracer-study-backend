@@ -39,6 +39,7 @@ class PendapatanService
             $rows = $this->repo->getGajiPerTahun(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
                 ambangMultiplier: $this->ambang($params),
@@ -67,6 +68,7 @@ class PendapatanService
             $rows = $this->repo->getProporsiUmpPerTahun(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
                 ambangMultiplier: $this->ambang($params),
@@ -100,6 +102,7 @@ class PendapatanService
             segmenUmp:      $params['segmen_ump']      ?? null,
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
+            idProdiIn:      $params['id_prodi_in'] ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
             tahunLulus:     $params['tahun_lulus']     ?? null,
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -139,6 +142,7 @@ class PendapatanService
                 prodiFilter:    $params['prodi']           ?? [],
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
                 ambangMultiplier: $this->ambang($params),

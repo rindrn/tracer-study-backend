@@ -127,28 +127,36 @@ trait EnforcesProdiScope
 
             $params['id_prodi_in'] = $ids;
 
-            // Sama seperti catatan kompatibilitas kajur di atas: 9 repository
-            // Cube.js belum dikonversi ke id_prodi_in dalam sesi ini, dan
-            // filter scalar `jurusan` hanya menerima SATU nilai (tidak bisa
-            // menampung >1 jurusan seperti cakupan Ketua Fakultas). Supaya
-            // endpoint-endpoint ITU tidak berjalan tanpa batas sama sekali
-            // (melihat data seluruh institusi), Ketua Fakultas untuk
-            // endpoint-endpoint tersebut TETAP wajib memilih satu jurusan
-            // dari cakupannya -- perilaku lama sebelum redesain ini.
+            // Ketua Fakultas TIDAK lagi wajib memilih satu jurusan.
             //
-            // Endpoint yang SUDAH dikonversi ke id_prodi_in (RingkasanTahun,
-            // AdminAlumniService) TIDAK memerlukan pilihan ini -- keduanya
-            // langsung menampilkan agregat dari seluruh scopedProgramIds()
-            // tanpa perlu memilih jurusan, sesuai tujuan Fase 5.
-            $scopeNames = $user->fakultas?->jurusans->pluck('name')->all() ?? [];
-            $requested  = $params['jurusan'] ?? null;
-            if ($requested === null || $requested === '') {
-                abort(422, 'Pilih salah satu jurusan yang menjadi cakupan Anda.');
+            // Dulu wajib, karena seluruh repository analitik menyaring lewat
+            // `jurusan` skalar yang hanya menampung SATU nama -- tidak pernah
+            // bisa menyatakan cakupan yang membawahi beberapa jurusan. Supaya
+            // endpoint-endpoint itu tidak berjalan tanpa batas sama sekali,
+            // jalan amannya waktu itu memaksa memilih satu.
+            //
+            // Sekarang seluruh repository sudah meneruskan `id_prodi_in` ke
+            // `buildGlobalFilters()` (dan ke `whereIn('p.id', ...)` pada dua
+            // repository yang bertanya langsung ke OLTP), jadi cakupan penuh
+            // fakultas sudah bisa dinyatakan apa adanya. Tanpa pilihan jurusan,
+            // yang tampil adalah agregat seluruh fakultas -- sejajar dengan
+            // kajur yang melihat agregat seluruh prodi di jurusannya.
+            //
+            // Kalau jurusan TETAP dipilih, ia dihormati sebagai penyempit di
+            // dalam cakupan, dan pilihan di luar cakupan tetap ditolak.
+            $requested = $params['jurusan'] ?? null;
+            if ($requested !== null && $requested !== '') {
+                $scopeNames = $user->fakultas?->jurusans->pluck('name')->all() ?? [];
+                if (!in_array($requested, $scopeNames, true)) {
+                    abort(403, 'Anda tidak memiliki akses ke jurusan tersebut.');
+                }
+                $params['jurusan'] = $requested;
+            } else {
+                // Dibuang supaya `buildGlobalFilters()` tidak menerima nilai
+                // kosong yang bisa terbaca sebagai penyaring; batasnya
+                // sepenuhnya dari id_prodi_in.
+                unset($params['jurusan']);
             }
-            if (!in_array($requested, $scopeNames, true)) {
-                abort(403, 'Anda tidak memiliki akses ke jurusan tersebut.');
-            }
-            $params['jurusan'] = $requested;
         }
 
         return $params;

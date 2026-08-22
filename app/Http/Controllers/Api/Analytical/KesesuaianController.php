@@ -20,13 +20,20 @@ class KesesuaianController extends Controller
 
     public function bar(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
+
+        // Hasil validate() TIDAK boleh dipakai langsung sebagai params: isinya
+        // murni query string, tanpa pembatasan peran. Ketiga endpoint di
+        // berkas ini sempat begitu, dan akibatnya kaprodi, kajur, maupun ketua
+        // fakultas melihat angka kesesuaian SELURUH institusi -- endpoint lain
+        // sudah lewat scopedParams() sejak awal, yang ini terlewat.
+        $params = $this->scopedParams($request);
 
         try {
             $dto = $this->service->getBar($params);
@@ -38,13 +45,20 @@ class KesesuaianController extends Controller
 
     public function pie(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
+
+        // Hasil validate() TIDAK boleh dipakai langsung sebagai params: isinya
+        // murni query string, tanpa pembatasan peran. Ketiga endpoint di
+        // berkas ini sempat begitu, dan akibatnya kaprodi, kajur, maupun ketua
+        // fakultas melihat angka kesesuaian SELURUH institusi -- endpoint lain
+        // sudah lewat scopedParams() sejak awal, yang ini terlewat.
+        $params = $this->scopedParams($request);
 
         try {
             $dto = $this->service->getPie($params);
@@ -56,13 +70,20 @@ class KesesuaianController extends Controller
 
     public function alasan(Request $request): JsonResponse
     {
-        $params = $request->validate([
+        $request->validate([
             'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
         ]);
+
+        // Hasil validate() TIDAK boleh dipakai langsung sebagai params: isinya
+        // murni query string, tanpa pembatasan peran. Ketiga endpoint di
+        // berkas ini sempat begitu, dan akibatnya kaprodi, kajur, maupun ketua
+        // fakultas melihat angka kesesuaian SELURUH institusi -- endpoint lain
+        // sudah lewat scopedParams() sejak awal, yang ini terlewat.
+        $params = $this->scopedParams($request);
 
         try {
             $dto = $this->service->getAlasan($params);

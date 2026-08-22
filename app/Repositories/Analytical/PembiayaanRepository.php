@@ -14,6 +14,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
     public function getPieData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -21,6 +22,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -44,6 +46,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
     public function getPerTahunData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -51,6 +54,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -81,6 +85,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
     public function getPerProdiData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -88,6 +93,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -124,6 +130,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
@@ -139,6 +146,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,
@@ -175,6 +183,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
         string|array|null $sumberBiaya = null,
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -185,6 +194,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,

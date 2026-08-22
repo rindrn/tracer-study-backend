@@ -20,6 +20,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
     public function getGapData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -28,6 +29,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -79,6 +81,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
@@ -95,6 +98,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
                 extra:          $extra,
@@ -148,6 +152,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
         string  $grupGap,
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -158,6 +163,7 @@ class KompetensiGapRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,

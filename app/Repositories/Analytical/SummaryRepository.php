@@ -39,6 +39,7 @@ class SummaryRepository
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $graduationYear = null,
     ): array {
         // Satuan seluruh angka di sini adalah ALUMNI, bukan baris responses.
@@ -59,7 +60,7 @@ class SummaryRepository
             ])
             ->groupBy('ap.id');
 
-        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $jurusan, $graduationYear);
+        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $jurusan, $graduationYear, $idProdiIn);
 
         $r = DB::query()->fromSub($inner, 't')
             ->selectRaw('COUNT(*) as total')
@@ -95,6 +96,7 @@ class SummaryRepository
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $graduationYear = null,
     ): array {
         // Per alumni, sama seperti getAggregate() — kalau tidak, tahun dengan
@@ -110,7 +112,7 @@ class SummaryRepository
             ])
             ->groupBy('ap.id', 'ap.graduation_year');
 
-        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $jurusan, $graduationYear);
+        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $jurusan, $graduationYear, $idProdiIn);
 
         $rows = DB::query()->fromSub($inner, 't')
             ->select('graduation_year')
@@ -143,6 +145,7 @@ class SummaryRepository
         ?string $namaProdi,
         ?string $jurusan,
         ?string $graduationYear,
+        ?array  $idProdiIn = null,
     ): void {
         if ($jenjang !== null && $jenjang !== '') {
             $query->where('p.degree', $jenjang);
@@ -152,7 +155,15 @@ class SummaryRepository
             $query->where('p.name', $namaProdi);
         }
         // Sama seperti ResponseRateRepository: tanpa penyaring ini, kajur
-        // melihat angka seluruh institusi di kartu Overview.
+        // melihat angka seluruh institusi di kartu Overview. `id_prodi_in`
+        // didahulukan karena ia menampung cakupan berisi beberapa jurusan
+        // sekaligus, yang tidak bisa dinyatakan penyaring teks satu nilai.
+        // Keduanya dipasang bila sama-sama ada: id_prodi_in batas cakupan,
+        // `jurusan` penyempit pilihan pengguna di dalamnya.
+        if ($idProdiIn !== null && $idProdiIn !== []) {
+            $query->whereIn('p.id', $idProdiIn);
+        }
+
         if ($jurusan !== null && $jurusan !== '') {
             $query->where('p.jurusan', $jurusan);
         }

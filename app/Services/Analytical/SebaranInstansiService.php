@@ -43,6 +43,7 @@ class SebaranInstansiService
             $raw   = $this->repo->getJenisData(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -77,6 +78,7 @@ class SebaranInstansiService
             $perProdiRaw = $this->repo->getTingkatData(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -85,6 +87,7 @@ class SebaranInstansiService
             $perTahunRaw = $this->repo->getTingkatPerTahun(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -145,6 +148,7 @@ class SebaranInstansiService
                 prodiFilter:    $prodiFilter,
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
@@ -153,6 +157,7 @@ class SebaranInstansiService
                 prodiFilter:    $prodiFilter,
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
@@ -203,6 +208,7 @@ class SebaranInstansiService
                 'topKota'     => $this->repo->getTopKota(
                     jenjang:        $params['jenjang']         ?? null,
                     jurusan:        $params['jurusan']         ?? null,
+                    idProdiIn:      $params['id_prodi_in'] ?? null,
                     namaProdi:      $params['nama_prodi']      ?? null,
                     tahunLulus:     $params['tahun_lulus']     ?? null,
                     mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -211,6 +217,7 @@ class SebaranInstansiService
                 'topProvinsi' => $this->repo->getTopProvinsi(
                     jenjang:        $params['jenjang']         ?? null,
                     jurusan:        $params['jurusan']         ?? null,
+                    idProdiIn:      $params['id_prodi_in'] ?? null,
                     namaProdi:      $params['nama_prodi']      ?? null,
                     tahunLulus:     $params['tahun_lulus']     ?? null,
                     mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -252,6 +259,7 @@ class SebaranInstansiService
             jenisInstansi:   $jenisInstansi,
             tingkatInstansi: $tingkatInstansi,
             jenjang:         $params['jenjang']         ?? null,
+            idProdiIn:       $params['id_prodi_in'] ?? null,
             namaProdi:       $params['nama_prodi']      ?? null,
             tahunLulus:      $params['tahun_lulus']     ?? null,
             mingguSnapshot:  $params['minggu_snapshot'] ?? null,

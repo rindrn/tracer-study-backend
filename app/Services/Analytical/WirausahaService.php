@@ -29,6 +29,7 @@ class WirausahaService
             $wirausaha = $this->repo->getBarData(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -37,6 +38,7 @@ class WirausahaService
             $totals = $this->repo->getBarDataTotal(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -79,6 +81,7 @@ class WirausahaService
             $posisiRaw = $this->repo->getPiePosisi(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -87,6 +90,7 @@ class WirausahaService
             $kotaRaw = $this->repo->getKotaData(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -139,6 +143,7 @@ class WirausahaService
         $result = $this->repo->getDetailAlumni(
             jabatan:        $jabatan,
             jenjang:        $params['jenjang']         ?? null,
+            idProdiIn:      $params['id_prodi_in'] ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
             tahunLulus:     $params['tahun_lulus']     ?? null,
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -174,6 +179,7 @@ class WirausahaService
                 prodiFilter:    $prodiFilter,
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
@@ -182,6 +188,7 @@ class WirausahaService
                 prodiFilter:    $prodiFilter,
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );

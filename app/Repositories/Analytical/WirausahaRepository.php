@@ -18,6 +18,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
     public function getBarData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -26,6 +27,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -74,6 +76,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
     public function getBarDataTotal(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -81,6 +84,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -110,6 +114,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
     public function getPiePosisi(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -118,6 +123,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -149,6 +155,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
     public function getKotaData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -157,6 +164,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang: $jenjang,
                 jurusan: $jurusan,
+                idProdiIn:$idProdiIn,
                 namaProdi: $namaProdi,
                 tahunLulus: $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -198,6 +206,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
         ?string $jabatan        = null,
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
         ?string $search         = null,
@@ -221,6 +230,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
         $filters = array_merge(
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -290,6 +300,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
@@ -313,6 +324,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,
@@ -359,6 +371,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
@@ -374,6 +387,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,

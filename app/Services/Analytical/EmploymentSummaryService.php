@@ -88,13 +88,14 @@ class EmploymentSummaryService
         $cached = $this->remember($key, function () use ($params) {
             $j  = $params['jenjang']         ?? null;
             $ju = $params['jurusan']         ?? null;
+            $ip = $params['id_prodi_in']     ?? null;
             $np = $params['nama_prodi']      ?? null;
             $tl = $params['tahun_lulus']     ?? null;
             $ms = $params['minggu_snapshot'] ?? null;
 
             // ── 1. Keterserapan ──────────────────────────────────
             $keterserapanRaw = $this->keterserapanRepo->getDistribusiStatusSnapshot(
-                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                jenjang: $j, jurusan: $ju, idProdiIn: $ip, namaProdi: $np,
                 tahunLulus: $tl, mingguSnapshot: $ms,
             );
 
@@ -103,7 +104,7 @@ class EmploymentSummaryService
             // Measure count_masa_tunggu_cepat dan count_terserap sudah
             // pre-computed di Cube.js (tanpa filter status manual di PHP).
             $masaTungguRaw = $this->masaTungguRepo->getBarData(
-                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                jenjang: $j, jurusan: $ju, idProdiIn: $ip, namaProdi: $np,
                 tahunLulus: $tl, mingguSnapshot: $ms,
             );
 
@@ -111,7 +112,7 @@ class EmploymentSummaryService
             // getPieData() sudah filter status_alumni_sk = 1 (Bekerja)
             // dan menghasilkan distribusi per DimKesesuaianBidang.label.
             $kesesuaianRaw = $this->kesesuaianRepo->getPieData(
-                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                jenjang: $j, jurusan: $ju, idProdiIn: $ip, namaProdi: $np,
                 tahunLulus: $tl, mingguSnapshot: $ms,
             );
 
@@ -120,7 +121,7 @@ class EmploymentSummaryService
             // Sudah filter status=3 di repo → sum count = total wirausaha.
             // Value card = jabatan terbesar sebagai % dari total wirausaha.
             $wirausahaPosisiRaw = $this->wirausahaRepo->getPiePosisi(
-                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                jenjang: $j, jurusan: $ju, idProdiIn: $ip, namaProdi: $np,
                 tahunLulus: $tl, mingguSnapshot: $ms,
             );
 
@@ -128,14 +129,14 @@ class EmploymentSummaryService
             // getGajiPerTahun() menghasilkan rows per tahun_lulus.
             // tahun_lulus filter diselesaikan di buildPendapatanCard().
             $pendapatanRaw = $this->pendapatanRepo->getGajiPerTahun(
-                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                jenjang: $j, jurusan: $ju, idProdiIn: $ip, namaProdi: $np,
                 mingguSnapshot: $ms,
             );
 
             // ── 6. Sebaran Instansi ──────────────────────────────
             // getTingkatData() sudah filter FILTER_BEKERJA (status_alumni_sk=1).
             $tingkatRaw = $this->sebaranInstansiRepo->getTingkatData(
-                jenjang: $j, jurusan: $ju, namaProdi: $np,
+                jenjang: $j, jurusan: $ju, idProdiIn: $ip, namaProdi: $np,
                 tahunLulus: $tl, mingguSnapshot: $ms,
             );
 

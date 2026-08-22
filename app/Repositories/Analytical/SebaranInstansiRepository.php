@@ -23,6 +23,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
     public function getJenisData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -31,6 +32,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -60,6 +62,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
     public function getTingkatData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -68,6 +71,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -104,6 +108,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
     public function getTingkatPerTahun(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -112,6 +117,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -149,6 +155,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
@@ -158,6 +165,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,
@@ -196,6 +204,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): Collection {
@@ -205,6 +214,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,
@@ -243,6 +253,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
     public function getTopKota(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -252,6 +263,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -281,6 +293,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
     public function getTopProvinsi(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -290,6 +303,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -322,6 +336,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
         ?string $tingkatInstansi = null,
         ?string $jenjang         = null,
         ?string $namaProdi       = null,
+        ?array  $idProdiIn       = null,
         ?string $tahunLulus      = null,
         ?string $mingguSnapshot  = null,
         ?string $search          = null,
@@ -331,6 +346,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
         $filters = array_merge(
             $this->buildGlobalFilters(
                 jenjang:        $jenjang,
+                idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,

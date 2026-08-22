@@ -33,12 +33,14 @@ class KeterserapanRepository extends BaseAnalyticalRepository
     public function getDistribusiStatusPerTahun(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $mingguSnapshot = null,
     ): Collection {
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             mingguSnapshot: $mingguSnapshot,
             // tahun_lulus sengaja tidak difilter di sini
@@ -78,6 +80,7 @@ class KeterserapanRepository extends BaseAnalyticalRepository
     public function getDistribusiStatusSnapshot(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -85,6 +88,7 @@ class KeterserapanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -117,6 +121,7 @@ class KeterserapanRepository extends BaseAnalyticalRepository
         string  $statusLabel,
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -127,6 +132,7 @@ class KeterserapanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -200,6 +206,7 @@ class KeterserapanRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
     ): array {
@@ -216,6 +223,7 @@ class KeterserapanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,
@@ -274,6 +282,7 @@ class KeterserapanRepository extends BaseAnalyticalRepository
         $statusFilter         = null,  // ← UBAH: bisa array atau string
         ?string $jenjang      = null,
         ?string $jurusan      = null,
+        ?array  $idProdiIn    = null,
         ?string $namaProdi    = null,
         ?string $mingguSnapshot = null,
         ?string $search       = null,
@@ -310,6 +319,7 @@ class KeterserapanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,

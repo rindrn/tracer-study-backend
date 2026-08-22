@@ -38,6 +38,7 @@ class MasaTungguService
             return $this->repo->getBarData(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -76,6 +77,7 @@ class MasaTungguService
             return $this->repo->getDistribusiData(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -111,6 +113,7 @@ class MasaTungguService
                 prodiFilter:    $prodiFilter,
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
                 batasCepatBulan: $this->batasCepat($params),
@@ -136,6 +139,7 @@ class MasaTungguService
             rentang:        $rentang,
             jenjang:        $params['jenjang']         ?? null,
             jurusan:        $params['jurusan']         ?? null,
+            idProdiIn:      $params['id_prodi_in'] ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
             tahunLulus:     $params['tahun_lulus']     ?? null,
             mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -177,6 +181,7 @@ class MasaTungguService
             return $this->repo->getPolaPencarianKerja(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
@@ -203,6 +208,7 @@ class MasaTungguService
             $rows = $this->repo->getMedianTrendPerTahun(
                 jenjang:        $params['jenjang']         ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             )->values();

@@ -52,12 +52,14 @@ class SummaryService
             $jenjang   = $params['jenjang']         ?? null;
             $namaProdi = $params['nama_prodi']      ?? null;
             $jurusan   = $params['jurusan']         ?? null;
+            $idProdiIn = $params['id_prodi_in']     ?? null;
             $gradYear  = $params['graduation_year'] ?? null;
 
             $agg = $this->repo->getAggregate(
                 jenjang:        $jenjang,
                 namaProdi:      $namaProdi,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 graduationYear: $gradYear,
             );
 
@@ -65,6 +67,7 @@ class SummaryService
                 jenjang:        $jenjang,
                 namaProdi:      $namaProdi,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
                 graduationYear: $gradYear,
             );
 

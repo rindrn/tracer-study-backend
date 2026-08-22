@@ -58,6 +58,7 @@ class ResponseRateRepository
         ?string $graduationYear,
         array   $extraSelect = [],
         array   $groupBy     = [],
+        ?array  $idProdiIn   = null,
     ) {
         $query = DB::table('alumni_profiles as ap')
             ->join('programs as p', 'ap.program_id', '=', 'p.id')
@@ -68,7 +69,7 @@ class ResponseRateRepository
             ]))
             ->groupBy(array_merge(['ap.id'], $groupBy));
 
-        $this->applyCommonFilters($query, $jenjang, $namaProdi, $jurusan, $graduationYear);
+        $this->applyCommonFilters($query, $jenjang, $namaProdi, $jurusan, $graduationYear, $idProdiIn);
 
         return $query;
     }
@@ -81,12 +82,14 @@ class ResponseRateRepository
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $graduationYear = null,
     ): Collection {
         $inner = $this->perAlumniQuery(
             $jenjang, $namaProdi, $jurusan, $graduationYear,
             extraSelect: ['p.id as program_id', 'p.name as nama_prodi', 'p.degree as jenjang'],
             groupBy:     ['p.id', 'p.name', 'p.degree'],
+            idProdiIn:   $idProdiIn,
         );
 
         $query = DB::query()->fromSub($inner, 't')
@@ -112,9 +115,10 @@ class ResponseRateRepository
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $graduationYear = null,
     ): array {
-        $inner = $this->perAlumniQuery($jenjang, $namaProdi, $jurusan, $graduationYear);
+        $inner = $this->perAlumniQuery($jenjang, $namaProdi, $jurusan, $graduationYear, idProdiIn: $idProdiIn);
 
         $r = DB::query()->fromSub($inner, 't')->selectRaw(self::OUTER_COUNTS)->first();
 
@@ -134,12 +138,14 @@ class ResponseRateRepository
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $graduationYear = null,
     ): Collection {
         $inner = $this->perAlumniQuery(
             $jenjang, $namaProdi, $jurusan, $graduationYear,
             extraSelect: ['ap.graduation_year'],
             groupBy:     ['ap.graduation_year'],
+            idProdiIn:   $idProdiIn,
         );
 
         $query = DB::query()->fromSub($inner, 't')
@@ -165,6 +171,7 @@ class ResponseRateRepository
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $graduationYear = null,
         ?string $search         = null,
         int     $page           = 1,
@@ -192,7 +199,7 @@ class ResponseRateRepository
             ])
             ->groupBy('ap.id', 'ap.name', 'ap.nim', 'ap.graduation_year', 'p.name', 'p.degree');
 
-        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $jurusan, $graduationYear);
+        $this->applyCommonFilters($inner, $jenjang, $namaProdi, $jurusan, $graduationYear, $idProdiIn);
 
         if ($search !== null && $search !== '') {
             $inner->where(function ($q) use ($search) {
@@ -255,6 +262,7 @@ class ResponseRateRepository
         ?string $namaProdi,
         ?string $jurusan,
         ?string $graduationYear,
+        ?array  $idProdiIn = null,
     ): void {
         if ($jenjang !== null && $jenjang !== '') {
             $query->where('p.degree', $jenjang);
@@ -267,6 +275,17 @@ class ResponseRateRepository
         // yang dibatasi ke jurusannya tetap melihat angka seluruh institusi
         // di kartu dan donut Overview — dua-duanya dilayani query OLTP ini,
         // bukan Cube.js.
+        //
+        // `id_prodi_in` didahulukan karena ia cakupan sesungguhnya: satu
+        // daftar program_id dari keanggotaan FK. Penyaring teks `jurusan`
+        // hanya menampung SATU nama, jadi tidak pernah bisa menyatakan
+        // cakupan Ketua Fakultas yang membawahi beberapa jurusan sekaligus.
+        // Keduanya dipasang bila sama-sama ada: id_prodi_in batas cakupan,
+        // `jurusan` penyempit pilihan pengguna di dalamnya.
+        if ($idProdiIn !== null && $idProdiIn !== []) {
+            $query->whereIn('p.id', $idProdiIn);
+        }
+
         if ($jurusan !== null && $jurusan !== '') {
             $query->where('p.jurusan', $jurusan);
         }

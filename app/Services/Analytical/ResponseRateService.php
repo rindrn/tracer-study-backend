@@ -31,6 +31,7 @@ class ResponseRateService
                 jenjang:        $params['jenjang']         ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 graduationYear: $params['graduation_year'] ?? null,
             );
 
@@ -74,6 +75,7 @@ class ResponseRateService
                 jenjang:        $params['jenjang']         ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 graduationYear: $params['graduation_year'] ?? null,
             );
             $total = $raw['total'];
@@ -106,6 +108,7 @@ class ResponseRateService
                 jenjang:        $params['jenjang']         ?? null,
                 namaProdi:      $params['nama_prodi']      ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
                 graduationYear: $params['graduation_year'] ?? null,
             );
 
@@ -145,6 +148,7 @@ class ResponseRateService
             jenjang:        $params['jenjang']         ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
                 jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in'] ?? null,
             graduationYear: $params['graduation_year'] ?? null,
             search:         $params['search']          ?? null,
             page:           $page,

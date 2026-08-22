@@ -84,6 +84,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
     public function getGajiPerTahun(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $mingguSnapshot = null,
         float   $ambangMultiplier = self::AMBANG_DEFAULT,
@@ -91,6 +92,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             mingguSnapshot: $mingguSnapshot,
         );
@@ -143,6 +145,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
     public function getProporsiUmpPerTahun(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $mingguSnapshot = null,
         float   $ambangMultiplier = self::AMBANG_DEFAULT,
@@ -150,6 +153,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             mingguSnapshot: $mingguSnapshot,
         );
@@ -196,6 +200,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
         ?string $segmenUmp      = null,
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -231,6 +236,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,
@@ -289,6 +295,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
         array   $prodiFilter    = [],
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
         float   $ambangMultiplier = self::AMBANG_DEFAULT,
@@ -306,6 +313,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
         $filters = $this->buildGlobalFilters(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
             extra:          $extra,

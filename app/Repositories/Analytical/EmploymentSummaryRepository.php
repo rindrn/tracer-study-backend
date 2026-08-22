@@ -48,6 +48,7 @@ class EmploymentSummaryRepository
     public function getKeterserapanData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -55,6 +56,7 @@ class EmploymentSummaryRepository
         return $this->keterserapanRepo->getDistribusiStatusSnapshot(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -71,6 +73,7 @@ class EmploymentSummaryRepository
     public function getMasaTungguData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -78,6 +81,7 @@ class EmploymentSummaryRepository
         return $this->masaTungguRepo->getBarData(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -94,6 +98,7 @@ class EmploymentSummaryRepository
     public function getKesesuaianData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -101,6 +106,7 @@ class EmploymentSummaryRepository
         return $this->kesesuaianRepo->getPieData(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
@@ -117,6 +123,7 @@ class EmploymentSummaryRepository
     public function getWirausahaData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -126,6 +133,8 @@ class EmploymentSummaryRepository
             'wirausaha' => $this->wirausahaRepo->getBarData(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
+            idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -134,6 +143,8 @@ class EmploymentSummaryRepository
             'total' => $this->wirausahaRepo->getBarDataTotal(
                 jenjang:        $jenjang,
                 jurusan:        $jurusan,
+                idProdiIn:      $idProdiIn,
+            idProdiIn:      $idProdiIn,
                 namaProdi:      $namaProdi,
                 tahunLulus:     $tahunLulus,
                 mingguSnapshot: $mingguSnapshot,
@@ -151,6 +162,7 @@ class EmploymentSummaryRepository
     public function getPendapatanData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $mingguSnapshot = null,
     ): Collection {
@@ -159,6 +171,7 @@ class EmploymentSummaryRepository
         return $this->pendapatanRepo->getGajiPerTahun(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             mingguSnapshot: $mingguSnapshot,
         );
@@ -174,6 +187,7 @@ class EmploymentSummaryRepository
     public function getTingkatData(
         ?string $jenjang        = null,
         ?string $jurusan        = null,
+        ?array  $idProdiIn      = null,
         ?string $namaProdi      = null,
         ?string $tahunLulus     = null,
         ?string $mingguSnapshot = null,
@@ -181,6 +195,7 @@ class EmploymentSummaryRepository
         return $this->sebaranInstansiRepo->getTingkatData(
             jenjang:        $jenjang,
             jurusan:        $jurusan,
+            idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
