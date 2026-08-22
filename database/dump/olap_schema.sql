@@ -236,7 +236,7 @@ CREATE TABLE public.dim_prodi (
     kode_prodi character varying(10),
     nama_prodi character varying(100),
     jurusan character varying(100),
-    jenjang character varying(5),
+    jenjang character varying(20),
     nama_pt character varying(150),
     akreditasi_prodi character varying(10),
     valid_from date,

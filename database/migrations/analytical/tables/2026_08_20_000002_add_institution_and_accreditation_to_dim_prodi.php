@@ -29,6 +29,15 @@ use Illuminate\Support\Facades\Schema;
  * berlakunya, dan kita tidak punya data historis akreditasi. Membiarkannya
  * NULL jujur; mengisinya dengan peringkat hari ini akan memalsukan sejarah.
  * Hanya versi yang sedang aktif yang diisi.
+ *
+ * PENJAGA PEMASANGAN BARU. Skema OLAP tidak dibangun oleh migrasi melainkan
+ * oleh `database/dump/olap_schema.sql` yang diimpor DatabaseSeeder, sedangkan
+ * README menyuruh `php artisan migrate` dijalankan SEBELUM `db:seed`. Di
+ * basis data yang masih kosong, `dim_prodi` karena itu belum ada dan migrasi
+ * ini mati dengan SQLSTATE[42P01], menghentikan seluruh rangkaian migrasi.
+ * Dump-nya sendiri sudah memuat bentuk akhir kolom ini, jadi pemasangan baru
+ * tidak kehilangan apa pun bila migrasi ini dilewati -- yang membutuhkannya
+ * hanya pemasangan lama yang skemanya terlanjur dibuat sebelum perubahan ini.
  */
 return new class extends Migration
 {
@@ -36,6 +45,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        if (! Schema::connection('olap')->hasTable('dim_prodi')) {
+            return;
+        }
+
         Schema::connection('olap')->table('dim_prodi', function (Blueprint $table) {
             $table->string('nama_pt', 150)->nullable()->after('jurusan');
             $table->string('akreditasi_prodi', 30)->nullable()->after('nama_pt');
@@ -55,6 +68,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::connection('olap')->hasTable('dim_prodi')) {
+            return;
+        }
+
         Schema::connection('olap')->table('dim_prodi', function (Blueprint $table) {
             $table->dropColumn(['nama_pt', 'akreditasi_prodi']);
         });

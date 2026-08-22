@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Melebarkan `dim_prodi.jenjang` dari VARCHAR(5) ke VARCHAR(20).
@@ -16,6 +17,13 @@ use Illuminate\Support\Facades\DB;
  * ruang untuk seluruh daftar di `config/academic.php` beserta istilah panjang
  * yang mungkin menyusul, dan pada VARCHAR di Postgres batas yang lebih longgar
  * tidak menambah biaya penyimpanan.
+ *
+ * PENJAGA PEMASANGAN BARU. Skema OLAP dibangun oleh
+ * `database/dump/olap_schema.sql` saat seeding, bukan oleh migrasi, sedangkan
+ * README menyuruh migrate dijalankan lebih dahulu. Di basis data kosong
+ * `dim_prodi` belum ada dan ALTER ini akan mematikan seluruh rangkaian
+ * migrasi. Dump-nya sudah menyatakan VARCHAR(20), jadi melewati migrasi ini
+ * pada pemasangan baru tidak menghilangkan apa pun.
  */
 return new class extends Migration
 {
@@ -23,6 +31,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        if (! Schema::connection('olap')->hasTable('dim_prodi')) {
+            return;
+        }
+
         DB::connection('olap')->statement(
             'ALTER TABLE public.dim_prodi ALTER COLUMN jenjang TYPE VARCHAR(20)'
         );
@@ -36,6 +48,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::connection('olap')->hasTable('dim_prodi')) {
+            return;
+        }
+
         DB::connection('olap')->statement(
             'ALTER TABLE public.dim_prodi ALTER COLUMN jenjang TYPE VARCHAR(5)'
         );
