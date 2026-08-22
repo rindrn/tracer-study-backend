@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Analytical;
 
+use App\Support\Degree;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\Analytical\Concerns\EnforcesProdiScope;
 use App\Services\Analytical\WirausahaService;
@@ -21,7 +22,7 @@ class WirausahaController extends Controller
     public function bar(Request $request): JsonResponse
     {
         $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -41,7 +42,7 @@ class WirausahaController extends Controller
     public function pie(Request $request): JsonResponse
     {
         $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -66,7 +67,7 @@ class WirausahaController extends Controller
             // ('Owner', 'CEO', 'Manager', 'Direktur') tidak pernah ada di data,
             // sementara opsi asli 'Freelance / Kerja Lepas' justru ditolak 422.
             'jabatan'         => 'nullable|string|max:100',
-            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'         => Degree::filterRule(),
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
@@ -97,7 +98,7 @@ class WirausahaController extends Controller
         $request->validate([
             'prodi'           => 'nullable|array',
             'prodi.*'         => 'string|max:100',
-            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',

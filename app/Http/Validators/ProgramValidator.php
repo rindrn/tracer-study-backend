@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Validators;
  
+use App\Support\Degree;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
  
@@ -26,7 +27,11 @@ class ProgramValidator
         $v = Validator::make($data, [
             'name'      => ['required', 'string', 'max:100'],
             'code'      => ['required', 'string', 'max:20', $codeRule],
-            'degree'    => ['required', 'in:S1,D3,D4,S2'],
+            // Kosakata tertutup, tapi ditetapkan regulasi — bukan oleh
+            // kampus. Daftarnya di config/academic.php supaya politeknik
+            // (D1-D4), universitas (S1-S3), dan kampus dengan program
+            // profesi atau spesialis sama-sama tertampung.
+            'degree'    => ['required', Degree::in()],
             'is_active' => ['sometimes', 'boolean'],
             // Bebas teksnya: peringkat berbeda antar lembaga dan antar zaman
             // (A/B/C, Unggul/Baik Sekali/Baik, atau istilah khas tiap LAM).
@@ -39,7 +44,8 @@ class ProgramValidator
             'code.required'   => 'Kode program studi wajib diisi.',
             'code.unique'     => 'Kode program studi sudah digunakan.',
             'degree.required' => 'Jenjang wajib diisi.',
-            'degree.in'       => 'Jenjang harus salah satu dari: S1, D3, D4, S2.',
+            'degree.in'       => 'Jenjang harus salah satu dari: '
+                                 . implode(', ', Degree::all()) . '.',
         ]);
  
         if ($v->fails()) throw new ValidationException($v);

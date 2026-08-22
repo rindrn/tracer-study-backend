@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Analytical;
 
+use App\Support\Degree;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\Analytical\Concerns\EnforcesProdiScope;
 use App\Services\Analytical\SebaranInstansiService;
@@ -20,7 +21,7 @@ class SebaranInstansiController extends Controller
     public function jenis(Request $request): JsonResponse
     {
         $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -39,7 +40,7 @@ class SebaranInstansiController extends Controller
     public function tingkat(Request $request): JsonResponse
     {
         $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -60,7 +61,7 @@ class SebaranInstansiController extends Controller
         $request->validate([
             'prodi'           => 'nullable|array',
             'prodi.*'         => 'string|max:100',
-            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
             'minggu_snapshot' => 'nullable|string|max:10',
@@ -79,7 +80,7 @@ class SebaranInstansiController extends Controller
     public function lokasi(Request $request): JsonResponse
     {
         $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -107,7 +108,7 @@ class SebaranInstansiController extends Controller
             // (Lokal,Nasional,Internasional) menolak nilai yang sah dan
             // meloloskan nilai yang tidak pernah cocok saat difilter 'equals'.
             'tingkat_instansi' => 'nullable|string|max:100',
-            'jenjang'          => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'          => Degree::filterRule(),
             'nama_prodi'       => 'nullable|string|max:100',
             'tahun_lulus'      => 'nullable|string|max:5',
             'minggu_snapshot'  => 'nullable|string|max:10',

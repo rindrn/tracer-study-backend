@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Analytical;
 
+use App\Support\Degree;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\Analytical\Concerns\EnforcesProdiScope;
 use App\Services\Analytical\EmploymentSummaryService;
@@ -40,7 +41,7 @@ class EmploymentSummaryController extends Controller
     public function summary(Request $request): JsonResponse
     {
         $request->validate([
-            'jenjang'         => 'nullable|string|in:D3,D4,S2,S1',
+            'jenjang'         => Degree::filterRule(),
             'jurusan'         => 'nullable|string|max:100',
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
