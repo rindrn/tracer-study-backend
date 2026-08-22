@@ -30,14 +30,26 @@ use Illuminate\Support\Facades\Schema;
  * NULL jujur; mengisinya dengan peringkat hari ini akan memalsukan sejarah.
  * Hanya versi yang sedang aktif yang diisi.
  *
- * PENJAGA PEMASANGAN BARU. Skema OLAP tidak dibangun oleh migrasi melainkan
- * oleh `database/dump/olap_schema.sql` yang diimpor DatabaseSeeder, sedangkan
- * README menyuruh `php artisan migrate` dijalankan SEBELUM `db:seed`. Di
- * basis data yang masih kosong, `dim_prodi` karena itu belum ada dan migrasi
- * ini mati dengan SQLSTATE[42P01], menghentikan seluruh rangkaian migrasi.
- * Dump-nya sendiri sudah memuat bentuk akhir kolom ini, jadi pemasangan baru
- * tidak kehilangan apa pun bila migrasi ini dilewati -- yang membutuhkannya
- * hanya pemasangan lama yang skemanya terlanjur dibuat sebelum perubahan ini.
+ * PENJAGA. Skema OLAP tidak dibangun oleh migrasi melainkan oleh
+ * `database/dump/olap_schema.sql` yang diimpor DatabaseSeeder, sedangkan
+ * migrasi selalu jalan SEBELUM seeder. Akibatnya migrasi ini bisa menemui
+ * `dim_prodi` dalam dua keadaan yang sama-sama bukan salah pemakai, dan
+ * keduanya harus dilewati diam-diam:
+ *
+ *   - BELUM ADA (pemasangan baru, basis data kosong). Tanpa penjaga, mati
+ *     dengan SQLSTATE[42P01].
+ *   - SUDAH ADA BESERTA KOLOMNYA (`migrate:fresh` di pemasangan berjalan).
+ *     `migrate:fresh` bekerja di koneksi default yang search_path-nya
+ *     tracer_oltp, jadi dia mengosongkan tabel `migrations` TAPI tidak
+ *     menyentuh schema public sama sekali. Migrasi ini karena itu dianggap
+ *     belum pernah jalan padahal kolomnya masih terpasang, dan tanpa penjaga
+ *     mati dengan SQLSTATE[42701] -- menghentikan seluruh rangkaian migrasi
+ *     di tengah jalan dan meninggalkan basis data separuh termigrasi.
+ *
+ * Pengecekannya per kolom, bukan per tabel, supaya keadaan kedua ikut
+ * tertangkap. Dump-nya sendiri sudah memuat bentuk akhir kolom ini, jadi
+ * tidak ada yang hilang bila migrasi dilewati -- yang membutuhkannya hanya
+ * pemasangan lama yang skemanya terlanjur dibuat sebelum perubahan ini.
  */
 return new class extends Migration
 {
@@ -45,7 +57,8 @@ return new class extends Migration
 
     public function up(): void
     {
-        if (! Schema::connection('olap')->hasTable('dim_prodi')) {
+        if (! Schema::connection('olap')->hasTable('dim_prodi')
+            || Schema::connection('olap')->hasColumn('dim_prodi', 'nama_pt')) {
             return;
         }
 
@@ -68,7 +81,12 @@ return new class extends Migration
 
     public function down(): void
     {
-        if (! Schema::connection('olap')->hasTable('dim_prodi')) {
+        // Kebalikan dari up(): di sini kolomnya harus ADA supaya ada yang
+        // dijatuhkan. Pemasangan yang tidak pernah menjalankan up() -- karena
+        // skema OLAP-nya datang dari dump -- tidak punya apa pun untuk
+        // dibatalkan.
+        if (! Schema::connection('olap')->hasTable('dim_prodi')
+            || ! Schema::connection('olap')->hasColumn('dim_prodi', 'nama_pt')) {
             return;
         }
 
