@@ -15,6 +15,14 @@
 | sementara `education_records.degree` menerima tujuh — alumni boleh punya
 | riwayat S3 tapi kampusnya tidak boleh punya prodi S3.
 |
+| PERAN BERKAS INI SUDAH TURUN. Sejak jenjang jadi entity master data, sumber
+| kebenarannya adalah tabel `degrees` yang dikelola lewat Master Data. Daftar
+| di bawah tinggal dipakai dua hal: mengisi tabel itu pertama kali lewat
+| migrasi `create_degrees_table`, dan menjadi jaring pengaman di
+| `App\Support\Degree` selama tabelnya belum ada — misalnya saat migrasi
+| pemasangan baru sendiri sedang berjalan. Menyuntingnya TIDAK mengubah
+| pemasangan yang tabelnya sudah terbentuk.
+|
 */
 
 return [

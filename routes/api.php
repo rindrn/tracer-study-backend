@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Transactional\LamController;
 use App\Http\Controllers\Api\Transactional\LamVersionController;
 use App\Http\Controllers\Api\Transactional\JurusanController;
 use App\Http\Controllers\Api\Transactional\FakultasController;
+use App\Http\Controllers\Api\Transactional\DegreeController;
 use App\Http\Controllers\Api\Transactional\LamProgramController;
 use App\Http\Controllers\Api\Transactional\ProgramController;
 use App\Http\Controllers\Api\Transactional\RefUmpController;
@@ -218,6 +219,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('fakultas/{id}',       [FakultasController::class, 'destroy']);
         Route::put('fakultas/{id}/jurusans', [FakultasController::class, 'syncJurusans']);
 
+        // Master jenjang program studi. Pembacaannya ada di kelompok data
+        // viewer karena dipakai dropdown jenjang dan pelabelan grafik.
+        Route::post('degrees',        [DegreeController::class, 'store']);
+        Route::put('degrees/{id}',    [DegreeController::class, 'update']);
+        Route::delete('degrees/{id}', [DegreeController::class, 'destroy']);
+
         // Provinces CRUD
         Route::post('provinces', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'storeProvince']);
         Route::put('provinces/{id}', [\App\Http\Controllers\Api\Transactional\RegionController::class, 'updateProvince']);
@@ -381,6 +388,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // dan Kelola Mahasiswa, jadi tidak dibatasi peran admin.
     Route::get('jurusans', [JurusanController::class, 'index']);
     Route::get('fakultas', [FakultasController::class, 'index']);
+    Route::get('degrees', [DegreeController::class, 'index']);
 
     // Alumni management
     Route::get('alumni/stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'stats']);
