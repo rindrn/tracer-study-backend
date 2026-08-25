@@ -7,6 +7,7 @@ use App\Models\Transactional\User;
 use App\Repositories\Transactional\AlumniProfileRepository;
 use App\Support\PersonalData;
 use App\Support\PhoneNumber;
+use App\Traits\WithCache;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
@@ -19,6 +20,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class AdminAlumniService
 {
+    use WithCache;
+
     public function __construct(
         private readonly AlumniProfileRepository $alumniRepo,
         private readonly AuditLogService         $audit,
@@ -130,6 +133,8 @@ class AdminAlumniService
             'context'           => ['nim' => $data['nim'] ?? null],
         ]);
 
+        $this->forgetDashboardCache();
+
         return $id;
     }
 
@@ -166,6 +171,8 @@ class AdminAlumniService
             'subject_alumni_id' => $id,
             'context'           => ['fields' => array_keys($data)],
         ]);
+
+        $this->forgetDashboardCache();
     }
 
     /**
@@ -215,6 +222,8 @@ class AdminAlumniService
             'subject_alumni_id' => $id,
             'context'           => ['nim' => PersonalData::mask($alumni->nim ?? null)],
         ]);
+
+        $this->forgetDashboardCache();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -237,6 +246,10 @@ class AdminAlumniService
             ],
         ]);
 
+        if ($import->getImportedCount() > 0) {
+            $this->forgetDashboardCache();
+        }
+
         return [
             'imported' => $import->getImportedCount(),
             'errors'   => $import->getErrors(),
@@ -246,6 +259,22 @@ class AdminAlumniService
     // ═══════════════════════════════════════════════════════════
     // Helpers (private)
     // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Buang cache kartu & grafik dasbor sesudah jumlah alumni berubah.
+     *
+     * Kartu "Total Alumni" dan penyebut response rate dihitung langsung dari
+     * alumni_profiles (mode Realtime), tapi hasilnya disimpan satu jam penuh
+     * di bawah tag 'analytics-dashboard'. Sebelum ini hanya jalannya ETL dan
+     * penyuntingan pemetaan semantik yang membuang tag itu, sehingga impor
+     * atau penghapusan alumni tidak terlihat di Overview sampai TTL-nya habis
+     * — petugas mengimpor 1.800 baris lalu melihat angka lama dan mengira
+     * impornya gagal.
+     */
+    private function forgetDashboardCache(): void
+    {
+        $this->forgetTag('analytics-dashboard');
+    }
 
     /**
      * Tambahkan filter scope berdasarkan role user.
