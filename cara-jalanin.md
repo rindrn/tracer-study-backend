@@ -63,9 +63,21 @@ langkah ini — itu tugas seeder.
 php artisan db:seed
 ```
 
+Mengisi dengan **data karangan** (Faker): schema OLAP (`public`), ekstensi
+`pg_trgm`, lalu alumni, respons, dan kontak penilai palsu. Aman dijalankan di
+komputer mana pun.
+
+Kalau punya berkas data alumni asli dan memang ingin memakainya, mintalah
+eksplisit:
+
+```bash
+php artisan db:seed --class=RealDataSeeder
+```
+
 Empat langkah berurutan: schema OLAP (`public`), ekstensi `pg_trgm`, master
 data OLTP, lalu data alumni asli. Berkas terakhir dilewati dengan peringatan
-kalau tidak ada.
+kalau tidak ada. Jangan mencampur kedua jalur di satu basis data — lihat
+peringatan di bagian **Data karangan untuk pengembangan**.
 
 **5. Bangun data dashboard**
 
@@ -91,12 +103,12 @@ yang sama.
 ## Mengulang dari awal
 
 ```bash
-php artisan migrate:fresh
-php artisan db:seed
+php artisan migrate:fresh --seed
 ```
 
 `migrate:fresh` hanya membersihkan `tracer_oltp`; schema `public` dijatuhkan
-dan dibuat ulang oleh seeder, jadi aman diulang berkali-kali.
+dan dibuat ulang oleh seeder, jadi aman diulang berkali-kali. Hasilnya data
+karangan — `--seed` tidak pernah menyentuh berkas data asli.
 
 ## Kalau datanya berubah
 
@@ -114,7 +126,8 @@ commit berkas yang berubah.
 
 ## Data karangan untuk pengembangan
 
-Kalau tidak punya data asli dan hanya butuh isi untuk mencoba tampilan:
+Inilah jalur bawaan, jadi `php artisan db:seed` sudah cukup. Memanggil
+kelasnya langsung juga boleh dan hasilnya sama persis:
 
 ```bash
 php artisan db:seed --class=DemoSeeder
@@ -124,7 +137,9 @@ Menghasilkan alumni, respons, dan kontak penilai palsu lewat Faker.
 **Hanya untuk basis data yang baru dimigrasi dan masih kosong.** Dijalankan
 di atas data asli, kuesionernya tergandakan dan laporan menghitung dobel —
 jawaban terhubung ke pertanyaan lewat `question_code`, bukan foreign key,
-jadi basis data tidak akan menolaknya.
+jadi basis data tidak akan menolaknya. Berlaku sebaliknya juga: jangan
+menjalankan `--class=RealDataSeeder` di atas basis data yang sudah diisi
+jalur demo.
 
 ## Kalau memulihkan dari `init.sql`
 
