@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Exceptions\BusinessException;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -40,9 +43,26 @@ class CubeJsClient
      */
     public function load(array $cubeQuery): \Illuminate\Support\Collection
     {
-        $response = Http::withToken($this->getToken())
-            ->timeout($this->timeout)
-            ->post("{$this->baseUrl}/cubejs-api/v1/load", ['query' => $cubeQuery]);
+        // Tanpa try/catch di sini, ConnectionException (Cube.js down/refused)
+        // menjalar mentah sampai ke response HTTP sebagai 500 dengan stack
+        // trace lengkap (path server bocor ke klien saat APP_DEBUG=true), dan
+        // frontend tidak pernah tahu ini kegagalan permanen, bukan lambat
+        // (bug #17 — lihat HASIL_TESTING_2026-08-23.md §T.6). Ditangkap di
+        // sini dan diubah jadi BusinessException 503 yang rapi.
+        try {
+            $response = Http::withToken($this->getToken())
+                ->timeout($this->timeout)
+                ->post("{$this->baseUrl}/cubejs-api/v1/load", ['query' => $cubeQuery]);
+        } catch (ConnectionException|RequestException $e) {
+            Log::error('CubeJsClient: connection failed', [
+                'error' => $e->getMessage(),
+                'query' => $cubeQuery,
+            ]);
+            throw new BusinessException(
+                'Layanan analitik sedang tidak tersedia, coba lagi nanti.',
+                503,
+            );
+        }
 
         if ($response->failed()) {
             Log::error('CubeJsClient: request failed', [

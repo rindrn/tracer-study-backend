@@ -4,12 +4,31 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\Transactional\StakeholderContactRepository;
+use App\Services\Transactional\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class StakeholderContactController extends Controller
 {
-    public function __construct(private readonly StakeholderContactRepository $repo) {}
+    public function __construct(
+        private readonly StakeholderContactRepository $repo,
+        private readonly AuditLogService $audit,
+    ) {}
+
+    /**
+     * Netralkan awalan formula (`=`,`+`,`-`,`@`) di nilai bebas-teks sebelum
+     * ditulis ke CSV — mitigasi CSV/formula-injection standar OWASP. Tanpa
+     * ini, nilai seperti `=cmd|'/c calc'!A1` dieksekusi mentah oleh Excel/
+     * LibreOffice saat berkas dibuka.
+     */
+    private function csvSafe(?string $value): string
+    {
+        $value = (string) $value;
+        if (preg_match('/^[=+\-@]/', $value)) {
+            return "'" . $value;
+        }
+        return $value;
+    }
 
     /**
      * Penyaring yang berlaku sama untuk tabel maupun unduhan.
@@ -69,6 +88,18 @@ class StakeholderContactController extends Controller
         $format = $request->query('format', 'csv');
         $stamp  = now()->format('Ymd_His');
 
+        // Ekspor memindahkan data pribadi (nama & email kontak penilai)
+        // keluar dari sistem — dicatat setara dengan `export.ministry`,
+        // sesuai kewajiban `config/privacy.php` (`audit_read_actions`).
+        $this->audit->record('export.stakeholder_contacts', [
+            'entity_type' => 'stakeholder_contacts',
+            'context'     => [
+                'format'  => $format,
+                'filters' => $this->filters($request),
+                'rows'    => count($data),
+            ],
+        ]);
+
         if ($format === 'xlsx') {
             // Dua lembar: "Kontak" (per pasangan, untuk mail merge) dan
             // "Email Unik" (tanpa alamat kembar, untuk kiriman seragam).
@@ -78,21 +109,30 @@ class StakeholderContactController extends Controller
 
         // CSV tetap datar satu lembar — pemakainya biasanya menempel langsung
         // ke perkakas lain, dan format ini tidak mengenal banyak lembar.
-        $csv = "NIM,Nama Alumni,Tahun Lulus,Kode Prodi,Program Studi,Tipe Kontak,Nama Kontak,Email Kontak,Status Alumni\n";
+        //
+        // Ditulis lewat fputcsv() (bukan sprintf manual) supaya tanda kutip
+        // ganda yang tersemat di nilai bebas-teks (mis. nama kontak) di-escape
+        // otomatis sesuai RFC 4180, dan setiap kolom bebas-teks dinetralkan
+        // dulu lewat csvSafe() supaya awalan formula (`=`,`+`,`-`,`@`) tidak
+        // dieksekusi mentah oleh Excel/LibreOffice saat berkas dibuka.
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, ['NIM', 'Nama Alumni', 'Tahun Lulus', 'Kode Prodi', 'Program Studi', 'Tipe Kontak', 'Nama Kontak', 'Email Kontak', 'Status Alumni']);
         foreach ($data as $row) {
-            $csv .= sprintf(
-                "\"%s\",\"%s\",%s,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
-                $row->nim,
-                $row->alumni_name,
+            fputcsv($handle, [
+                $this->csvSafe($row->nim),
+                $this->csvSafe($row->alumni_name),
                 $row->graduation_year,
-                $row->program_code ?? '-',
-                $row->program_name ?? '-',
-                $row->contact_type,
-                $row->contact_name,
-                $row->contact_email,
-                $row->alumni_status,
-            );
+                $this->csvSafe($row->program_code ?? '-'),
+                $this->csvSafe($row->program_name ?? '-'),
+                $this->csvSafe($row->contact_type),
+                $this->csvSafe($row->contact_name),
+                $this->csvSafe($row->contact_email),
+                $this->csvSafe($row->alumni_status),
+            ]);
         }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',

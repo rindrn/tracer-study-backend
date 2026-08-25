@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Admin\StoreAlumniRequest;
 use App\Http\Requests\Api\Admin\UpdateAlumniRequest;
 use App\Services\Transactional\AdminAlumniService;
+use App\Services\Transactional\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
@@ -23,6 +24,7 @@ class AlumniController extends Controller
 {
     public function __construct(
         private readonly AdminAlumniService $service,
+        private readonly AuditLogService $audit,
     ) {}
 
     /** GET /api/alumni */
@@ -142,6 +144,33 @@ class AlumniController extends Controller
             'success' => true,
             'message' => 'Data alumni berhasil dihapus.',
         ]);
+    }
+
+    /**
+     * POST /api/admin/alumni/export-audit
+     *
+     * Ekspor "Data Alumni" (tombol Export di Kelola Mahasiswa) dirakit
+     * sepenuhnya di klien (ExcelJS, lihat StudentManagementPage.tsx) — tidak
+     * ada permintaan ke backend untuk mengunduh berkasnya. Tanpa endpoint
+     * ini, ekspor data pribadi itu lolos tanpa jejak audit sama sekali,
+     * padahal `config/privacy.php` (`audit_read_actions`) mewajibkan
+     * `export.alumni` tercatat setara `export.ministry`. Frontend memanggil
+     * ini tepat sebelum merakit berkas.
+     */
+    public function logExport(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'rows' => ['nullable', 'integer'],
+        ]);
+
+        $this->audit->record('export.alumni', [
+            'entity_type' => 'alumni_profiles',
+            'context'     => [
+                'rows' => $validated['rows'] ?? null,
+            ],
+        ]);
+
+        return response()->json(['success' => true]);
     }
 
     /** POST /api/admin/alumni/import */

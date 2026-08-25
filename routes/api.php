@@ -396,6 +396,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // tertangkap sebagai {alumni} di route show.
     Route::get('alumni/respondent-stats', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'respondentStats']);
     Route::get('alumni/template', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'downloadTemplate']);
+    Route::post('alumni/export-audit', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'logExport']);
     Route::post('alumni/import', [\App\Http\Controllers\Api\Admin\AlumniController::class, 'importAlumni']);
     Route::apiResource('alumni', \App\Http\Controllers\Api\Admin\AlumniController::class);
 

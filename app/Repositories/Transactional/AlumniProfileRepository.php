@@ -66,6 +66,13 @@ class AlumniProfileRepository
                 // null dan SETIAP alumni gagal masuk — tanpa gejala lain
                 // selain "kata sandi salah" yang menyesatkan.
                 'alumni_profiles.password',
+                // Tanpa tiga kolom ini, ConsentService::isCurrent()/state()
+                // membaca null dari objek ini walau nilainya benar terisi di
+                // DB — respons login SELALU melaporkan consent.granted:false
+                // (bug #18, HASIL_TESTING_2026-08-23.md §T.7).
+                'alumni_profiles.consent_at',
+                'alumni_profiles.consent_version',
+                'alumni_profiles.consent_ip',
                 'programs.name as program_name',
                 'programs.degree as program_degree',
                 'programs.code as program_code',
