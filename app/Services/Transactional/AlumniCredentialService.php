@@ -5,6 +5,7 @@ namespace App\Services\Transactional;
 use App\Models\Transactional\AlumniProfile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * AlumniCredentialService — menerbitkan kata sandi alumni (RBAC-16, NFR-01).
@@ -50,12 +51,33 @@ class AlumniCredentialService
     private const GROUP_COUNT = 3;
 
     /**
+     * Biaya bcrypt khusus kata sandi alumni.
+     *
+     * Selebihnya aplikasi memakai BCRYPT_ROUNDS dari .env (12). Nilai itu
+     * dipilih untuk kata sandi yang DIPILIH MANUSIA — pendek, bermakna, dan
+     * karena itu butuh biaya setinggi mungkin per percobaan tebakan.
+     *
+     * Kata sandi di sini bukan itu: dua belas karakter acak dari abjad 31
+     * huruf di atas, sekitar 59 bit entropi. Menebaknya tidak pernah jadi
+     * soal biaya per cincangan — pada biaya 10 pun ruang tebakannya masih di
+     * luar jangkauan. Yang nyata justru ongkosnya di sisi kita: pada mesin
+     * pengembangan ini biaya 12 memakan sekitar 271 md per cincangan,
+     * sehingga seangkatan berisi ribuan orang berarti bermenit-menit CPU
+     * murni hanya untuk mencincang. Biaya 10 seperempatnya.
+     *
+     * Aman diturunkan tanpa migrasi apa pun: biaya ikut tertulis di dalam
+     * cincangannya sendiri dan Hash::check() membacanya dari sana. Cincangan
+     * lama tetap terverifikasi, dan kata sandi staf tidak tersentuh karena
+     * hanya jalur inilah yang menyetel pilihan ini.
+     */
+    private const BCRYPT_ROUNDS = 10;
+
+    /**
      * Batas jumlah alumni per PERMINTAAN — bukan per penerbitan.
      *
-     * Bcrypt sengaja lambat, itu justru gunanya, dan pada mesin ini satu
-     * cincangan memakan sekitar sepertiga detik. Biayanya lurus terhadap
-     * jumlah baris: seribu alumni berarti enam menit dalam satu permintaan
-     * HTTP, yang akan mati di batas waktu proksi jauh sebelum selesai.
+     * Bcrypt sengaja lambat, itu justru gunanya, dan biayanya lurus terhadap
+     * jumlah baris. Seangkatan penuh dalam satu permintaan HTTP akan mati di
+     * batas waktu proksi jauh sebelum selesai.
      *
      * Membatasi jumlah alumni yang boleh diterbitkan sekali jalan BUKAN
      * jawabannya — satu angkatan di politeknik bisa mencapai ribuan orang,
@@ -66,18 +88,21 @@ class AlumniCredentialService
      * berjalan berurutan, dikendalikan kursor `after_nim`. Tiap permintaan
      * selesai dalam hitungan puluhan detik, dan pemanggil mengulang sampai
      * `remaining` habis. Konstanta ini adalah batas ATAS yang boleh diminta
-     * per permintaan; nilai bawaannya lebih kecil, lihat DEFAULT_LIMIT.
+     * per permintaan.
      */
     public const MAX_BATCH = 250;
 
     /**
      * Jumlah bawaan per permintaan bila pemanggil tidak menentukan.
      *
-     * Seratus baris ≈ 36 detik pada mesin ini — di bawah batas tunggu proksi
-     * yang lazim (60 detik) dengan margin yang masuk akal, sambil menjaga
-     * jumlah bolak-balik tetap wajar untuk angkatan besar.
+     * Dulu seratus, ketika satu baris memakan sekitar 360 md: 271 md
+     * mencincang pada biaya 12, ditambah tiga kueri terpisah per alumni.
+     * Sesudah biayanya diturunkan (lihat BCRYPT_ROUNDS) dan seluruh potongan
+     * ditulis dalam dua pernyataan, satu baris tinggal sekitar 47 md — 250
+     * baris ≈ 12 detik, masih jauh di bawah batas tunggu proksi yang lazim
+     * (60 detik), dan jumlah bolak-baliknya tinggal seperlima.
      */
-    public const DEFAULT_LIMIT = 100;
+    public const DEFAULT_LIMIT = 250;
 
     /**
      * Terbitkan kata sandi baru untuk SATU POTONG alumni.
@@ -87,10 +112,16 @@ class AlumniCredentialService
      * OFFSET: penerbitan mengubah baris yang sedang dilalui, sehingga OFFSET
      * akan bergeser dan melewatkan orang tanpa gejala apa pun.
      *
-     * Dijalankan dalam satu transaksi PER POTONG. Potongan yang gagal
-     * dibatalkan seluruhnya, sementara potongan yang sudah selesai tetap
-     * berlaku — itu memang yang diinginkan, karena penerbitan yang terputus
-     * dapat dilanjutkan alih-alih diulang dari nol.
+     * Pencincangan dikerjakan DI LUAR transaksi. Ia bagian paling lama dari
+     * seluruh penerbitan dan sama sekali tidak menyentuh basis data;
+     * membiarkannya di dalam hanya membuat satu transaksi menggenggam ratusan
+     * baris selama belasan detik tanpa alasan.
+     *
+     * Yang tersisa di dalam transaksi tinggal dua pernyataan untuk seluruh
+     * potongan: satu UPDATE dan satu DELETE. Potongan yang gagal dibatalkan
+     * seluruhnya, sementara potongan yang sudah selesai tetap berlaku — itu
+     * memang yang diinginkan, karena penerbitan yang terputus dapat
+     * dilanjutkan alih-alih diulang dari nol.
      *
      * Token Sanctum yang masih aktif ikut dicabut — kata sandi lama sudah tidak
      * berlaku, jadi sesi yang lahir darinya juga tidak boleh terus hidup.
@@ -109,29 +140,27 @@ class AlumniCredentialService
             return ['issued' => collect(), 'remaining' => 0, 'last_nim' => null];
         }
 
-        $issued = DB::connection(self::CONN)->transaction(function () use ($targets) {
-            $out = collect();
-            $now = now();
+        // Bangkitkan dan cincang seluruh potongan lebih dulu. $hashes hanya
+        // berisi cincangan; teks polosnya tidak pernah keluar dari $issued.
+        $issued = collect();
+        $hashes = [];
 
-            foreach ($targets as $row) {
-                $plain = $this->generatePassword();
+        foreach ($targets as $row) {
+            $plain = $this->generatePassword();
 
-                $alumni = AlumniProfile::findOrFail($row->id);
-                $alumni->password           = $plain;   // cast 'hashed' yang mencincang
-                $alumni->password_issued_at = $now;
-                $alumni->save();
+            $hashes[(int) $row->id] = Hash::make($plain, ['rounds' => self::BCRYPT_ROUNDS]);
 
-                $alumni->tokens()->delete();
+            $issued->push([
+                'nim'      => (string) $row->nim,
+                'name'     => (string) ($row->name ?? ''),
+                'email'    => (string) ($row->email ?? ''),
+                'password' => $plain,
+            ]);
+        }
 
-                $out->push([
-                    'nim'      => (string) $row->nim,
-                    'name'     => (string) ($row->name ?? ''),
-                    'email'    => (string) ($row->email ?? ''),
-                    'password' => $plain,
-                ]);
-            }
-
-            return $out;
+        DB::connection(self::CONN)->transaction(function () use ($hashes) {
+            $this->storeHashes($hashes, now());
+            $this->revokeTokens(array_keys($hashes));
         });
 
         $lastNim = (string) $targets->last()->nim;
@@ -155,6 +184,56 @@ class AlumniCredentialService
             'remaining' => $this->countRemaining($filters, $lastNim),
             'last_nim'  => $lastNim,
         ];
+    }
+
+    /**
+     * Simpan cincangan seluruh potongan dalam SATU pernyataan.
+     *
+     * Bentuknya UPDATE ... FROM (VALUES ...) khas PostgreSQL, bukan CASE
+     * bertingkat, supaya panjang SQL-nya tumbuh linear dan tetap terbaca.
+     *
+     * Sengaja tidak lewat Eloquent. Cast `hashed` di AlumniProfile ada untuk
+     * menjaga penetapan kata sandi lewat model tidak pernah tersimpan polos,
+     * sementara yang masuk ke sini memang sudah berupa cincangan. Lewat query
+     * builder cast itu tidak ikut sama sekali: tidak ada risiko tercincang
+     * dua kali, tapi juga tidak ada jaring pengaman — apa pun yang dikirim ke
+     * sini WAJIB sudah dicincang oleh pemanggilnya.
+     *
+     * @param  array<int, string> $hashes  id alumni => cincangan bcrypt
+     */
+    private function storeHashes(array $hashes, \DateTimeInterface $now): void
+    {
+        $tuples   = implode(',', array_fill(0, count($hashes), '(?::bigint, ?)'));
+        $bindings = [$now];
+
+        foreach ($hashes as $id => $hash) {
+            $bindings[] = $id;
+            $bindings[] = $hash;
+        }
+
+        DB::connection(self::CONN)->update(
+            'update alumni_profiles as a'
+            . ' set password = v.password, password_issued_at = ?'
+            . " from (values {$tuples}) as v(id, password)"
+            . ' where a.id = v.id',
+            $bindings,
+        );
+    }
+
+    /**
+     * Cabut token Sanctum seluruh potongan dalam satu DELETE.
+     *
+     * getMorphClass() dipakai, bukan nama kelas harfiah, supaya tetap benar
+     * kalau suatu saat morph map dipasang di AppServiceProvider.
+     *
+     * @param  list<int> $alumniIds
+     */
+    private function revokeTokens(array $alumniIds): void
+    {
+        DB::connection(self::CONN)->table('personal_access_tokens')
+            ->where('tokenable_type', (new AlumniProfile)->getMorphClass())
+            ->whereIn('tokenable_id', $alumniIds)
+            ->delete();
     }
 
     /**
