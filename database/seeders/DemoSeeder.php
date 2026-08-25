@@ -12,8 +12,10 @@ use Illuminate\Support\Facades\DB;
  *
  *     php artisan db:seed --class=DemoSeeder
  *
- * Dulu semua ini bagian dari DatabaseSeeder. Dipisah setelah instalasi baku
- * beralih memakai data asli dari database/dump/oltp_real_data.sql.
+ * Inilah jalur seeding BAKU: DatabaseSeeder tidak melakukan apa pun selain
+ * memanggil kelas ini, sehingga `migrate:fresh --seed` berakhir di sini juga.
+ * Data alumni sungguhan dipindah ke RealDataSeeder dan harus diminta
+ * eksplisit -- lihat catatan di DatabaseSeeder soal alasannya.
  *
  * JANGAN dijalankan di atas basis data yang sudah berisi data asli.
  * QuestionnaireSeeder membuat kuesioner baru dengan `code` yang sama persis
@@ -43,6 +45,12 @@ class DemoSeeder extends Seeder
             // nilai yang dipakai program studi. Lihat catatan di kelasnya
             // soal kenapa pengisian di migration saja tidak cukup.
             JurusanSeeder::class,
+            // Sumber otorisasi kajur/ketua_fakultas. Backfill-nya dulu ada di
+            // migration jurusan_program_scopes, dan di sana selalu mengisi nol
+            // baris karena migration jalan sebelum seeder mana pun -- lihat
+            // catatan di kelasnya. Jalur demo juga terkena, jadi ikut dipanggil
+            // di sini, sesudah programs dan jurusans terisi.
+            JurusanProgramScopeSeeder::class,
             ProvinceSeeder::class,
             CitySeeder::class,
             RoleSeeder::class,
