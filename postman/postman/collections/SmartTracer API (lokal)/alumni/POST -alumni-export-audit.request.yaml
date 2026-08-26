@@ -1,0 +1,28 @@
+$kind: http-request
+name: POST /alumni/export-audit
+description: |-
+  Guard: staff
+  Controller: App\Http\Controllers\Api\Admin\AlumniController@logExport
+  Sumber aturan: validate() di controller
+
+  Field body:
+  - rows (opsional): nullable, integer
+url: "{{baseUrl}}/alumni/export-audit"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "rows": 1
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 8000

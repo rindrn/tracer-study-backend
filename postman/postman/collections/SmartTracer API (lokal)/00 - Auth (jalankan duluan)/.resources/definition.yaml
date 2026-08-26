@@ -1,0 +1,3 @@
+$kind: collection
+description: Login staff dan login alumni menyimpan token ke variabel collection secara otomatis, jadi request lain tinggal dijalankan.
+order: 1000

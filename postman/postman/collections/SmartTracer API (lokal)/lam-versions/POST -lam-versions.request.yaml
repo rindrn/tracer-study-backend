@@ -1,0 +1,35 @@
+$kind: http-request
+name: POST /lam-versions
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer
+  Controller: App\Http\Controllers\Api\Transactional\LamVersionController@store
+  Sumber aturan: kelas validator terpisah
+
+  Field body:
+  - lam_id (wajib): required, integer, exists:oltp.lams,id
+  - year (wajib): required, integer, min:2000, max:2100
+  - version_name (opsional): nullable, string, max:100
+  - is_active (opsional): nullable, boolean
+url: "{{baseUrl}}/lam-versions"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "is_active": true,
+      "lam_id": 1,
+      "version_name": "Contoh",
+      "year": 2024
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 1000

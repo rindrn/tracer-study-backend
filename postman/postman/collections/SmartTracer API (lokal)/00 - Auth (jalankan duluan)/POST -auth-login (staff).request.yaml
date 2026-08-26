@@ -1,0 +1,36 @@
+$kind: http-request
+name: POST /auth/login (staff)
+description: |-
+  Guard: public
+  Controller: App\Http\Controllers\Api\Auth\AuthController@login
+  Sumber aturan: validate() di controller
+
+  Field body:
+  - email (wajib): required, email
+  - password (wajib): required, string
+url: "{{baseUrl}}/auth/login"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{staffEmail}}",
+      "password": "{{staffPassword}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('login berhasil', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      const token = body && body.data && body.data.token;
+      if (token) {
+        pm.collectionVariables.set('token', token);
+        console.log('Token tersimpan ke variabel token');
+      } else {
+        console.warn('Token tidak ditemukan di respons');
+      }
+    language: text/javascript
+order: 1000

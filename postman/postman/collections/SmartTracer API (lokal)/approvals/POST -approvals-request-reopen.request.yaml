@@ -1,0 +1,33 @@
+$kind: http-request
+name: POST /approvals/request-reopen
+description: |-
+  Guard: staff
+  Peran yang diizinkan: tracer_team,kaprodi
+  Controller: App\Http\Controllers\Api\Transactional\ApprovalController@requestReopen
+  Sumber aturan: validate() di controller
+
+  Field body:
+  - alumni_id (wajib): required, integer, exists:oltp.alumni_profiles,id
+  - questionnaire_id (opsional): nullable, integer, exists:oltp.questionnaires,id
+  - note (wajib): required, string
+url: "{{baseUrl}}/approvals/request-reopen"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "alumni_id": 1,
+      "note": "contoh",
+      "questionnaire_id": 1
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 5000

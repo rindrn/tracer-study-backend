@@ -1,0 +1,17 @@
+$kind: http-request
+name: GET /dashboard/masa-tunggu/prediksi
+description: |-
+  Guard: staff
+  Controller: App\Http\Controllers\Api\Analytical\MasaTungguController@prediksi
+url: "{{baseUrl}}/dashboard/masa-tunggu/prediksi"
+method: GET
+headers:
+  Accept: application/json
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 25000

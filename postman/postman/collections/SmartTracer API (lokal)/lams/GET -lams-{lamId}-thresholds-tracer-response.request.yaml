@@ -1,0 +1,21 @@
+$kind: http-request
+name: GET /lams/{lamId}/thresholds/tracer-response
+description: |-
+  Guard: staff
+  Controller: App\Http\Controllers\Api\Transactional\ThresholdController@tracerResponseByLam
+url: "{{baseUrl}}/lams/:lamId/thresholds/tracer-response"
+method: GET
+headers:
+  Accept: application/json
+  Authorization: Bearer {{token}}
+pathVariables:
+  - key: lamId
+    value: "1"
+    description: isi dengan id yang ada di basis data
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 9000

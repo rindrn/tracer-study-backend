@@ -1,0 +1,28 @@
+$kind: http-request
+name: POST /alumni/import
+description: |-
+  Guard: staff
+  Controller: App\Http\Controllers\Api\Admin\AlumniController@importAlumni
+  Sumber aturan: validate() di controller
+
+  Field body:
+  - file (wajib): required, file, mimes:xlsx,xls, max:5120
+url: "{{baseUrl}}/alumni/import"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "file": "(kirim lewat form-data, bukan JSON)"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 9000

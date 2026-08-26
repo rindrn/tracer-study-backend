@@ -1,0 +1,44 @@
+$kind: http-request
+name: POST /stakeholder-contacts
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer,tracer_team
+  Controller: App\Http\Controllers\Api\Admin\StakeholderContactController@store
+  Sumber aturan: validate() di controller
+
+  Field body:
+  - alumni_id (wajib): required, integer
+  - questionnaire_id (wajib): required, integer
+  - alumni_status (wajib): required, string
+  - contacts (wajib): required, array, min:1
+  - contacts.*.contact_type (wajib): required, string
+  - contacts.*.contact_name (wajib): required, string, max:150
+  - contacts.*.contact_email (wajib): required, email, max:150
+url: "{{baseUrl}}/stakeholder-contacts"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "alumni_id": 1,
+      "alumni_status": "contoh",
+      "contacts": [
+        {
+          "contact_email": "nama@contoh.ac.id",
+          "contact_name": "Contoh",
+          "contact_type": "contoh"
+        }
+      ],
+      "questionnaire_id": 1
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 2000

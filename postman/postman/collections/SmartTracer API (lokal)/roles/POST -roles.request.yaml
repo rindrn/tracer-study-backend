@@ -1,0 +1,35 @@
+$kind: http-request
+name: POST /roles
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer
+  Controller: App\Http\Controllers\Api\Transactional\RoleController@store
+  Sumber aturan: validate() di controller
+
+  Field body:
+  - name (wajib): required, string, max:50, unique:oltp.roles,name
+  - label (wajib): required, string, max:100
+  - description (opsional): nullable, string, max:255
+  - scope (opsional): nullable, string, max:100
+url: "{{baseUrl}}/roles"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "description": "contoh",
+      "label": "contoh",
+      "name": "Contoh",
+      "scope": "contoh"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 2000

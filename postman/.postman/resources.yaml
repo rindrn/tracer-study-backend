@@ -1,0 +1,15 @@
+# Use this workspace to collaborate
+workspace:
+  id: c1a3139d-2f06-49af-89aa-d46a22e03007
+
+localResources:
+  collections:
+    - ../smarttracer.postman_collection.json
+  environments:
+    - ../local.postman_environment.json
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../postman/collections/SmartTracer API (lokal): 5b3baf12-9b5a-4023-a959-a67216630271

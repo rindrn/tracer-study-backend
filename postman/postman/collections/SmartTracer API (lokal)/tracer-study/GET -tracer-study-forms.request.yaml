@@ -1,0 +1,16 @@
+$kind: http-request
+name: GET /tracer-study/forms
+description: |-
+  Guard: public
+  Controller: App\Http\Controllers\Api\Transactional\QuestionnaireFetchController@getActiveForms
+url: "{{baseUrl}}/tracer-study/forms"
+method: GET
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 4000

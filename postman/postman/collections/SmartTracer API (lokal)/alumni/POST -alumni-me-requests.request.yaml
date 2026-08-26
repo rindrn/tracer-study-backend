@@ -1,0 +1,30 @@
+$kind: http-request
+name: POST /alumni/me/requests
+description: |-
+  Guard: alumni
+  Controller: App\Http\Controllers\Api\Alumni\SelfServiceController@storeRequest
+  Sumber aturan: validate() di controller
+
+  Field body:
+  - type (wajib): required, string, in:, ,
+  - message (wajib): required, string, min:10, max:2000
+url: "{{baseUrl}}/alumni/me/requests"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{alumniToken}}
+body:
+  type: json
+  content: |-
+    {
+      "message": "contoh",
+      "type": "contoh"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 15000

@@ -1,0 +1,17 @@
+$kind: http-request
+name: GET /alumni/stats
+description: |-
+  Guard: staff
+  Controller: App\Http\Controllers\Api\Admin\AlumniController@stats
+url: "{{baseUrl}}/alumni/stats"
+method: GET
+headers:
+  Accept: application/json
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 17000

@@ -1,0 +1,20 @@
+$kind: http-request
+name: GET /public/reports/{id}/preview
+description: |-
+  Guard: public
+  Controller: App\Http\Controllers\Api\PublicAccess\PublicReportController@preview
+url: "{{baseUrl}}/public/reports/:id/preview"
+method: GET
+headers:
+  Accept: application/json
+pathVariables:
+  - key: id
+    value: "1"
+    description: isi dengan id yang ada di basis data
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 3000

@@ -1,0 +1,24 @@
+{
+  "version": "0.1",
+  "project": {
+    "name": "SmartTracer API",
+    "baseUrl": "http://127.0.0.1:8000/api"
+  },
+  "default": {
+    "workspace": "main",
+    "collection": "smarttracer",
+    "environment": "local"
+  },
+  "collections": {
+    "smarttracer": {
+      "path": "postman/smarttracer.postman_collection.json",
+      "name": "SmartTracer API (lokal)"
+    }
+  },
+  "environments": {
+    "local": {
+      "path": "postman/local.postman_environment.json",
+      "name": "SmartTracer Lokal"
+    }
+  }
+}

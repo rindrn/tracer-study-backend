@@ -1,0 +1,11 @@
+$kind: collection
+name: SmartTracer API (lokal)
+description: Dibuat otomatis dari `php artisan route:list`. Jalankan folder "00 - Auth" lebih dulu supaya token terisi.
+variables:
+  baseUrl: http://127.0.0.1:8000/api
+  token: ""
+  alumniToken: ""
+  staffEmail: ""
+  staffPassword: ""
+  alumniNim: ""
+  alumniPassword: ""

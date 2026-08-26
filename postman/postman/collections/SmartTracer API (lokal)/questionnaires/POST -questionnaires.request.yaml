@@ -1,0 +1,156 @@
+$kind: http-request
+name: POST /questionnaires
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer,tracer_team
+  Controller: App\Http\Controllers\Api\Transactional\QuestionnaireController@store
+  Sumber aturan: kelas validator terpisah
+
+  Field body:
+  - title (wajib): required, string, max:200
+  - description (opsional): nullable, string
+  - target (opsional): nullable, string, max:255
+  - respondents (opsional): nullable, array
+  - respondents.* (opsional): nullable, string, max:255
+  - status (wajib): required, in:draft,published,archived
+  - period_year (opsional): nullable, integer, min:2000, max:2100
+  - code (opsional): nullable, string, max:80
+  - version (opsional): nullable, integer, min:1
+  - program_code (opsional): nullable, string, exists:oltp.programs,code
+  - program_id (opsional): nullable, integer, exists:oltp.programs,id
+  - target_graduation_years (opsional): nullable, array
+  - target_graduation_years.* (opsional): integer
+  - sections (wajib): required, array, min:1
+  - sections.*.title (wajib): required, string, max:200
+  - sections.*.description (opsional): nullable, string
+  - sections.*.order_no (opsional): nullable, integer, min:1
+  - sections.*.questions (wajib): required, array, min:1
+  - sections.*.questions.*.code (opsional): nullable, string, max:80
+  - sections.*.questions.*.order_no (opsional): nullable, integer, min:1
+  - sections.*.questions.*.question (wajib): required, string
+  - sections.*.questions.*.type (wajib): required, string, in:, ,
+  - sections.*.questions.*.description (opsional): nullable, string, max:300
+  - sections.*.questions.*.hint (opsional): nullable, string, max:300
+  - sections.*.questions.*.format (opsional): nullable, string, in:email,phone,url,currency
+  - sections.*.questions.*.divider_label (opsional): nullable, string, max:300
+  - sections.*.questions.*.competency (opsional): nullable, string, max:100
+  - sections.*.questions.*.dimension (opsional): nullable, string, max:100
+  - sections.*.questions.*.method (opsional): nullable, string, max:100
+  - sections.*.questions.*.warn_min (opsional): nullable, numeric
+  - sections.*.questions.*.warn_max (opsional): nullable, numeric
+  - sections.*.questions.*.option_hints (opsional): nullable, array
+  - sections.*.questions.*.option_hints.* (opsional): nullable, string, max:300
+  - sections.*.questions.*.required (opsional): sometimes, boolean
+  - sections.*.questions.*.allowOther (opsional): sometimes, boolean
+  - sections.*.questions.*.scaleMin (opsional): nullable, integer
+  - sections.*.questions.*.scaleMax (opsional): nullable, integer
+  - sections.*.questions.*.scaleLabels (opsional): nullable, array
+  - sections.*.questions.*.scaleLabels.* (opsional): nullable, string, max:255
+  - sections.*.questions.*.gridRows (opsional): nullable, array
+  - sections.*.questions.*.gridRows.* (opsional): nullable, string
+  - sections.*.questions.*.gridColumns (opsional): nullable, array
+  - sections.*.questions.*.gridColumns.* (opsional): nullable, string
+  - sections.*.questions.*.options (opsional): nullable, array
+  - sections.*.questions.*.options.*.label (opsional): nullable, string, max:255
+  - sections.*.questions.*.options.*.value (opsional): nullable, string, max:255
+  - sections.*.questions.*.options.*.code (opsional): nullable, string, max:80
+  - sections.*.questions.*.options.*.is_hidden (opsional): nullable, boolean
+  - sections.*.questions.*.logic (opsional): nullable, array
+  - sections.*.questions.*.logic.type (opsional): nullable, string, in:always,in_array
+  - sections.*.questions.*.logic.dependsOn (opsional): nullable, string, max:100
+  - sections.*.questions.*.logic.values (opsional): nullable, array
+  - sections.*.questions.*.logic.values.* (opsional): nullable, string, max:255
+  - sections.*.questions.*.lookup (opsional): nullable, string, in:program,province,city
+  - sections.*.questions.*.lookupValue (opsional): nullable, string, in:id,code
+  - sections.*.questions.*.dependsOn (opsional): nullable, string, max:100
+  - sections.*.questions.*.group_code (opsional): nullable, string, max:100
+  - sections.*.questions.*.group_label (opsional): nullable, string, max:500
+  - sections.*.questions.*.group_title (opsional): nullable, string, max:500
+url: "{{baseUrl}}/questionnaires"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "code": "KODE01",
+      "description": "contoh",
+      "period_year": 2024,
+      "program_code": "KODE01",
+      "program_id": 1,
+      "respondents": [
+        "contoh"
+      ],
+      "sections": [
+        {
+          "description": "contoh",
+          "order_no": 1,
+          "questions": [
+            {
+              "allowOther": true,
+              "code": "KODE01",
+              "competency": "contoh",
+              "dependsOn": "contoh",
+              "description": "contoh",
+              "dimension": "contoh",
+              "divider_label": "contoh",
+              "format": "email",
+              "gridColumns": [
+                "contoh"
+              ],
+              "gridRows": [
+                "contoh"
+              ],
+              "group_code": "KODE01",
+              "group_label": "contoh",
+              "group_title": "Contoh",
+              "hint": "contoh",
+              "logic": [],
+              "lookup": "program",
+              "lookupValue": "id",
+              "method": "contoh",
+              "option_hints": [
+                "contoh"
+              ],
+              "options": [
+                {
+                  "code": "KODE01",
+                  "is_hidden": true,
+                  "label": "contoh",
+                  "value": "contoh"
+                }
+              ],
+              "order_no": 1,
+              "question": "contoh",
+              "required": true,
+              "scaleLabels": [
+                "contoh"
+              ],
+              "scaleMax": 1,
+              "scaleMin": 1,
+              "type": "contoh",
+              "warn_max": 1,
+              "warn_min": 1
+            }
+          ],
+          "title": "Contoh"
+        }
+      ],
+      "status": "draft",
+      "target": "contoh",
+      "target_graduation_years": [
+        2024
+      ],
+      "title": "Contoh",
+      "version": 1
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 2000

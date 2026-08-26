@@ -1,0 +1,34 @@
+$kind: http-request
+name: POST /lam-programs
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer
+  Controller: App\Http\Controllers\Api\Transactional\LamProgramController@store
+  Sumber aturan: kelas validator terpisah
+
+  Field body:
+  - lam_id (wajib): required, integer, exists:oltp.lams,id
+  - program_ids (wajib): required, array, min:1
+  - program_ids.* (opsional): integer, exists:oltp.programs,id
+url: "{{baseUrl}}/lam-programs"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "lam_id": 1,
+      "program_ids": [
+        1
+      ]
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 1000

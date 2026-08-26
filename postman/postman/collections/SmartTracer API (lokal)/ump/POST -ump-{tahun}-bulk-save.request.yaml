@@ -1,0 +1,33 @@
+$kind: http-request
+name: POST /ump/{tahun}/bulk-save
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer
+  Controller: App\Http\Controllers\Api\Transactional\RefUmpController@bulkSave
+  Sumber aturan: kelas validator terpisah
+
+  Field body:
+  - tahun (opsional): aturan dinamis
+url: "{{baseUrl}}/ump/:tahun/bulk-save"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+pathVariables:
+  - key: tahun
+    value: "1"
+    description: isi dengan id yang ada di basis data
+body:
+  type: json
+  content: |-
+    {
+      "tahun": "ISI_MANUAL"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 2000

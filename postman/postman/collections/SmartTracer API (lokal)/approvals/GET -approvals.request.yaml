@@ -1,0 +1,18 @@
+$kind: http-request
+name: GET /approvals
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer,tracer_team,kaprodi
+  Controller: App\Http\Controllers\Api\Transactional\ApprovalController@index
+url: "{{baseUrl}}/approvals"
+method: GET
+headers:
+  Accept: application/json
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 1000

@@ -1,0 +1,46 @@
+$kind: http-request
+name: POST /alumni
+description: |-
+  Guard: staff
+  Controller: App\Http\Controllers\Api\Admin\AlumniController@store
+  Sumber aturan: FormRequest: StoreAlumniRequest
+
+  Field body:
+  - nim (wajib): required, string, max:30, unique:oltp.alumni_profiles,nim
+  - name (wajib): required, string, max:150
+  - email (opsional): nullable, email, max:150
+  - phone (opsional): nullable, string, max:30
+  - entry_year (opsional): nullable, integer
+  - graduation_year (opsional): nullable, integer
+  - gpa (opsional): nullable, numeric, min:0, max:4
+  - nik (opsional): nullable, string, max:16
+  - npwp (opsional): nullable, string, max:20
+  - kode_pt (opsional): nullable, string, max:10
+url: "{{baseUrl}}/alumni"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "email": "nama@contoh.ac.id",
+      "entry_year": 2024,
+      "gpa": 0,
+      "graduation_year": 2024,
+      "kode_pt": "KODE01",
+      "name": "Contoh",
+      "nik": "contoh",
+      "nim": "2011001",
+      "npwp": "contoh",
+      "phone": "081200000000"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 2000

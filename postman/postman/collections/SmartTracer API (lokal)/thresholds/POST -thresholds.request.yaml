@@ -1,0 +1,35 @@
+$kind: http-request
+name: POST /thresholds
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer,tracer_team
+  Controller: App\Http\Controllers\Api\Transactional\ThresholdController@store
+  Sumber aturan: kelas validator terpisah
+
+  Field body:
+  - lam_version_id (wajib): required, integer, exists:oltp.lam_versions,id
+  - indicator_id (wajib): required, integer, exists:oltp.threshold_indicators,id
+  - level (wajib): required, string, in:baik,unggul
+  - value (wajib): required, numeric, min:0, max:100
+url: "{{baseUrl}}/thresholds"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "indicator_id": 1,
+      "lam_version_id": 1,
+      "level": "baik",
+      "value": 0
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 1000

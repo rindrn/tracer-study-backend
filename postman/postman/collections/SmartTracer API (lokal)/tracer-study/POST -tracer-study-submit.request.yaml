@@ -1,0 +1,48 @@
+$kind: http-request
+name: POST /tracer-study/submit
+description: |-
+  Guard: alumni
+  Controller: App\Http\Controllers\Api\Transactional\TracerStudySubmitController@store
+  Sumber aturan: FormRequest: SubmitTracerStudyRequest
+
+  Field body:
+  - nim (wajib): required, string, max:30
+  - name (wajib): required, string, max:150
+  - email (wajib): required, email, max:150
+  - phone (opsional): nullable, string, max:30
+  - tahun_lulus (wajib): required
+  - kdpstmsmh (wajib): required, string, exists:programs,code
+  - kode_pt (opsional): nullable, string, max:10
+  - nik (opsional): nullable, string, max:20
+  - npwp (opsional): nullable, string, max:25
+  - questionnaire_ids (opsional): nullable, array
+  - questionnaire_ids.* (opsional): integer
+url: "{{baseUrl}}/tracer-study/submit"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{alumniToken}}
+body:
+  type: json
+  content: |-
+    {
+      "email": "nama@contoh.ac.id",
+      "kdpstmsmh": "KODE01",
+      "kode_pt": "KODE01",
+      "name": "Contoh",
+      "nik": "contoh",
+      "nim": "2011001",
+      "npwp": "contoh",
+      "phone": "081200000000",
+      "questionnaire_ids": [
+        1
+      ]
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 5000

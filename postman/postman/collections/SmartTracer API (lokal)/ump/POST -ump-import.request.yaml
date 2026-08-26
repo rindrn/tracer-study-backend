@@ -1,0 +1,29 @@
+$kind: http-request
+name: POST /ump/import
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer
+  Controller: App\Http\Controllers\Api\Transactional\RefUmpController@import
+  Sumber aturan: kelas validator terpisah
+
+  Field body:
+  - file (wajib): required, file, mimes:xlsx,xls,csv, max:5120
+url: "{{baseUrl}}/ump/import"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "file": "(kirim lewat form-data, bukan JSON)"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 5000

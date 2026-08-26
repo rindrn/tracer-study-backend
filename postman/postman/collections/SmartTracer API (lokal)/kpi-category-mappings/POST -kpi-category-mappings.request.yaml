@@ -1,0 +1,39 @@
+$kind: http-request
+name: POST /kpi-category-mappings
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer
+  Controller: App\Http\Controllers\Api\Analytical\KpiCategoryMappingController@store
+  Sumber aturan: kelas validator terpisah
+
+  Field body:
+  - semantic_role (wajib): required, string, max:50
+  - option_code (wajib): required, string, max:80
+  - option_label_snapshot (opsional): nullable, string, max:200
+  - kpi_category (wajib): required, string, max:30
+  - kpi_category_label (opsional): nullable, string, max:150
+  - digunakan_oleh (wajib): required, string, max:50
+url: "{{baseUrl}}/kpi-category-mappings"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "digunakan_oleh": "contoh",
+      "kpi_category": "contoh",
+      "kpi_category_label": "contoh",
+      "option_code": "KODE01",
+      "option_label_snapshot": "contoh",
+      "semantic_role": "contoh"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 2000

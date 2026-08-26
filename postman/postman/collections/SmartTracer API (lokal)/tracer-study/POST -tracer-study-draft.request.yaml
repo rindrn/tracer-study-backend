@@ -1,0 +1,28 @@
+$kind: http-request
+name: POST /tracer-study/draft
+description: |-
+  Guard: alumni
+  Controller: App\Http\Controllers\Api\Transactional\TracerStudyDraftController@store
+  Sumber aturan: validate() di controller
+
+  Field body:
+  - answers (wajib): required, array
+url: "{{baseUrl}}/tracer-study/draft"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{alumniToken}}
+body:
+  type: json
+  content: |-
+    {
+      "answers": []
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 2000

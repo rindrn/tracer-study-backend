@@ -1,0 +1,52 @@
+$kind: http-request
+name: PUT /alumni/{alumnus}
+description: |-
+  Guard: staff
+  Controller: App\Http\Controllers\Api\Admin\AlumniController@update
+  Sumber aturan: FormRequest: UpdateAlumniRequest
+
+  Field body:
+  - nim (wajib): sometimes, required, string, max:30, unique:oltp.alumni_profiles,nim,
+  - name (wajib): sometimes, required, string, max:150
+  - email (opsional): nullable, email, max:150
+  - phone (opsional): nullable, string, max:30
+  - entry_year (opsional): nullable, integer
+  - graduation_year (opsional): nullable, integer
+  - gpa (opsional): nullable, numeric, min:0, max:4
+  - nik (opsional): nullable, string, max:16
+  - npwp (opsional): nullable, string, max:20
+  - kode_pt (opsional): nullable, string, max:10
+  - is_active (opsional): nullable, boolean
+url: "{{baseUrl}}/alumni/:alumnus"
+method: PUT
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+pathVariables:
+  - key: alumnus
+    value: "1"
+    description: isi dengan id yang ada di basis data
+body:
+  type: json
+  content: |-
+    {
+      "email": "nama@contoh.ac.id",
+      "entry_year": 2024,
+      "gpa": 0,
+      "graduation_year": 2024,
+      "is_active": true,
+      "kode_pt": "KODE01",
+      "name": "Contoh",
+      "nik": "contoh",
+      "nim": "2011001",
+      "npwp": "contoh",
+      "phone": "081200000000"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 5000

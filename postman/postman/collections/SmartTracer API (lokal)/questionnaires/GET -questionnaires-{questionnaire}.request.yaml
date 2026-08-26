@@ -1,0 +1,20 @@
+$kind: http-request
+name: GET /questionnaires/{questionnaire}
+description: |-
+  Guard: public
+  Controller: App\Http\Controllers\Api\Transactional\QuestionnaireController@show
+url: "{{baseUrl}}/questionnaires/:questionnaire"
+method: GET
+headers:
+  Accept: application/json
+pathVariables:
+  - key: questionnaire
+    value: "1"
+    description: isi dengan id yang ada di basis data
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 3000

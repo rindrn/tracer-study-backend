@@ -1,0 +1,17 @@
+$kind: http-request
+name: DELETE /alumni/me/consent
+description: |-
+  Guard: alumni
+  Controller: App\Http\Controllers\Api\Alumni\SelfServiceController@withdrawConsent
+url: "{{baseUrl}}/alumni/me/consent"
+method: DELETE
+headers:
+  Accept: application/json
+  Authorization: Bearer {{alumniToken}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 13000

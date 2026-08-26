@@ -1,0 +1,17 @@
+$kind: http-request
+name: GET /auth/me
+description: |-
+  Guard: staff
+  Controller: App\Http\Controllers\Api\Auth\AuthController@me
+url: "{{baseUrl}}/auth/me"
+method: GET
+headers:
+  Accept: application/json
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 6000

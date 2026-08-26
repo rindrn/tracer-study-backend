@@ -1,0 +1,31 @@
+$kind: http-request
+name: PUT /admin/public-settings
+description: |-
+  Guard: staff
+  Peran yang diizinkan: head_tracer
+  Controller: App\Http\Controllers\Api\Admin\PublicDisplaySettingController@update
+  Sumber aturan: validate() di controller
+
+  Field body:
+  - start (opsional): nullable, integer, min:, max:
+  - end (opsional): nullable, integer, min:, max:, gte:start
+url: "{{baseUrl}}/admin/public-settings"
+method: PUT
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "end": 1,
+      "start": 1
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));
+      pm.test('respons JSON', () => pm.response.to.be.json);
+    language: text/javascript
+order: 9000
