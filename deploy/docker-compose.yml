@@ -1,0 +1,264 @@
+# ---------------------------------------------------------------------------
+# SmartTracer -- susunan produksi satu VPS.
+#
+# Jalankan dari folder deploy/ :  docker compose up -d --build
+# Semua nilai rahasia dibaca dari deploy/.env (lihat .env.example).
+#
+# Hanya service "nginx" yang membuka port ke publik. Postgres, Redis, dan Cube
+# sengaja tanpa "ports:" -- mereka hanya terjangkau lewat jaringan internal
+# Docker. Ini penting untuk Cube: playground-nya tidak punya autentikasi.
+#
+# Batas memori tiap service disetel untuk VPS 2 GB dengan swap 2 GB. Di VPS
+# 4 GB, naikkan app dan cube lebih dulu -- keduanya yang paling sering mentok.
+# ---------------------------------------------------------------------------
+
+name: smarttracer
+
+x-laravel-env: &laravel-env
+  APP_NAME: SmartTracer
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_KEY: ${APP_KEY:?APP_KEY wajib diisi, buat dengan php artisan key:generate --show}
+  APP_URL: ${APP_URL}
+  APP_TIMEZONE: Asia/Jakarta
+
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: warning
+
+  DB_CONNECTION: oltp
+  OLTP_DB_HOST: postgres
+  OLTP_DB_PORT: 5432
+  OLTP_DB_DATABASE: ${POSTGRES_DB}
+  OLTP_DB_USERNAME: ${POSTGRES_USER}
+  OLTP_DB_PASSWORD: ${POSTGRES_PASSWORD}
+  OLAP_DB_HOST: postgres
+  OLAP_DB_PORT: 5432
+  OLAP_DB_DATABASE: ${POSTGRES_DB}
+  OLAP_DB_USERNAME: ${POSTGRES_USER}
+  OLAP_DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+  # predis dipakai, bukan phpredis: paketnya sudah ada di composer.json dan
+  # dengan begitu image tidak perlu ekstensi PHP tambahan.
+  REDIS_CLIENT: predis
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+
+  CACHE_STORE: redis
+  SESSION_DRIVER: database
+  QUEUE_CONNECTION: database
+
+  # Nama service Docker, bukan localhost -- Cube ada di container terpisah.
+  CUBEJS_BASE_URL: http://cube:4000
+  CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:?CUBEJS_API_SECRET wajib diisi}
+
+  INSTITUTION_NAME: ${INSTITUTION_NAME}
+  INSTITUTION_CODE: ${INSTITUTION_CODE}
+  PRIVACY_NOTICE_VERSION: ${PRIVACY_NOTICE_VERSION}
+  PERSONAL_DATA_RETENTION_YEARS: ${PERSONAL_DATA_RETENTION_YEARS}
+
+services:
+  # --- Basis data --------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backup:/backup
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    # shared_buffers 256M cukup untuk dataset tracer study skala satu kampus;
+    # sisanya dibiarkan untuk page cache OS.
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c work_mem=8MB
+      -c maintenance_work_mem=64MB
+      -c max_connections=50
+    mem_limit: 640m
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Hanya dipakai sebagai cache aplikasi, bukan penyimpan queue (queue ada
+    # di tabel Postgres), jadi datanya boleh hilang -- tanpa persistence.
+    command: redis-server --save "" --appendonly no --maxmemory 96mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 128m
+    networks: [internal]
+
+  # --- Lapisan analitik --------------------------------------------------
+  cube:
+    image: cubejs/cube:v1.6.47
+    restart: unless-stopped
+    environment:
+      CUBEJS_DB_TYPE: postgres
+      CUBEJS_DB_HOST: postgres
+      CUBEJS_DB_PORT: 5432
+      CUBEJS_DB_NAME: ${POSTGRES_DB}
+      CUBEJS_DB_USER: ${POSTGRES_USER}
+      CUBEJS_DB_PASS: ${POSTGRES_PASSWORD}
+
+      # WAJIB false di produksi. Dengan true, Developer Playground terbuka
+      # tanpa autentikasi apa pun bagi siapa saja yang bisa menjangkau :4000.
+      CUBEJS_DEV_MODE: "false"
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET}
+      CUBEJS_SCHEMA_PATH: model
+      CUBEJS_PORT: 4000
+
+      # false = pre-aggregation ditulis ke schema Postgres, bukan ke Cube
+      # Store. Itu menghemat satu proses yang rakus memori -- pilihan yang
+      # tepat untuk VPS kecil, dan sama dengan setelan development.
+      CUBEJS_EXTERNAL_DEFAULT: "false"
+      # Nama schema ini TIDAK boleh diganti meski terdengar seperti nama
+      # development. Ia terpakai apa adanya di dokumentasi struktur data dan
+      # di catatan bootstrap, dan entrypoint backend menyiapkannya dengan nama
+      # yang sama. Mengubahnya hanya membuat Cube membangun ulang seluruh
+      # pra-agregasi di schema baru dan meninggalkan yang lama menganggur.
+      CUBEJS_PRE_AGGREGATIONS_SCHEMA: dev_pre_aggregations
+      CUBEJS_SCHEDULED_REFRESH_DEFAULT: "true"
+      CUBEJS_WEB_SOCKETS: "false"
+      CUBEJS_LOG_LEVEL: warn
+      NODE_OPTIONS: --max-old-space-size=512
+    volumes:
+      # Model dipasang read-only langsung dari repositori analitik supaya
+      # perubahan definisi cube tidak perlu build image.
+      - ../../tracer-study-analytics/tracer-analytics/model:/cube/conf/model:ro
+      - ../../tracer-study-analytics/tracer-analytics/cube.js:/cube/conf/cube.js:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:4000/readyz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    mem_limit: 768m
+    networks: [internal]
+
+  # --- Backend Laravel ---------------------------------------------------
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: smarttracer-backend:latest
+    restart: unless-stopped
+    environment:
+      <<: *laravel-env
+      # Hanya container ini yang boleh menjalankan migrasi; worker dan
+      # scheduler memakai image yang sama tapi tidak ikut migrate.
+      RUN_MIGRATIONS: "true"
+    volumes:
+      - laravel_public:/var/www/html/public
+      - laravel_storage:/var/www/html/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 768m
+    networks: [internal]
+
+  worker:
+    image: smarttracer-backend:latest
+    restart: unless-stopped
+    environment:
+      <<: *laravel-env
+      RUN_MIGRATIONS: "false"
+    volumes:
+      - laravel_storage:/var/www/html/storage
+    depends_on:
+      app:
+        condition: service_started
+    # timeout 900 detik karena RunEtlJob memuat ulang seluruh star schema;
+    # tries=1 supaya ETL yang gagal separuh jalan tidak diulang otomatis --
+    # perbaiki dulu penyebabnya, lalu jalankan ulang manual.
+    command: php artisan queue:work --tries=1 --timeout=900 --sleep=3 --max-jobs=100
+    # 2 GB karena RunEtlJob memuat seluruh star schema dalam satu proses PHP
+    # (lihat memory_limit di docker/php.ini). Ini plafon, bukan cadangan --
+    # container idle tetap memakai puluhan MB. Tapi di VPS 2 GB, ETL mingguan
+    # akan menyentuh swap; itu alasan terkuat untuk naik ke 4 GB.
+    mem_limit: 2g
+    networks: [internal]
+
+  scheduler:
+    image: smarttracer-backend:latest
+    restart: unless-stopped
+    environment:
+      <<: *laravel-env
+      RUN_MIGRATIONS: "false"
+    volumes:
+      - laravel_storage:/var/www/html/storage
+    depends_on:
+      app:
+        condition: service_started
+    # schedule:work adalah pengganti bawaan Laravel untuk cron; ia sendiri
+    # yang menahan diri sampai menit berikutnya. Jadwal nyatanya (ETL mingguan
+    # Senin 01:00) ada di routes/console.php.
+    command: php artisan schedule:work
+    # schedule:work menjalankan etl:run sebagai proses anak di container INI,
+    # bukan lewat queue -- jadi plafonnya harus sebesar worker, bukan 256m.
+    mem_limit: 2g
+    networks: [internal]
+
+  # --- Frontend dan edge -------------------------------------------------
+  fe:
+    build:
+      context: ../../fe-tracer-study
+      dockerfile: Dockerfile
+      args:
+        # Relatif, bukan absolut: FE dan API dilayani dari domain yang sama
+        # lewat nginx edge, sehingga tidak ada CORS dan tidak perlu build
+        # ulang saat domain berubah.
+        VITE_API_URL: /api
+        VITE_INSTITUTION_NAME: ${VITE_INSTITUTION_NAME}
+        VITE_INSTITUTION_SHORT_NAME: ${VITE_INSTITUTION_SHORT_NAME}
+        VITE_INSTITUTION_DOMAIN: ${VITE_INSTITUTION_DOMAIN}
+        VITE_INSTITUTION_APP_DOMAIN: ${VITE_INSTITUTION_APP_DOMAIN}
+        VITE_INSTITUTION_EMAIL: ${VITE_INSTITUTION_EMAIL}
+        VITE_INSTITUTION_PHONE: ${VITE_INSTITUTION_PHONE}
+        VITE_INSTITUTION_ADDRESS: ${VITE_INSTITUTION_ADDRESS}
+        VITE_INSTITUTION_UNIT: ${VITE_INSTITUTION_UNIT}
+    image: smarttracer-fe:latest
+    restart: unless-stopped
+    mem_limit: 128m
+    networks: [internal]
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # Read-only: nginx hanya menyajikan berkas statis Laravel, tidak menulis.
+      - laravel_public:/var/www/html/public:ro
+    depends_on:
+      - app
+      - fe
+    mem_limit: 128m
+    networks: [internal]
+
+volumes:
+  pgdata:
+  laravel_public:
+  laravel_storage:
+
+networks:
+  internal:
+    driver: bridge
