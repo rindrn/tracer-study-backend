@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -35,7 +36,56 @@ class AppServiceProvider extends ServiceProvider
         // Override Sanctum agar token disimpan di koneksi oltp
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
+        $this->configureRoutePatterns();
         $this->configureRateLimiting();
+    }
+
+    /**
+     * Parameter rute ber-id wajib berupa angka.
+     *
+     * Laravel selalu mengoper segmen URL sebagai string, sementara seluruh
+     * controller sumber daya di aplikasi ini mengetik parameternya sebagai
+     * int (ProgramController::show(int $id) dan 14 controller lain). Selama
+     * nilainya numerik PHP mengubahnya diam-diam dan semuanya aman; begitu
+     * segmennya tidak numerik konversi gagal dan PHP melempar TypeError.
+     *
+     * TypeError bukan turunan HttpException, jadi Laravel tidak punya jalur
+     * penanganan khusus untuknya dan galat itu lolos sebagai 500 — padahal
+     * yang terjadi sebenarnya cuma "id tidak valid", yang seharusnya 404.
+     * Dampaknya dua: monitoring melihat 5xx untuk sesuatu yang bukan
+     * kerusakan server, dan bila APP_DEBUG keliru menyala di server, jejak
+     * tumpukannya ikut membocorkan struktur direktori beserta potongan kode.
+     *
+     * Dipasang sebagai pola global, bukan ->whereNumber() satu per satu,
+     * karena ada 62 rute berparameter dan menambahkannya per rute berarti
+     * setiap rute baru harus ingat melakukannya — persis jenis kedisiplinan
+     * yang akan terlewat. Dengan pola ini rute tidak cocok untuk id
+     * non-numerik, sehingga Laravel sendiri yang membalas 404 tanpa
+     * controller tersentuh.
+     *
+     * SELURUH nama parameter didaftarkan, bukan 'id' saja. Empat apiResource
+     * (questionnaires, users, thresholds, alumni) menamai parameternya
+     * mengikuti nama sumber daya — {threshold}, {user}, {questionnaire},
+     * {alumnus} — dan itu MUDAH disangka route model binding yang sudah aman
+     * dengan sendirinya. Bukan: controllernya tetap mengetik int $id, jadi
+     * rute-rute itu tetap 500 kalau hanya 'id' yang dibatasi. Sisanya
+     * ({alumniId}, {lamId}, {idProvinsi}, {role}, {tahun}) menyusul dengan
+     * alasan sama; {tahun} pun selalu angka.
+     *
+     * ->whereNumber('id') yang sudah ada di lima rute publik dibiarkan: kini
+     * mubazir, tapi menyatakan maksudnya secara eksplisit di tempat yang
+     * paling terbuka.
+     */
+    private function configureRoutePatterns(): void
+    {
+        $numerik = [
+            'id', 'alumniId', 'alumnus', 'idProvinsi', 'lamId',
+            'questionnaire', 'role', 'tahun', 'threshold', 'user',
+        ];
+
+        foreach ($numerik as $parameter) {
+            Route::pattern($parameter, '[0-9]+');
+        }
     }
 
     /**
