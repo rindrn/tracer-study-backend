@@ -693,6 +693,11 @@ class AlumniProfileRepository
                 'responses.id as response_id',
                 'programs.name as program_name',
                 'programs.code as program_code',
+                // Kode prodi versi PDDIKTI, dipakai MinistrySheetExport saat
+                // format=code: portal Kementerian tidak mengenal singkatan
+                // internal seperti "TKG". Tanpa kolom ini ekspor kode mentah
+                // mati dengan "Undefined property: $program_dikti_code".
+                'programs.dikti_code as program_dikti_code',
                 'programs.jurusan as jurusan_name',
             )
             ->orderBy('alumni_profiles.id');
