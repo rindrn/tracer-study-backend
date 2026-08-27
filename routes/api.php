@@ -287,9 +287,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('threshold-indicators/{id}', [ThresholdIndicatorController::class, 'update']);
 
         // Thresholds
-        Route::post('thresholds',        [ThresholdController::class, 'store']);
-        Route::put('thresholds/{id}',    [ThresholdController::class, 'update']);
-        Route::delete('thresholds/{id}', [ThresholdController::class, 'destroy']);
+        // DINONAKTIFKAN: tiga rute single-item di bawah memanggil
+        // ThresholdService::create/update/delete yang tidak pernah ada, jadi selalu 500.
+        // Threshold dikelola per-versi lewat endpoint bulk di bawahnya (itu yang dipakai frontend).
+        // Route::post('thresholds',        [ThresholdController::class, 'store']);
+        // Route::put('thresholds/{id}',    [ThresholdController::class, 'update']);
+        // Route::delete('thresholds/{id}', [ThresholdController::class, 'destroy']);
         Route::post('lam-versions/{id}/thresholds/bulk', [ThresholdController::class, 'bulkStore']);
         Route::put('lam-versions/{id}/thresholds/bulk',  [ThresholdController::class, 'bulkUpdate']);
 
@@ -369,7 +372,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('approvals/request-delete', [ApprovalController::class, 'requestDelete']);
 
         // Thresholds
-        Route::apiResource('thresholds', ThresholdController::class);
+        // DINONAKTIFKAN: apiResource ini menduplikasi store/update/destroy yang
+        // sudah didaftarkan manual di grup role:head_tracer, sekaligus memunculkan
+        // rute index & show yang metode service-nya belum ada
+        // (ThresholdService tidak punya list/show/update/delete) sehingga selalu 500.
+        // Pembacaan threshold dilayani lewat lam-versions/{id}/thresholds (byVersion)
+        // dan dashboard/thresholds (forChart).
+        // Route::apiResource('thresholds', ThresholdController::class);
     });
 
     // ── Pemohon persetujuan (tracer_team, kaprodi) ───────────────────────

@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\RoleAccessMiddleware;
 use App\Exceptions\BusinessException;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -46,6 +47,31 @@ return Application::configure(basePath: dirname(__DIR__))
                 'message' => 'Validasi gagal.',
                 'errors'  => $e->errors(),
             ], 422);
+        });
+
+        // Pelanggaran foreign key (SQLSTATE 23503) → 409, bukan 500.
+        //
+        // Dua kejadian yang sah secara operasional tapi selama ini bocor sebagai
+        // 500 lengkap dengan stack trace dan SQL mentahnya:
+        //   - menghapus baris induk yang masih dirujuk tabel lain
+        //     (mis. DELETE /provinces/{id} yang masih dipakai ref_ump), dan
+        //   - menyimpan baris dengan id rujukan yang tidak ada
+        //     (mis. POST /stakeholder-contacts dengan alumni_id asing).
+        // Keduanya konflik keadaan data, jadi 409 dengan pesan yang bisa
+        // ditampilkan apa adanya di frontend.
+        $exceptions->render(function (QueryException $e, $request) {
+            if (($e->errorInfo[0] ?? null) !== '23503') {
+                return null; // galat query lain tetap lewat penanganan bawaan
+            }
+
+            $penghapusan = str_contains(strtolower($e->getMessage()), 'update or delete on table');
+
+            return response()->json([
+                'success' => false,
+                'message' => $penghapusan
+                    ? 'Data ini masih dipakai oleh data lain, jadi tidak bisa dihapus. Lepaskan atau hapus dulu keterkaitannya.'
+                    : 'Data rujukan yang dipilih tidak ditemukan. Muat ulang halaman lalu pilih ulang.',
+            ], 409);
         });
 
         // BusinessException → JSON dengan HTTP code sesuai $e->getCode().

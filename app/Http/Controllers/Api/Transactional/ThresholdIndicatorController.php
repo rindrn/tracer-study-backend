@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Validators\ThresholdIndicatorValidator;
 use App\Services\Transactional\ThresholdIndicatorService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ThresholdIndicatorController extends Controller
 {
     public function __construct(
-        private readonly ThresholdIndicatorService $service,
+        private readonly ThresholdIndicatorService   $service,
+        private readonly ThresholdIndicatorValidator $validator,
     ) {}
 
     // GET /api/threshold-indicators

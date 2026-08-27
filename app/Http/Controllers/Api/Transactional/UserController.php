@@ -18,6 +18,14 @@ class UserController extends Controller
         return response()->json(['success' => true, 'data' => $users]);
     }
 
+    // GET /api/users/{id} -- dipakai oleh Route::apiResource('users', ...)
+    public function show(int $id): JsonResponse
+    {
+        $user = User::with(['program', 'jurusanEntity', 'fakultas'])->findOrFail($id);
+
+        return response()->json(['success' => true, 'data' => $this->formatUser($user)]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
