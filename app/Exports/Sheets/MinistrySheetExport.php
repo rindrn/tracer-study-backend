@@ -181,7 +181,7 @@ class MinistrySheetExport extends DefaultValueBinder implements FromQuery, WithH
             // belum diisi di master data -- lebih baik kode yang salah tapi
             // terlacak daripada kolom kosong yang membuang barisnya.
             $this->rawCode
-                ? ($alumni->program_dikti_code ?: $alumni->program_code ?: '-')
+                ? (($alumni->program_dikti_code ?? null) ?: $alumni->program_code ?: '-')
                 : ($alumni->program_code ?? '-'),
             $alumni->nim ?: '-',
             $alumni->name,
@@ -258,21 +258,37 @@ class MinistrySheetExport extends DefaultValueBinder implements FromQuery, WithH
 
     /**
      * Tanpa ini semua kolom pakai lebar default (~8 karakter), sehingga
-     * header pertanyaan terpotong dan sheet tidak terbaca. Kolom pertanyaan
-     * sengaja dipatok 32 (bukan auto-size): auto-size akan melebarkan kolom
-     * mengikuti header sepanjang 80 karakter, dan 76 kolom selebar itu
-     * justru lebih tidak terbaca.
+     * header pertanyaan terpotong dan sheet tidak terbaca.
+     *
+     * Lebarnya beda per format, karena isi headernya beda jauh:
+     *
+     *   - format=label -> header berisi teks pertanyaan (dipotong 80
+     *     karakter) yang dibungkus wrap. Kolom pertanyaan dipatok 32 --
+     *     bukan auto-size, karena auto-size akan melebarkan 76 kolom
+     *     mengikuti teks sepanjang 80 karakter dan justru tak terbaca.
+     *   - format=code  -> header cuma question_code telanjang ("f8",
+     *     "f1774"), paling panjang 6 karakter. Kolom selebar 32 di sini
+     *     menyisakan ruang kosong berhektar-hektar; 9 sudah cukup untuk
+     *     kode DAN nilai jawabannya yang berupa angka satu-dua digit.
+     *     Kolom identitas juga ikut dirampingkan sepas isinya.
      */
     public function columnWidths(): array
     {
-        $widths = [
-            'A' => 10, 'B' => 12, 'C' => 18, 'D' => 30, 'E' => 16,
-            'F' => 28, 'G' => 12, 'H' => 20, 'I' => 20,
-        ];
+        $widths = $this->rawCode
+            ? [
+                'A' => 9,  'B' => 11, 'C' => 14, 'D' => 26, 'E' => 15,
+                'F' => 24, 'G' => 12, 'H' => 18, 'I' => 18,
+            ]
+            : [
+                'A' => 10, 'B' => 12, 'C' => 18, 'D' => 30, 'E' => 16,
+                'F' => 28, 'G' => 12, 'H' => 20, 'I' => 20,
+            ];
+
+        $questionWidth = $this->rawCode ? 9 : 32;
 
         $firstQuestionColumn = count(self::IDENTITY_HEADERS);
         foreach (array_keys(self::MINISTRY_QUESTION_CODES) as $i) {
-            $widths[ColumnLetter::at($firstQuestionColumn + $i)] = 32;
+            $widths[ColumnLetter::at($firstQuestionColumn + $i)] = $questionWidth;
         }
 
         return $widths;
@@ -284,15 +300,28 @@ class MinistrySheetExport extends DefaultValueBinder implements FromQuery, WithH
 
         $header = $sheet->getStyle("A1:{$lastColumn}1");
         $header->getFont()->setBold(true);
-        $header->getAlignment()
-            ->setWrapText(true)
-            ->setVertical(Alignment::VERTICAL_TOP);
+        $header->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
 
-        $sheet->getRowDimension(1)->setRowHeight(75);
+        if ($this->rawCode) {
+            // Header di mode ini cuma question_code sebaris ("f8", "f502"),
+            // jadi wrap text dan baris setinggi 75pt cuma menyisakan kotak
+            // kosong raksasa di atas sheet. Tinggi baris dikembalikan ke
+            // otomatis (-1) supaya mengikuti satu baris teks saja.
+            $sheet->getRowDimension(1)->setRowHeight(-1);
 
-        // Bekukan header DAN 4 kolom identitas (Kode PT s/d Nama), supaya
-        // saat digulir ke kanan masih terlihat baris ini milik siapa.
-        $sheet->freezePane('E2');
+            // Hanya baris header yang dibekukan. Membekukan kolom identitas
+            // memasang garis pemisah tebal setelah kolom Nama dan membuat
+            // empat kolom pertama seolah terblok; berkas ini toh ditujukan
+            // untuk diunggah ke portal, bukan ditelusuri manual ke kanan.
+            $sheet->freezePane('A2');
+        } else {
+            $header->getAlignment()->setWrapText(true);
+            $sheet->getRowDimension(1)->setRowHeight(75);
+
+            // Bekukan header DAN 4 kolom identitas (Kode PT s/d Nama), supaya
+            // saat digulir ke kanan masih terlihat baris ini milik siapa.
+            $sheet->freezePane('E2');
+        }
 
         $sheet->setAutoFilter("A1:{$lastColumn}1");
 
