@@ -42,7 +42,28 @@ class AlumniImport implements ToCollection, WithHeadingRow, WithMultipleSheets
     {
         $validRows = [];
 
-        $programCodes = DB::connection('oltp')->table('programs')->pluck('id', 'code')->toArray();
+        // Satu peta untuk DUA jenis kode. Kolom "Kode PDDIKTI/Prodi" di
+        // templat menerima kode PDDIKTI (mis. 24301) maupun singkatan
+        // internal kampus (mis. TKPB): berkas alumni datang dari dua arah --
+        // salinan data PDDIKTI dan ekspor sistem ini sendiri -- dan memaksa
+        // satu bentuk saja berarti salah satunya harus disalin ulang kolom
+        // per kolom sebelum bisa diunggah.
+        //
+        // Kunci diseragamkan huruf besar supaya "tkpb" ikut dikenali. Kode
+        // internal ditulis BELAKANGAN, jadi bila ada kode PDDIKTI milik prodi
+        // lain yang kebetulan sama persis, kode internal yang menang.
+        $programs = DB::connection('oltp')->table('programs')->select('id', 'code', 'dikti_code')->get();
+
+        $programCodes = [];
+        foreach ($programs as $p) {
+            $dikti = strtoupper(trim((string) $p->dikti_code));
+            if ($dikti !== '') {
+                $programCodes[$dikti] = $p->id;
+            }
+        }
+        foreach ($programs as $p) {
+            $programCodes[strtoupper(trim((string) $p->code))] = $p->id;
+        }
         $existingNims = DB::connection('oltp')->table('alumni_profiles')->pluck('nim')->toArray();
 
         foreach ($rows as $index => $row) {
@@ -67,7 +88,11 @@ class AlumniImport implements ToCollection, WithHeadingRow, WithMultipleSheets
                 'email'      => trim($row['surel'] ?? $row['email'] ?? ''),
                 'phone'      => trim($row['no_hp'] ?? $row['telepon'] ?? ''),
                 'graduation_year' => $row['tahun_lulus'] ?? null,
-                'kode_prodi' => trim($row['kode_prodi'] ?? ''),
+                // Judul kolomnya kini "Kode PDDIKTI/Prodi" -- WithHeadingRow
+                // menyulapnya jadi kunci 'kode_pddiktiprodi'. Nama lama tetap
+                // dibaca supaya templat yang sudah beredar tidak mendadak
+                // kehilangan kolom prodinya.
+                'kode_prodi' => trim($row['kode_pddiktiprodi'] ?? $row['kode_prodi'] ?? ''),
                 'kode_pt'    => trim($row['kode_pt'] ?? ''),
                 'nik'        => trim($row['nik'] ?? ''),
                 'npwp'       => trim($row['npwp'] ?? ''),
@@ -93,8 +118,10 @@ class AlumniImport implements ToCollection, WithHeadingRow, WithMultipleSheets
                 continue;
             }
 
-            if (!isset($programCodes[$data['kode_prodi']])) {
-                $this->errors[] = "Baris {$rowNum}: Kode Prodi '{$data['kode_prodi']}' tidak valid.";
+            $kodeProdi = strtoupper($data['kode_prodi']);
+            if (!isset($programCodes[$kodeProdi])) {
+                $this->errors[] = "Baris {$rowNum}: Kode PDDIKTI/Prodi '{$data['kode_prodi']}' tidak dikenali. "
+                    . "Lihat lembar Referensi Kode Prodi di templat.";
                 continue;
             }
 
@@ -110,7 +137,7 @@ class AlumniImport implements ToCollection, WithHeadingRow, WithMultipleSheets
                 'email'           => $data['email'] ?: null,
                 'phone'           => $this->normalizePhone($data['phone']),
                 'graduation_year' => $data['graduation_year'] ? (int) $data['graduation_year'] : null,
-                'program_id'      => $programCodes[$data['kode_prodi']],
+                'program_id'      => $programCodes[$kodeProdi],
                 'kode_pt'         => $data['kode_pt'] ?: null,
                 'nik'             => $data['nik'] ?: null,
                 'npwp'            => $data['npwp'] ?: null,

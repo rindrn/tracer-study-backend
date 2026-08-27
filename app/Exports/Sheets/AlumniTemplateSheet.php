@@ -24,14 +24,16 @@ class AlumniTemplateSheet implements FromCollection, WithHeadings, WithTitle, Wi
      * ke kementerian dan berkas yang diimpor kembali sebangun (DATA-03).
      *
      * Program Studi dan Jurusan menyusul di belakang sebagai kolom bantu
-     * pembaca: importir tidak memakainya, prodi ditentukan oleh Kode Prodi.
+     * pembaca: importir tidak memakainya, prodi ditentukan oleh kolom
+     * Kode PDDIKTI/Prodi -- yang menerima kode PDDIKTI maupun singkatan
+     * internal kampus (lihat AlumniImport::collection()).
      *
      * Kolom Status dihapus — seluruh alumni hasil impor otomatis aktif.
      */
     public function headings(): array
     {
         return [
-            'Kode PT', 'Kode Prodi', 'NIM', 'Nama', 'No. HP', 'Surel',
+            'Kode PT', 'Kode PDDIKTI/Prodi', 'NIM', 'Nama', 'No. HP', 'Surel',
             'Tahun Lulus', 'NIK', 'NPWP',
             'Program Studi', 'Jurusan',
         ];
@@ -40,7 +42,7 @@ class AlumniTemplateSheet implements FromCollection, WithHeadings, WithTitle, Wi
     public function columnWidths(): array
     {
         return [
-            'A' => 12, 'B' => 14, 'C' => 20, 'D' => 32, 'E' => 18, 'F' => 32,
+            'A' => 12, 'B' => 20, 'C' => 20, 'D' => 32, 'E' => 18, 'F' => 32,
             'G' => 14, 'H' => 22, 'I' => 22,
             'J' => 36, 'K' => 28,
         ];
