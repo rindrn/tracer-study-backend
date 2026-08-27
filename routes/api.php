@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\Analytical\EtlAnomalyLogController;
 // ini tanpa menulis FQCN panjang di setiap baris route.
 use App\Http\Controllers\Api\PublicAccess\PublicReportController as PublicReportViewController;
 use App\Http\Controllers\Api\PublicAccess\PublicStatisticsController;
+use App\Http\Controllers\Api\PublicAccess\PrivacyNoticeController;
 use App\Http\Controllers\Api\Admin\PublicReportController;
 use App\Http\Controllers\Api\Admin\PublicDisplaySettingController;
 use App\Http\Controllers\Api\Admin\AuditLogController;
@@ -91,6 +92,10 @@ Route::prefix('public')->group(function () {
 
     Route::get('statistics/years',    [PublicStatisticsController::class, 'years']);
     Route::get('statistics/progress', [PublicStatisticsController::class, 'progress']);
+
+    // Versi dan masa simpan yang tercantum di halaman Kebijakan Privasi.
+    // Publik dengan sengaja -- lihat PrivacyNoticeController.
+    Route::get('privacy-notice', [PrivacyNoticeController::class, 'show']);
 });
 
 // Unduhan CSV referensi kode (provinsi, kab/kota, prodi). Publik karena dibuka
