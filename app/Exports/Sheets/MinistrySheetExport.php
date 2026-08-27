@@ -34,7 +34,8 @@ use App\Support\PersonalData;
  *     ("Bekerja", "Sangat Tinggi", "Ya"), lihat AnswerValueResolver.
  *   - format=code            -> nilai ditampilkan mentah apa adanya
  *     ("1", "5", "0"), format yang dibutuhkan kalau file ini mau diunggah
- *     ke portal Kementerian.
+ *     ke portal Kementerian. Di mode ini header kolom pertanyaan juga
+ *     ikut jadi question_code telanjang -- lihat headings().
  *
  * Sebelumnya kode mentah dipilih otomatis untuk role head_tracer. Aturan
  * itu dibuang: role tidak bisa menebak apakah file mau dibaca manusia atau
@@ -115,8 +116,15 @@ class MinistrySheetExport extends DefaultValueBinder implements FromQuery, WithH
          *  question_code yang sama ada di beberapa questionnaire dengan
          *  metadata berbeda -- lihat QuestionnaireRepository::getQuestionMetaByCode(). */
         private readonly array $sourceQuestionnaireIds = [],
+        /** true = berkas ditujukan untuk diunggah ke portal Kementerian,
+         *  bukan dibaca manusia. Selain nilainya (lihat $valueResolver),
+         *  HEADER-nya juga ikut berubah jadi question_code telanjang --
+         *  lihat headings(). */
+        private readonly bool $rawCode = false,
     ) {
-        $this->questionLabels = $this->buildQuestionLabels();
+        // Di mode kode mentah header tidak memakai question_text sama
+        // sekali, jadi query metadata pertanyaan tidak perlu dijalankan.
+        $this->questionLabels = $rawCode ? [] : $this->buildQuestionLabels();
     }
 
     public function query(): Builder
@@ -168,7 +176,13 @@ class MinistrySheetExport extends DefaultValueBinder implements FromQuery, WithH
 
         $row = [
             $alumni->kode_pt ?? '-',
-            $alumni->program_code ?? '-',
+            // Portal Kementerian mencocokkan prodi dari kode PDDIKTI, bukan
+            // singkatan internal. Fallback ke program_code kalau dikti_code
+            // belum diisi di master data -- lebih baik kode yang salah tapi
+            // terlacak daripada kolom kosong yang membuang barisnya.
+            $this->rawCode
+                ? ($alumni->program_dikti_code ?: $alumni->program_code ?: '-')
+                : ($alumni->program_code ?? '-'),
             $alumni->nim ?: '-',
             $alumni->name,
             $alumni->phone ?: '-',
@@ -211,9 +225,25 @@ class MinistrySheetExport extends DefaultValueBinder implements FromQuery, WithH
         return parent::bindValue($cell, $value);
     }
 
+    /**
+     * Kepala kolom mengikuti tujuan berkasnya:
+     *
+     *   - format=label -> "{teks pertanyaan} ({kode})", supaya sheet bisa
+     *     dibaca tanpa membuka kamus kode.
+     *   - format=code  -> question_code TELANJANG ("f8", "f502", ...).
+     *     Portal Kementerian mencocokkan kolom dari kode ini; teks
+     *     pertanyaan berkurung tidak dikenali importir-nya.
+     *
+     * Kolom identitas di depan TIDAK ikut berubah: namanya bukan
+     * question_code, jadi tidak ada bentuk "telanjang" yang bisa dipakai.
+     */
     public function headings(): array
     {
         $headers = self::IDENTITY_HEADERS;
+
+        if ($this->rawCode) {
+            return array_merge($headers, self::MINISTRY_QUESTION_CODES);
+        }
 
         foreach (self::MINISTRY_QUESTION_CODES as $code) {
             $text = $this->questionLabels[$code] ?? $code;

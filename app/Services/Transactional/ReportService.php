@@ -129,6 +129,7 @@ class ReportService
                 $this->questionnaireRepo,
                 $this->buildValueResolver(MinistrySheetExport::MINISTRY_QUESTION_CODES, $ministryQnrIds, $rawCode),
                 $ministryQnrIds,
+                $rawCode,
             );
         }
 

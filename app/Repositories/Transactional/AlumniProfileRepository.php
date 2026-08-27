@@ -264,6 +264,12 @@ class AlumniProfileRepository
                 // bukan nama program studi, sehingga tanpa kolom ini berkas
                 // ekspor tidak akan pernah bisa diunggah kembali.
                 'programs.code as program_code',
+                // Kode prodi versi PDDIKTI (5 digit angka). Dipakai HANYA oleh
+                // ekspor format=code yang berkasnya diunggah ke portal
+                // Kementerian -- portal tidak mengenal singkatan internal
+                // seperti "TKG". Mode label tetap memakai programs.code supaya
+                // berkasnya bisa diimpor balik lewat templat impor alumni.
+                'programs.dikti_code as program_dikti_code',
             )
             ->selectRaw($statusSql, array_merge($globalQnrIds, $globalQnrIds));
 
