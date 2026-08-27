@@ -21,19 +21,24 @@ class ProgramService
     {
         $key = 'programs:list:' . ($includeInactive ? '1' : '0') . ':' . ($degree ?? 'all');
 
+        // Tag WAJIB: key daftar bercabang per (includeInactive, degree),
+        // jadi tidak ada satu nama key yang bisa di-forget() satu per satu
+        // setelah prodi berubah. Tanpa tag, forgetTag('programs') di
+        // create/update/destroy tidak menyentuh key ini sama sekali dan
+        // daftar prodi tetap menampilkan kode lama sampai TTL habis.
         return $this->remember($key, function () use ($includeInactive, $degree) {
             return $this->repo
                 ->all($includeInactive, $degree)
                 ->map(fn($p) => ProgramResponseDTO::fromModel($p)->toArray())
                 ->toArray();
-        }, self::TTL);
+        }, self::TTL, ['programs']);
     }
 
     public function show(int $id): ProgramResponseDTO
     {
         $program = $this->remember("programs:show:{$id}", function () use ($id) {
             return $this->repo->findById($id);
-        }, self::TTL);
+        }, self::TTL, ['programs']);
 
         if (! $program) {
             throw new BusinessException("Program ID {$id} tidak ditemukan.", 404);
@@ -77,7 +82,8 @@ class ProgramService
             'accredited_until' => $validated['accredited_until'] ?? $program->accredited_until,
         ]);
 
-        $this->forget("programs:show:{$id}");
+        // Cukup forgetTag: key show sekarang bertag 'programs', dan forget()
+        // polos tidak menyentuh key yang disimpan di namespace tag.
         $this->forgetTag('programs');
 
         return ProgramResponseDTO::fromModel($updated);
@@ -98,7 +104,6 @@ class ProgramService
 
         $this->repo->deactivate($program);
 
-        $this->forget("programs:show:{$id}");
         $this->forgetTag('programs');
     }
 }
