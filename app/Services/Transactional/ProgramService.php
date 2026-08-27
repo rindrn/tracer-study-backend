@@ -46,11 +46,26 @@ class ProgramService
         return ProgramResponseDTO::fromModel($program);
     }
 
+    /**
+     * Kode PDDIKTI dirapikan seragam sebelum disimpan: spasi di ujung dibuang
+     * dan isian kosong dijadikan null. Tanpa ini string kosong dari form
+     * tersimpan apa adanya, dan ekspor format=code mengira kodenya ADA lalu
+     * mengirim sel kosong ke portal alih-alih jatuh ke kode internal.
+     */
+    private function normalizeDiktiCode(?string $value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
+    }
+
     public function create(array $validated): ProgramResponseDTO
     {
         $program = $this->repo->create([
-            'name'      => $validated['name'],
-            'code'      => strtoupper($validated['code']),
+            'name'       => $validated['name'],
+            'code'       => strtoupper($validated['code']),
+            'dikti_code' => $this->normalizeDiktiCode($validated['dikti_code'] ?? null),
+            'jurusan'    => $validated['jurusan'] ?? null,
             'degree'    => $validated['degree'],
             'is_active' => $validated['is_active'] ?? true,
             'accreditation'    => $validated['accreditation'] ?? null,
@@ -72,6 +87,15 @@ class ProgramService
         $updated = $this->repo->update($program, [
             'name'      => $validated['name'],
             'code'      => strtoupper($validated['code']),
+            // array_key_exists, bukan ??: mengosongkan kode PDDIKTI berarti
+            // mengirim null secara sengaja, dan itu harus tersimpan. Kunci
+            // yang memang tidak dikirim baru mempertahankan nilai lama.
+            'dikti_code' => array_key_exists('dikti_code', $validated)
+                ? $this->normalizeDiktiCode($validated['dikti_code'])
+                : $program->dikti_code,
+            'jurusan'   => array_key_exists('jurusan', $validated)
+                ? $validated['jurusan']
+                : $program->jurusan,
             'degree'    => $validated['degree'],
             'is_active' => $validated['is_active'] ?? $program->is_active,
             // ?? mempertahankan nilai lama saat kunci tidak dikirim; itu yang
