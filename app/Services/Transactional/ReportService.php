@@ -64,7 +64,7 @@ class ReportService
      * @param string|null $jurusan TIDAK LAGI DIPAKAI -- dipertahankan hanya
      *             supaya signature tetap kompatibel dengan ReportController
      *             yang masih boleh mengirim param `jurusan` lama. Scope
-     *             Kajur & Ketua Fakultas sekarang murni dari
+     *             Kajur & Dekan sekarang murni dari
      *             User::scopedProgramIds() (keanggotaan FK eksplisit),
      *             sehingga keduanya langsung mengekspor data gabungan
      *             seluruh prodi dalam cakupannya tanpa perlu memilih satu
@@ -77,7 +77,7 @@ class ReportService
         bool $rawCode = false,
         ?string $jurusan = null,
     ): TracerStudyMultiSheetExport {
-        $programIdIn = ($user->isKajur() || $user->isKetuaFakultas()) ? $user->scopedProgramIds() : null;
+        $programIdIn = ($user->isKajur() || $user->isDekan()) ? $user->scopedProgramIds() : null;
         if ($programIdIn !== null && empty($programIdIn)) {
             $label = $user->isKajur() ? 'jurusan' : 'fakultas';
             abort(403, "Akun ini belum memiliki {$label} dengan prodi yang di-assign. Hubungi pengelola.");
@@ -104,7 +104,7 @@ class ReportService
                 'format'           => $rawCode ? 'code' : 'label',
                 'scope'            => $user->isKaprodi()
                     ? 'prodi'
-                    : ($user->isKajur() || $user->isKetuaFakultas() ? 'jurusan' : 'institusi'),
+                    : ($user->isKajur() || $user->isDekan() ? 'jurusan' : 'institusi'),
             ],
         ]);
 

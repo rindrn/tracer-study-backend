@@ -279,7 +279,7 @@ class ResponseRateRepository
         // `id_prodi_in` didahulukan karena ia cakupan sesungguhnya: satu
         // daftar program_id dari keanggotaan FK. Penyaring teks `jurusan`
         // hanya menampung SATU nama, jadi tidak pernah bisa menyatakan
-        // cakupan Ketua Fakultas yang membawahi beberapa jurusan sekaligus.
+        // cakupan Dekan yang membawahi beberapa jurusan sekaligus.
         // Keduanya dipasang bila sama-sama ada: id_prodi_in batas cakupan,
         // `jurusan` penyempit pilihan pengguna di dalamnya.
         if ($idProdiIn !== null && $idProdiIn !== []) {

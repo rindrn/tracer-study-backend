@@ -216,7 +216,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('jurusans/{id}', [JurusanController::class, 'destroy']);
         Route::put('jurusans/{id}/programs', [JurusanController::class, 'syncPrograms']);
 
-        // Fakultas CRUD + keanggotaan jurusan (redesain scope Ketua Fakultas).
+        // Fakultas CRUD + keanggotaan jurusan (redesain scope Dekan).
         // Pembacaannya ada di kelompok data viewer -- dipakai dropdown
         // Fakultas di form Kelola Staff.
         Route::post('fakultas',              [FakultasController::class, 'store']);

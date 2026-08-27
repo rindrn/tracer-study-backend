@@ -64,7 +64,7 @@ class UserSeeder extends Seeder
             ]);
         }
 
-        // ── 6. Ketua Fakultas — 1 akun demo, fakultas dibuat mencakup 2-3
+        // ── 6. Dekan — 1 akun demo, fakultas dibuat mencakup 2-3
         //      jurusan pertama lewat fakultas_jurusan_scopes ──────────────
         $fakultasScopeNames = $jurusanList->take(3);
         if ($fakultasScopeNames->isNotEmpty()) {
@@ -72,8 +72,8 @@ class UserSeeder extends Seeder
             $jurusanIds = Jurusan::whereIn('name', $fakultasScopeNames)->pluck('id');
             $fakultas->jurusans()->sync($jurusanIds);
 
-            User::updateOrCreate(['email' => 'ketua.fakultas@test.com'], [
-                'name' => 'Ketua Fakultas Demo', 'role' => User::ROLE_KETUA_FAKULTAS,
+            User::updateOrCreate(['email' => 'dekan@test.com'], [
+                'name' => 'Dekan Demo', 'role' => User::ROLE_DEKAN,
                 'program_id' => null, 'jurusan' => null,
                 'fakultas_id' => $fakultas->id, 'password' => $pw,
             ]);

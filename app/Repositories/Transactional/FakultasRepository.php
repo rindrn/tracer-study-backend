@@ -81,7 +81,7 @@ class FakultasRepository
      * Ganti seluruh keanggotaan jurusan fakultas ini (hapus lalu insert ulang).
      *
      * Dibungkus transaksi: tanpa ini, kegagalan di tengah insert meninggalkan
-     * keanggotaan KOSONG -- setiap Ketua Fakultas yang bergantung pada
+     * keanggotaan KOSONG -- setiap Dekan yang bergantung pada
      * fakultas ini kehilangan seluruh cakupannya secara diam-diam.
      */
     public function syncJurusans(int $fakultasId, array $jurusanIds): void

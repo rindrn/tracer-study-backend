@@ -18,7 +18,7 @@ class FakultasController extends Controller
      *
      * Terbuka untuk seluruh peran yang sudah masuk (sama seperti
      * JurusanController::index) -- mengisi dropdown Fakultas di form
-     * Kelola Staff untuk role ketua_fakultas.
+     * Kelola Staff untuk role dekan.
      */
     public function index(): JsonResponse
     {

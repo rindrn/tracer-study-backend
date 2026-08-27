@@ -15,11 +15,11 @@ class ResponseAuthDTO
         public readonly ?string $jurusan,
         /** Nama Jurusan entity yang dipimpin (role kajur); null untuk role lain. */
         public readonly ?string $jurusanName,
-        /** Nama Fakultas entity yang dipimpin (role ketua_fakultas); null untuk role lain. */
+        /** Nama Fakultas entity yang dipimpin (role dekan); null untuk role lain. */
         public readonly ?string $fakultasName,
         /**
          * Nama-nama Jurusan anggota fakultas yang dipimpin (role
-         * ketua_fakultas); array kosong untuk role lain. Dashboard Cube.js
+         * dekan); array kosong untuk role lain. Dashboard Cube.js
          * (Overview/Employment/Education/KPI) masih mewajibkan Ketua
          * Fakultas memilih SATU jurusan dari daftar ini sebelum melihat
          * data -- lihat catatan kompatibilitas di

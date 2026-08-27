@@ -66,7 +66,7 @@ class AdminAlumniService
     public function getStats(User $user, ?int $graduationYear = null): array
     {
         $programId   = $user->isKaprodi() ? $user->program_id : null;
-        $programIdIn = ($user->isKajur() || $user->isKetuaFakultas()) ? $user->scopedProgramIds() : null;
+        $programIdIn = ($user->isKajur() || $user->isDekan()) ? $user->scopedProgramIds() : null;
 
         $stats = $this->alumniRepo->countStatsByProgram($programId, $graduationYear, $programIdIn);
 
@@ -279,7 +279,7 @@ class AdminAlumniService
     /**
      * Tambahkan filter scope berdasarkan role user.
      *
-     * Kajur & Ketua Fakultas dibatasi lewat `program_id_in` (daftar
+     * Kajur & Dekan dibatasi lewat `program_id_in` (daftar
      * program_id dari User::scopedProgramIds(), berdasar keanggotaan FK
      * eksplisit di jurusan_program_scopes / fakultas_jurusan_scopes) --
      * bukan lagi cocokkan teks `jurusan`. Efek sampingnya sekaligus jadi
@@ -290,7 +290,7 @@ class AdminAlumniService
     {
         if ($user->isKaprodi() && $user->program_id) {
             $filters['program_id'] = $user->program_id;
-        } elseif ($user->isKajur() || $user->isKetuaFakultas()) {
+        } elseif ($user->isKajur() || $user->isDekan()) {
             $ids = $user->scopedProgramIds();
 
             if (empty($ids)) {
@@ -303,10 +303,10 @@ class AdminAlumniService
         return $filters;
     }
 
-    /** Viewer roles (wadir, kajur, kaprodi, ketua_fakultas) — block semua operasi tulis. */
+    /** Viewer roles (wadir, kajur, kaprodi, dekan) — block semua operasi tulis. */
     private function assertCanWrite(User $user): void
     {
-        if ($user->isWadir() || $user->isKajur() || $user->isKaprodi() || $user->isKetuaFakultas()) {
+        if ($user->isWadir() || $user->isKajur() || $user->isKaprodi() || $user->isDekan()) {
             throw new BusinessException('Role Anda tidak diizinkan mengubah data alumni.', 403);
         }
     }

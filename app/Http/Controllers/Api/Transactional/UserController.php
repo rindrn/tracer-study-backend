@@ -27,12 +27,12 @@ class UserController extends Controller
             'role'        => ['required', Rule::in(User::ROLES_ALL)],
             'program_id'  => 'nullable|integer|exists:oltp.programs,id',
             'jurusan'     => 'nullable|string|max:100',
-            // Kajur & Ketua Fakultas sekarang dropdown single-select ke
+            // Kajur & Dekan sekarang dropdown single-select ke
             // entity Jurusan/Fakultas (bukan lagi checkbox multi-jurusan
             // per-user) -- keanggotaan prodi/jurusan dikelola admin sekali
             // di Master Data, bukan di form user ini.
             'jurusan_id'  => 'required_if:role,' . User::ROLE_KAJUR . '|nullable|integer|exists:oltp.jurusans,id',
-            'fakultas_id' => 'required_if:role,' . User::ROLE_KETUA_FAKULTAS . '|nullable|integer|exists:oltp.fakultas,id',
+            'fakultas_id' => 'required_if:role,' . User::ROLE_DEKAN . '|nullable|integer|exists:oltp.fakultas,id',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -58,7 +58,7 @@ class UserController extends Controller
             'program_id'  => 'nullable|integer|exists:oltp.programs,id',
             'jurusan'     => 'nullable|string|max:100',
             'jurusan_id'  => 'required_if:role,' . User::ROLE_KAJUR . '|nullable|integer|exists:oltp.jurusans,id',
-            'fakultas_id' => 'required_if:role,' . User::ROLE_KETUA_FAKULTAS . '|nullable|integer|exists:oltp.fakultas,id',
+            'fakultas_id' => 'required_if:role,' . User::ROLE_DEKAN . '|nullable|integer|exists:oltp.fakultas,id',
         ]);
 
         if (!empty($validated['password'])) {
@@ -103,7 +103,7 @@ class UserController extends Controller
             User::ROLE_HEAD_TRACER, User::ROLE_TRACER_TEAM, User::ROLE_WADIR => 'Seluruh Jurusan',
             User::ROLE_KAJUR => $user->jurusanEntity?->name ?? '-',
             User::ROLE_KAPRODI => $user->program ? ($user->program->name . ' (' . $user->program->degree . ')') : '-',
-            User::ROLE_KETUA_FAKULTAS => $user->fakultas?->name ?? '-',
+            User::ROLE_DEKAN => $user->fakultas?->name ?? '-',
             default => '-',
         };
 

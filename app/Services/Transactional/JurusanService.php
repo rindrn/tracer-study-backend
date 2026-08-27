@@ -111,11 +111,11 @@ class JurusanService
         // Dua jalur pemakaian harus dicek sekaligus: teks lama (programs.jurusan
         // / users.jurusan, warisan sebelum redesain scope) DAN keanggotaan FK
         // baru (jurusan_program_scopes / users.jurusan_id / fakultas_jurusan_scopes,
-        // sumber otorisasi Kajur/Ketua Fakultas sejak redesain). Akun yang
+        // sumber otorisasi Kajur/Dekan sejak redesain). Akun yang
         // dibuat lewat form Master Data baru cuma mengisi FK, tidak pernah
         // menyentuh kolom teks -- kalau cuma jalur teks yang dicek, jurusan
         // itu lolos delete dan cascade FK diam-diam mencabut akses Kajur/
-        // menyusutkan cakupan Ketua Fakultas yang bergantung padanya.
+        // menyusutkan cakupan Dekan yang bergantung padanya.
         $programs        = $this->jurusanRepo->programCount($jurusan->name);
         $users           = $this->jurusanRepo->userCount($jurusan->name);
         $scopedPrograms  = count($this->jurusanRepo->scopedProgramIds($id));

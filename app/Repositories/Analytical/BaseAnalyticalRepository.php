@@ -29,7 +29,7 @@ abstract class BaseAnalyticalRepository
             ];
         }
 
-        // Scope Kajur/Ketua Fakultas: daftar id_prodi eksplisit (dari
+        // Scope Kajur/Dekan: daftar id_prodi eksplisit (dari
         // User::scopedProgramIds(), lihat EnforcesProdiScope::scopedParams).
         // Menggantikan filter scalar `jurusan` di bawah -- teks itu bisa
         // drift dari keanggotaan FK sesungguhnya begitu admin memindahkan
@@ -39,7 +39,7 @@ abstract class BaseAnalyticalRepository
         // KEDUANYA dipasang bila sama-sama ada, bukan salah satu. id_prodi_in
         // adalah BATAS cakupan (apa yang boleh dilihat), sedangkan `jurusan`
         // adalah PENYEMPIT yang dipilih pengguna di dalam batas itu. Sempat
-        // ditulis sebagai elseif, dan akibatnya Ketua Fakultas yang memilih
+        // ditulis sebagai elseif, dan akibatnya Dekan yang memilih
         // satu jurusan tetap melihat angka seluruh fakultas -- penyaringnya
         // tampak tidak berfungsi, tanpa galat apa pun.
         if ($idProdiIn !== null && $idProdiIn !== []) {

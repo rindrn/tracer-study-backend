@@ -60,7 +60,7 @@ class RealDataSeeder extends Seeder
         );
 
         // Daftar role (termasuk yang belum ikut di dump lama seperti
-        // ketua_fakultas). updateOrCreate, aman diulang.
+        // dekan). updateOrCreate, aman diulang.
         $this->call(RoleSeeder::class);
 
         // Backfill jurusan_program_scopes dari programs.jurusan (teks) --

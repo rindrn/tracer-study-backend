@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Program) sesuai keputusan: program-program di dalamnya ikut otomatis
  * lewat `Jurusan::programs()`.
  *
- * Dipakai jalur otorisasi Ketua Fakultas: satu user ketua_fakultas
+ * Dipakai jalur otorisasi Dekan: satu user dekan
  * ditautkan ke SATU fakultas lewat `users.fakultas_id`, dan scope-nya
  * adalah gabungan seluruh program di seluruh jurusan anggota fakultas itu.
  */

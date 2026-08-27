@@ -41,7 +41,7 @@ class User extends Authenticatable
     public const ROLE_WADIR        = 'wadir';         // Pimpinan (Direktur/Wadir/P2MPP)
     public const ROLE_KAJUR           = 'kajur';            // Ketua Jurusan
     public const ROLE_KAPRODI         = 'kaprodi';          // Ketua Program Studi
-    public const ROLE_KETUA_FAKULTAS  = 'ketua_fakultas';   // Ketua Fakultas (multi-jurusan)
+    public const ROLE_DEKAN  = 'dekan';   // Dekan (multi-jurusan)
 
     public const ROLES_ALL = [
         self::ROLE_HEAD_TRACER,
@@ -49,7 +49,7 @@ class User extends Authenticatable
         self::ROLE_WADIR,
         self::ROLE_KAJUR,
         self::ROLE_KAPRODI,
-        self::ROLE_KETUA_FAKULTAS,
+        self::ROLE_DEKAN,
     ];
 
     // ── Relationships ────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ class User extends Authenticatable
         return $this->belongsTo(Jurusan::class, 'jurusan_id');
     }
 
-    /** Fakultas yang dipimpin user `ketua_fakultas` (satu-satu). */
+    /** Fakultas yang dipimpin user `dekan` (satu-satu). */
     public function fakultas(): BelongsTo
     {
         return $this->belongsTo(Fakultas::class, 'fakultas_id');
@@ -79,7 +79,7 @@ class User extends Authenticatable
      * Resolve daftar program_id dalam cakupan user, sesuai role:
      *   - kaprodi         → [program_id] miliknya sendiri.
      *   - kajur           → seluruh program dalam jurusan yang dipimpinnya.
-     *   - ketua_fakultas  → gabungan program dari SELURUH jurusan anggota
+     *   - dekan  → gabungan program dari SELURUH jurusan anggota
      *                       fakultas yang dipimpinnya.
      *   - role lain       → array kosong (tidak relevan, canAccessAll()
      *                       yang dipakai untuk role tanpa batasan prodi).
@@ -95,7 +95,7 @@ class User extends Authenticatable
         return match ($this->role) {
             self::ROLE_KAPRODI => $this->program_id !== null ? [$this->program_id] : [],
             self::ROLE_KAJUR => $this->jurusanEntity?->programs->pluck('id')->all() ?? [],
-            self::ROLE_KETUA_FAKULTAS => $this->fakultas
+            self::ROLE_DEKAN => $this->fakultas
                 ?->jurusans->flatMap(fn ($j) => $j->programs)->pluck('id')->unique()->values()->all() ?? [],
             default => [],
         };
@@ -107,7 +107,7 @@ class User extends Authenticatable
     public function isWadir(): bool           { return $this->role === self::ROLE_WADIR; }
     public function isKajur(): bool           { return $this->role === self::ROLE_KAJUR; }
     public function isKaprodi(): bool         { return $this->role === self::ROLE_KAPRODI; }
-    public function isKetuaFakultas(): bool   { return $this->role === self::ROLE_KETUA_FAKULTAS; }
+    public function isDekan(): bool   { return $this->role === self::ROLE_DEKAN; }
 
     /**
      * Roles yang bisa lihat data SEMUA prodi (tidak tersegmentasi).

@@ -491,7 +491,7 @@ class AlumniProfileRepository
      * tinggal satu dan medan yang sudah dideklarasikan FE benar-benar terisi.
      */
     /**
-     * @param array<int>|null $programIdIn Scope Kajur/Ketua Fakultas (daftar
+     * @param array<int>|null $programIdIn Scope Kajur/Dekan (daftar
      *        program_id dari User::scopedProgramIds()) -- diprioritaskan di
      *        atas $jurusan kalau keduanya somehow terisi.
      */
@@ -563,7 +563,7 @@ class AlumniProfileRepository
         ];
     }
 
-    /** @param array<int>|null $programIdIn Scope Kajur/Ketua Fakultas. */
+    /** @param array<int>|null $programIdIn Scope Kajur/Dekan. */
     public function getAvailableGraduationYears(?int $programId, ?array $programIdIn = null): array
     {
         $query = DB::connection(self::CONN)->table('alumni_profiles')
@@ -657,9 +657,9 @@ class AlumniProfileRepository
         if (!empty($filters['graduation_year'])) {
             $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
         }
-        // Scope kajur/ketua_fakultas, sama seperti di getForReportQuery().
+        // Scope kajur/dekan, sama seperti di getForReportQuery().
         // Tanpa klausa ini filter 'program_id_in' yang dikirim ReportService
-        // diabaikan diam-diam dan kajur/ketua_fakultas ikut melihat alumni
+        // diabaikan diam-diam dan kajur/dekan ikut melihat alumni
         // di luar cakupannya di sheet per-prodi.
         if (!empty($filters['program_id_in'])) {
             $query->whereIn('alumni_profiles.program_id', $filters['program_id_in']);
@@ -706,10 +706,10 @@ class AlumniProfileRepository
         if (!empty($filters['graduation_year'])) {
             $query->where('alumni_profiles.graduation_year', $filters['graduation_year']);
         }
-        // Scope kajur/ketua_fakultas: dibatasi ke cakupannya sendiri (daftar
+        // Scope kajur/dekan: dibatasi ke cakupannya sendiri (daftar
         // program_id dari User::scopedProgramIds()). Tanpa klausa ini filter
         // 'program_id_in' yang dikirim ReportService diabaikan diam-diam dan
-        // kajur/ketua_fakultas ikut melihat alumni di luar cakupannya.
+        // kajur/dekan ikut melihat alumni di luar cakupannya.
         if (!empty($filters['program_id_in'])) {
             $query->whereIn('alumni_profiles.program_id', $filters['program_id_in']);
         }

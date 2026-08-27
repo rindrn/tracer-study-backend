@@ -45,7 +45,7 @@ class DemoSeeder extends Seeder
             // nilai yang dipakai program studi. Lihat catatan di kelasnya
             // soal kenapa pengisian di migration saja tidak cukup.
             JurusanSeeder::class,
-            // Sumber otorisasi kajur/ketua_fakultas. Backfill-nya dulu ada di
+            // Sumber otorisasi kajur/dekan. Backfill-nya dulu ada di
             // migration jurusan_program_scopes, dan di sana selalu mengisi nol
             // baris karena migration jalan sebelum seeder mana pun -- lihat
             // catatan di kelasnya. Jalur demo juga terkena, jadi ikut dipanggil

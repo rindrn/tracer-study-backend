@@ -5,9 +5,9 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Fakultas sebagai entity master data (redesain scope Ketua Fakultas).
+ * Fakultas sebagai entity master data (redesain scope Dekan).
  *
- * Tidak butuh backfill: akun `ketua_fakultas` yang ada sekarang murni data
+ * Tidak butuh backfill: akun `dekan` yang ada sekarang murni data
  * uji coba sesi sebelumnya, aman dibuat ulang manual lewat Master Data
  * setelah migrasi ini jalan.
  */

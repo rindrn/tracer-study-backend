@@ -9,7 +9,7 @@ use App\Repositories\Transactional\FakultasRepository;
  * FakultasService — satu-satunya jalur tulis untuk master Fakultas dan
  * keanggotaan jurusannya (fakultas_jurusan_scopes).
  *
- * Dipakai jalur otorisasi Ketua Fakultas: User::scopedProgramIds()
+ * Dipakai jalur otorisasi Dekan: User::scopedProgramIds()
  * merangkai fakultas->jurusans->programs jadi satu daftar program_id.
  */
 class FakultasService
@@ -66,7 +66,7 @@ class FakultasService
     }
 
     /**
-     * Hapus fakultas. Ditolak selama masih dipakai akun Ketua Fakultas --
+     * Hapus fakultas. Ditolak selama masih dipakai akun Dekan --
      * menghapusnya akan melepas fakultas_id akun itu jadi NULL (FK
      * nullOnDelete) dan diam-diam membuatnya kehilangan seluruh scope.
      */

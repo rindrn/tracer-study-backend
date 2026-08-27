@@ -49,7 +49,7 @@ class ReportController extends Controller
             'tahun_lulus'      => ['required', 'integer', 'min:2000', 'max:2100'],
             'questionnaire_id' => ['nullable', 'integer'],
             'format'           => ['nullable', 'in:label,code'],
-            // Hanya dipakai (dan divalidasi terhadap scope) untuk ketua_fakultas
+            // Hanya dipakai (dan divalidasi terhadap scope) untuk dekan
             // -- lihat ReportService::buildAlumniResponsesExport().
             'jurusan'          => ['nullable', 'string', 'max:100'],
         ]);

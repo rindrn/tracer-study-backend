@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
  *   - Kaprodi        : hanya program studinya
  *   - Kajur          : gabungan seluruh prodi dalam jurusan yang di-assign
  *                      admin (User::scopedProgramIds())
- *   - Ketua Fakultas : gabungan seluruh prodi dalam fakultas yang di-assign
+ *   - Dekan : gabungan seluruh prodi dalam fakultas yang di-assign
  *                      admin -- langsung agregat, tidak perlu memilih satu
  *                      jurusan dulu (Fase 5)
  *   - lainnya        : seluruh institusi
@@ -37,7 +37,7 @@ class RingkasanTahunController extends Controller
         $user = $request->user();
 
         $programIdIn = null;
-        if ($user->isKajur() || $user->isKetuaFakultas()) {
+        if ($user->isKajur() || $user->isDekan()) {
             $programIdIn = $user->scopedProgramIds();
             if (empty($programIdIn)) {
                 $label = $user->isKajur() ? 'jurusan' : 'fakultas';

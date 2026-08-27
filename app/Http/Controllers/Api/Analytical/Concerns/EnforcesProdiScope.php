@@ -114,20 +114,20 @@ trait EnforcesProdiScope
             // id_prodi_in (RingkasanTahun, AdminAlumniService) mengabaikan
             // key ini.
             $params['jurusan'] = $user->jurusanEntity?->name;
-        } elseif ($user->isKetuaFakultas()) {
-            // Ketua Fakultas membawahi BEBERAPA jurusan sekaligus lewat
+        } elseif ($user->isDekan()) {
+            // Dekan membawahi BEBERAPA jurusan sekaligus lewat
             // fakultas yang di-assign admin (`users.fakultas_id` →
             // `fakultas_jurusan_scopes` → `jurusan_program_scopes`).
             // Sama seperti kajur, scope-nya sekarang berupa daftar
             // program_id nyata (bukan cocokkan nama).
             $ids = $user->scopedProgramIds();
             if (empty($ids)) {
-                abort(403, 'Akun ketua fakultas ini belum memiliki fakultas dengan prodi yang di-assign. Hubungi pengelola.');
+                abort(403, 'Akun dekan ini belum memiliki fakultas dengan prodi yang di-assign. Hubungi pengelola.');
             }
 
             $params['id_prodi_in'] = $ids;
 
-            // Ketua Fakultas TIDAK lagi wajib memilih satu jurusan.
+            // Dekan TIDAK lagi wajib memilih satu jurusan.
             //
             // Dulu wajib, karena seluruh repository analitik menyaring lewat
             // `jurusan` skalar yang hanya menampung SATU nama -- tidak pernah
@@ -194,7 +194,7 @@ trait EnforcesProdiScope
             abort(403, 'Anda hanya dapat mengakses data program studi Anda sendiri.');
         }
 
-        if ($user->isKajur() || $user->isKetuaFakultas()) {
+        if ($user->isKajur() || $user->isDekan()) {
             // Drill-down masih menerima nama_prodi sebagai path/query param,
             // jadi pencocokan tetap harus lewat nama -- tapi daftar yang
             // dibandingkan sekarang berasal dari scopedProgramIds() (FK
