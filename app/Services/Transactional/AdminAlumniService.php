@@ -8,6 +8,7 @@ use App\Repositories\Transactional\AlumniProfileRepository;
 use App\Support\PersonalData;
 use App\Support\PhoneNumber;
 use App\Traits\WithCache;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
@@ -123,6 +124,7 @@ class AdminAlumniService
         }
 
         $data = $this->normalizePhone($data);
+        $data = $this->hashPassword($data);
 
         $id = $this->alumniRepo->create($data);
 
@@ -158,6 +160,7 @@ class AdminAlumniService
         }
 
         $data = $this->normalizePhone($data);
+        $data = $this->hashPassword($data);
 
         $this->alumniRepo->updateById($id, $data);
 
@@ -193,6 +196,46 @@ class AdminAlumniService
         if (array_key_exists('phone', $data)) {
             $data['phone'] = PhoneNumber::normalize($data['phone']);
         }
+
+        return $data;
+    }
+
+    /**
+     * Cincang kata sandi yang ditetapkan staf lewat borang, sebelum disimpan.
+     *
+     * Repository di jalur ini menulis dengan query builder, bukan model, jadi
+     * cast 'hashed' tidak ikut berlaku — tanpa langkah ini kata sandinya
+     * masuk ke kolom apa adanya dan Hash::check() saat masuk selalu gagal.
+     *
+     * Kolom kosong berarti "jangan sentuh", bukan "kosongkan": borang Edit
+     * tidak pernah bisa memperlihatkan kata sandi yang berlaku sekarang
+     * (yang tersimpan hanya cincangannya), sehingga menyimpan borang tanpa
+     * mengetik apa pun tidak boleh mencabut akses alumni.
+     *
+     * Biaya bcrypt-nya disamakan dengan penerbitan massal
+     * (AlumniCredentialService::BCRYPT_ROUNDS) supaya kedua jalur menghasilkan
+     * cincangan sejenis; biaya ikut tertulis di dalam cincangan, jadi
+     * Hash::check() membacanya sendiri.
+     *
+     * `password_issued_at` ikut disetel karena kolom itulah penanda "sudah
+     * punya kredensial masuk" yang dibaca penerbitan massal — tanpa itu,
+     * alumni yang kata sandinya baru saja ditetapkan manual akan ikut
+     * terbawa lagi pada penerbitan berikutnya dan kata sandinya tertimpa.
+     */
+    private function hashPassword(array $data): array
+    {
+        if (!array_key_exists('password', $data)) {
+            return $data;
+        }
+
+        if ($data['password'] === null || $data['password'] === '') {
+            unset($data['password']);
+
+            return $data;
+        }
+
+        $data['password']           = Hash::make($data['password'], ['rounds' => 10]);
+        $data['password_issued_at'] = now();
 
         return $data;
     }

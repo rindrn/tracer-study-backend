@@ -2,6 +2,7 @@
 namespace App\Services\Transactional;
  
 use App\DTOs\Auth\ResponseAuthDTO; 
+use App\Exceptions\BusinessException;
 use App\Models\Transactional\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -34,10 +35,19 @@ class AuthService
             ]);
         }
 
+        // Penonaktifan dilempar sebagai BusinessException 403, BUKAN
+        // ValidationException 422 seperti kredensial salah. Halaman masuk
+        // menyatukan dua rute -- staf dicoba lebih dulu, lalu jatuh ke rute
+        // alumni -- sehingga tanpa status yang berbeda, staf yang akunnya
+        // dinonaktifkan ikut jatuh ke rute alumni dan yang terbaca di layar
+        // adalah "NIM atau email tidak ditemukan dalam database alumni":
+        // sebab sebenarnya tersembunyi, dan pemiliknya mengira akunnya
+        // terhapus. Lihat Login.tsx yang menghentikan penerusan pada 403.
         if (! $user->isActive()) {
-            throw ValidationException::withMessages([
-                'email' => ['Akun Anda telah dinonaktifkan. Hubungi administrator.'],
-            ]);
+            throw new BusinessException(
+                'Akun Anda telah dinonaktifkan oleh Ketua Tim Tracer Study. Hubungi pengelola untuk mengaktifkannya kembali.',
+                403,
+            );
         }
  
         // Satu user = satu token aktif

@@ -28,6 +28,11 @@ class UpdateAlumniRequest extends FormRequest
             'npwp' => ['nullable', 'string', 'max:20'],
             'kode_pt' => ['nullable', 'string', 'max:10'],
             'is_active' => ['nullable', 'boolean'],
+            // Dikosongkan berarti kata sandinya tidak diganti — borang Edit
+            // Akun Mahasiswa tidak pernah bisa menampilkan yang sekarang
+            // (yang tersimpan hanya cincangannya), jadi kolom kosong harus
+            // berarti "biarkan", bukan "hapus".
+            'password' => ['nullable', 'string', 'min:8', 'max:100'],
         ];
 
         if ($user && $user->isHeadTracer()) {

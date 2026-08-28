@@ -28,6 +28,11 @@ class StoreAlumniRequest extends FormRequest
             'nik' => ['nullable', 'string', 'max:16'],
             'npwp' => ['nullable', 'string', 'max:20'],
             'kode_pt' => ['nullable', 'string', 'max:10'],
+            // Kata sandi boleh ditetapkan langsung dari borang Tambah Akun
+            // Mahasiswa. Kosong berarti akunnya belum punya kredensial masuk
+            // dan harus menunggu penerbitan massal lewat AlumniCredentialService.
+            'password' => ['nullable', 'string', 'min:8', 'max:100'],
+            'is_active' => ['nullable', 'boolean'],
         ];
 
         // Head_tracer wajib assign program_id manual (tidak terikat ke prodi).

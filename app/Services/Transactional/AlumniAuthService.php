@@ -61,7 +61,10 @@ class AlumniAuthService
         }
 
         if (!$alumni->is_active) {
-            throw new BusinessException('Akun alumni tidak aktif. Hubungi admin.', 403);
+            throw new BusinessException(
+                'Akun Anda telah dinonaktifkan oleh Tim Tracer Study. Hubungi pengelola untuk mengaktifkannya kembali.',
+                403,
+            );
         }
 
         // Alumni yang kredensialnya belum pernah diterbitkan dibedakan dari
