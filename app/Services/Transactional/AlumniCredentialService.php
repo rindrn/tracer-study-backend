@@ -95,14 +95,23 @@ class AlumniCredentialService
     /**
      * Jumlah bawaan per permintaan bila pemanggil tidak menentukan.
      *
-     * Dulu seratus, ketika satu baris memakan sekitar 360 md: 271 md
-     * mencincang pada biaya 12, ditambah tiga kueri terpisah per alumni.
-     * Sesudah biayanya diturunkan (lihat BCRYPT_ROUNDS) dan seluruh potongan
-     * ditulis dalam dua pernyataan, satu baris tinggal sekitar 47 md — 250
-     * baris ≈ 12 detik, masih jauh di bawah batas tunggu proksi yang lazim
-     * (60 detik), dan jumlah bolak-baliknya tinggal seperlima.
+     * Satu baris memakan sekitar 47 md sesudah biaya bcrypt diturunkan (lihat
+     * BCRYPT_ROUNDS) dan seluruh potongan ditulis dalam dua pernyataan. Seratus
+     * baris berarti sekitar 5 detik per permintaan.
+     *
+     * Nilai ini sempat 250 (≈ 12 detik) dengan alasan menekan jumlah
+     * bolak-balik. Ternyata itu menukar hal yang salah: ongkos tiap permintaan
+     * — bootstrap, auth, dan satu COUNT di countRemaining() — hanya seratusan
+     * milidetik, sehingga memperbanyak permintaan menambah kurang dari dua
+     * persen pada total. Yang didapat sebagai gantinya jauh lebih berharga:
+     * worker php-fpm dilepas dua setengah kali lebih sering (plafonnya cuma
+     * enam, lihat docker/php-fpm.conf), jarak ke batas tunggu proksi melebar,
+     * dan kemajuan di layar petugas bergerak lebih halus.
+     *
+     * MAX_BATCH sengaja dibiarkan 250: itu plafon bagi pemanggil yang memang
+     * meminta potongan besar, bukan nilai yang dipakai sehari-hari.
      */
-    public const DEFAULT_LIMIT = 250;
+    public const DEFAULT_LIMIT = 100;
 
     /**
      * Terbitkan kata sandi baru untuk SATU POTONG alumni.
