@@ -128,6 +128,31 @@ class JurusanRepository
     }
 
     /**
+     * Daftarkan satu prodi sebagai anggota jurusan, kalau belum terdaftar.
+     *
+     * Dipakai saat prodi dibuat/dipindah jurusan lewat Master Data. Tanpa ini
+     * keanggotaan hanya bisa lahir dari dialog cakupan, sehingga prodi baru
+     * yang sudah jelas-jelas dipilihkan jurusannya tetap di luar cakupan
+     * Kajur jurusan itu sampai ada admin yang mencentangnya manual.
+     */
+    public function attachProgram(int $jurusanId, int $programId): void
+    {
+        DB::connection(self::CONN)->table('jurusan_program_scopes')->updateOrInsert(
+            ['jurusan_id' => $jurusanId, 'program_id' => $programId],
+            ['created_at' => now()],
+        );
+    }
+
+    /** Cabut keanggotaan satu prodi dari satu jurusan. */
+    public function detachProgram(int $jurusanId, int $programId): void
+    {
+        DB::connection(self::CONN)->table('jurusan_program_scopes')
+            ->where('jurusan_id', $jurusanId)
+            ->where('program_id', $programId)
+            ->delete();
+    }
+
+    /**
      * Ganti seluruh keanggotaan prodi jurusan ini (hapus lalu insert ulang).
      *
      * Dibungkus transaksi: tanpa ini, kegagalan di tengah insert (jarang,

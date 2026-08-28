@@ -112,6 +112,18 @@ class QuestionnaireValidator
             throw new ValidationException($validator);
         }
 
-        return $validator->validated();
+        $validated = $validator->validated();
+
+        // `program_id: null` adalah perintah eksplisit "berlaku untuk semua
+        // prodi", bukan sekadar isian yang tidak dikirim. validated() membuang
+        // kunci bernilai null, sehingga perintah itu lenyap sebelum sampai ke
+        // service dan di sana jatuh ke nilai lama -- kuesioner nasional yang
+        // telanjur terpatok ke satu prodi jadi tidak pernah bisa dikembalikan
+        // ke semua prodi lewat antarmuka, berapa kali pun disimpan ulang.
+        if (array_key_exists('program_id', $data) && $data['program_id'] === null) {
+            $validated['program_id'] = null;
+        }
+
+        return $validated;
     }
 }

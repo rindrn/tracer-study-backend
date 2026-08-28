@@ -158,7 +158,8 @@ class QuestionnaireService
             if ($responseCount > 0) {
                 throw new BusinessException(
                     "Kuisioner tidak dapat diubah karena sudah memiliki {$responseCount} responden. "
-                    . 'Buat versi baru bila pertanyaannya perlu berubah.',
+                    . 'Seluruh isiannya terkunci, termasuk Target Prodi dan judul, bukan '
+                    . 'pertanyaannya saja. Buat versi baru bila memang perlu berubah.',
                     422,
                 );
             }
@@ -226,8 +227,12 @@ class QuestionnaireService
     /** Resolve program_id dari input (program_id langsung atau program_code). */
     private function resolveProgramId(array $validated, ?int $fallback = null): ?int
     {
-        if (!empty($validated['program_id'])) {
-            return (int) $validated['program_id'];
+        // array_key_exists, bukan !empty(): null yang dikirim dengan sengaja
+        // berarti "lepaskan patokan prodi, berlaku untuk semua" dan harus
+        // tersimpan. Hanya kunci yang memang tidak dikirim yang boleh jatuh
+        // ke $fallback.
+        if (array_key_exists('program_id', $validated)) {
+            return $validated['program_id'] === null ? null : (int) $validated['program_id'];
         }
         if (!empty($validated['program_code'])) {
             return $this->programRepo->findByCode($validated['program_code'])?->id;

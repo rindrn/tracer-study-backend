@@ -4,6 +4,7 @@ namespace App\Services\Transactional;
 
 use App\DTOs\Transactional\ProgramResponseDTO;
 use App\Exceptions\BusinessException;
+use App\Repositories\Transactional\JurusanRepository;
 use App\Repositories\Transactional\ProgramRepository;
 use App\Traits\WithCache;
 
@@ -15,6 +16,7 @@ class ProgramService
 
     public function __construct(
         private readonly ProgramRepository $repo,
+        private readonly JurusanRepository $jurusanRepo,
     ) {}
 
     public function list(bool $includeInactive, ?string $degree): array
@@ -72,6 +74,8 @@ class ProgramService
             'accredited_until' => $validated['accredited_until'] ?? null,
         ]);
 
+        $this->attachToJurusanScope((int) $program->id, $validated['jurusan'] ?? null);
+
         $this->forgetTag('programs');
 
         return ProgramResponseDTO::fromModel($program);
@@ -83,6 +87,8 @@ class ProgramService
         if (! $program) {
             throw new BusinessException("Program ID {$id} tidak ditemukan.", 404);
         }
+
+        $jurusanLama = $program->jurusan;
 
         $updated = $this->repo->update($program, [
             'name'      => $validated['name'],
@@ -106,11 +112,62 @@ class ProgramService
             'accredited_until' => $validated['accredited_until'] ?? $program->accredited_until,
         ]);
 
+        if ($updated->jurusan !== $jurusanLama) {
+            $this->detachFromJurusanScope((int) $updated->id, $jurusanLama);
+            $this->attachToJurusanScope((int) $updated->id, $updated->jurusan);
+        }
+
         // Cukup forgetTag: key show sekarang bertag 'programs', dan forget()
         // polos tidak menyentuh key yang disimpan di namespace tag.
         $this->forgetTag('programs');
 
         return ProgramResponseDTO::fromModel($updated);
+    }
+
+    /**
+     * Jaga keanggotaan `jurusan_program_scopes` tetap sejalan dengan jurusan
+     * yang dipilih di form prodi.
+     *
+     * Kolom teks `programs.jurusan` dan tabel keanggotaan itu dua hal berbeda:
+     * yang pertama untuk tampilan dan laporan, yang kedua sumber otorisasi
+     * Kajur. Selama ini hanya yang pertama terisi saat prodi dibuat, sehingga
+     * prodi baru tidak pernah masuk cakupan Kajur jurusannya sampai ada yang
+     * mencentangnya manual di dialog cakupan -- dan tidak ada apa pun di
+     * antarmuka yang memberi tahu bahwa langkah itu masih tertinggal.
+     *
+     * Sengaja hanya menyentuh jurusan lama dan barunya, bukan menghapus
+     * seluruh keanggotaan prodi ini: admin boleh saja memasukkan satu prodi ke
+     * cakupan jurusan lain lewat dialog, dan kurasi itu tidak boleh hilang
+     * cuma karena nama prodinya diperbaiki.
+     */
+    private function attachToJurusanScope(int $programId, ?string $jurusanName): void
+    {
+        $jurusan = $this->resolveJurusan($jurusanName);
+
+        if ($jurusan !== null) {
+            $this->jurusanRepo->attachProgram((int) $jurusan->id, $programId);
+        }
+    }
+
+    private function detachFromJurusanScope(int $programId, ?string $jurusanName): void
+    {
+        $jurusan = $this->resolveJurusan($jurusanName);
+
+        if ($jurusan !== null) {
+            $this->jurusanRepo->detachProgram((int) $jurusan->id, $programId);
+        }
+    }
+
+    /**
+     * Nama jurusan pada prodi adalah teks bebas dan tidak dijamin punya baris
+     * induk di `jurusans` (data lama, atau impor). Kalau tidak ketemu,
+     * keanggotaannya memang tidak bisa dicatat -- prodinya tetap tersimpan.
+     */
+    private function resolveJurusan(?string $jurusanName): ?object
+    {
+        $jurusanName = trim((string) $jurusanName);
+
+        return $jurusanName === '' ? null : $this->jurusanRepo->findByName($jurusanName);
     }
 
     public function destroy(int $id): void
