@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\Alumni\SelfServiceController;
 // use App\Http\Controllers\Api\Transactional\TracerOfficerController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireController;
 use App\Http\Controllers\Api\Transactional\ApprovalController;
+use App\Http\Controllers\Api\Transactional\NotificationController;
 use App\Http\Controllers\Api\Transactional\TracerStudySubmitController;
 use App\Http\Controllers\Api\Transactional\TracerStudyDraftController;
 use App\Http\Controllers\Api\Transactional\QuestionnaireFetchController;
@@ -159,6 +160,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout']);
     Route::get('auth/me', [AuthController::class, 'me']);
     Route::post('auth/change-password', [AuthController::class, 'changePassword']);
+
+    // Ringkasan pekerjaan yang menunggu, untuk lonceng di topbar.
+    // Tanpa gate role: isinya sudah disaring per peran di controller, dan
+    // peran yang tidak berkepentingan menerima angka nol, bukan 403 —
+    // lonceng dirender di layout yang dipakai semua peran.
+    Route::get('notifications/summary', [NotificationController::class, 'summary']);
 
     // Questionnaires — index (semua role bisa lihat list)
     Route::get('questionnaires', [QuestionnaireController::class, 'index']);
