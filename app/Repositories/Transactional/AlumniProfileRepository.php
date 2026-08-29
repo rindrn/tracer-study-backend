@@ -563,6 +563,117 @@ class AlumniProfileRepository
         ];
     }
 
+    /**
+     * Stats alumni DIPECAH per prodi, untuk layar kartu prodi.
+     *
+     * Bentuknya sengaja tiga kueri beragregasi, bukan pemanggilan
+     * countStatsByProgram() sekali per prodi: prodinya puluhan, dan versi
+     * per-prodi berarti puluhan kali tiga perjalanan ke basis data untuk
+     * satu layar.
+     *
+     * Definisi "sudah mengisi" dijaga sama persis dengan
+     * countStatsByProgram() -- kuesioner global published, dihitung alumni
+     * distinct, bukan jumlah baris response. Kalau keduanya berbeda, kartu
+     * prodi dan kartu ringkasan di halaman yang sama akan saling
+     * bertentangan untuk data yang sama.
+     *
+     * Alumni tanpa program_id tidak diikutkan: tidak ada kartu yang bisa
+     * mewakilinya, dan memaksakannya ke satu kartu "lain-lain" membuat
+     * jumlah seluruh kartu tidak lagi cocok dengan angka mana pun.
+     *
+     * @param array<int>|null $programIdIn Scope Kajur/Dekan.
+     * @return array<int, array<string, mixed>> satu baris per prodi
+     */
+    public function countStatsGroupedByProgram(?int $programId, ?int $graduationYear = null, ?array $programIdIn = null): array
+    {
+        $conn = DB::connection(self::CONN);
+
+        $scope = function ($query, string $column = 'alumni_profiles.program_id') use ($programId, $programIdIn, $graduationYear) {
+            $query->whereNotNull($column);
+            if ($programId !== null) {
+                $query->where($column, $programId);
+            } elseif (!empty($programIdIn)) {
+                $query->whereIn($column, $programIdIn);
+            }
+            if ($graduationYear !== null) {
+                $query->where('alumni_profiles.graduation_year', $graduationYear);
+            }
+
+            return $query;
+        };
+
+        // select eksplisit + alias, bukan pluck(DB::raw('count(*)'), ...):
+        // pluck() dengan ekspresi mentah mencoba membaca properti bernama
+        // seluruh ekspresi itu pada baris hasil, dan di PostgreSQL kolomnya
+        // kembali sebagai "count" — hasilnya nol di mana-mana disertai
+        // peringatan properti tak dikenal, bukan galat yang terlihat.
+        $totals = $scope($conn->table('alumni_profiles'))
+            ->groupBy('alumni_profiles.program_id')
+            ->select('alumni_profiles.program_id', DB::raw('count(*) as jumlah'))
+            ->pluck('jumlah', 'program_id');
+
+        if ($totals->isEmpty()) {
+            return [];
+        }
+
+        $globalQnrIds = $conn->table('questionnaires')
+            ->whereNull('program_id')
+            ->where('status', 'published')
+            ->pluck('id')
+            ->toArray();
+
+        $countByStatus = function (array $statuses) use ($conn, $scope, $globalQnrIds) {
+            if (empty($globalQnrIds)) {
+                return collect();
+            }
+
+            return $scope(
+                $conn->table('alumni_profiles')
+                    ->join('responses', 'responses.alumni_id', '=', 'alumni_profiles.id')
+                    ->whereIn('responses.questionnaire_id', $globalQnrIds)
+                    ->whereIn('responses.status', $statuses),
+            )
+                ->groupBy('alumni_profiles.program_id')
+                ->select('alumni_profiles.program_id', DB::raw('count(distinct alumni_profiles.id) as jumlah'))
+                ->pluck('jumlah', 'program_id');
+        };
+
+        $finished = $countByStatus(['submitted', 'verified']);
+        $ongoing  = $countByStatus(['started']);
+
+        $programs = $conn->table('programs')
+            ->whereIn('id', $totals->keys()->all())
+            ->get(['id', 'name', 'code', 'degree', 'jurusan'])
+            ->keyBy('id');
+
+        $rows = [];
+
+        foreach ($totals as $pid => $total) {
+            $program  = $programs->get($pid);
+            $total    = (int) $total;
+            $answered = (int) ($finished[$pid] ?? 0);
+            $running  = (int) ($ongoing[$pid] ?? 0);
+
+            $rows[] = [
+                'program_id'     => (int) $pid,
+                'program_name'   => $program->name ?? 'Prodi #' . $pid,
+                'program_code'   => $program->code ?? null,
+                'program_degree' => $program->degree ?? null,
+                'jurusan_name'   => $program->jurusan ?? null,
+                'total'          => $total,
+                'answered'       => $answered,
+                'unanswered'     => $total - $answered,
+                'ongoing'        => $running,
+                'not_started'    => max($total - $answered - $running, 0),
+                'response_rate'  => $total > 0 ? round($answered / $total * 100, 1) : 0.0,
+            ];
+        }
+
+        usort($rows, fn (array $a, array $b) => strcmp((string) $a['program_name'], (string) $b['program_name']));
+
+        return $rows;
+    }
+
     /** @param array<int>|null $programIdIn Scope Kajur/Dekan. */
     public function getAvailableGraduationYears(?int $programId, ?array $programIdIn = null): array
     {

@@ -64,10 +64,34 @@ class AdminAlumniService
      * kuesioner global (program_id NULL, status published) — lihat
      * AlumniProfileRepository::countStatsByProgram.
      */
-    public function getStats(User $user, ?int $graduationYear = null): array
+    public function getStats(User $user, ?int $graduationYear = null, ?int $requestedProgramId = null): array
     {
         $programId   = $user->isKaprodi() ? $user->program_id : null;
         $programIdIn = ($user->isKajur() || $user->isDekan()) ? $user->scopedProgramIds() : null;
+
+        // Penyempitan ke satu prodi atas permintaan pemanggil, dipakai kartu
+        // ringkasan setelah sebuah kartu prodi dipilih.
+        //
+        // Diperiksa terhadap cakupan peran DULU, bukan diteruskan begitu saja:
+        // countStatsByProgram() memprioritaskan $programId di atas
+        // $programIdIn, jadi meneruskannya mentah-mentah membuat Kajur atau
+        // Dekan bisa membaca angka prodi di luar jangkauannya hanya dengan
+        // menyunting query string. Kaprodi tidak pernah bisa menggesernya:
+        // prodinya sudah dipatok di atas.
+        if ($requestedProgramId !== null && $programId === null) {
+            // Dicek hanya kalau daftarnya benar-benar berisi. Kajur atau Dekan
+            // yang belum punya jurusan/fakultas menghasilkan daftar kosong,
+            // dan seluruh lapisan repositori memperlakukan daftar kosong
+            // sebagai "tanpa penyaring" -- lihat countStatsByProgram(). Kalau
+            // di sini diperlakukan sebagai "tidak boleh apa pun", kartu prodi
+            // tampil berisi tetapi kartu ringkasannya nol begitu diklik.
+            if (!empty($programIdIn) && !in_array($requestedProgramId, $programIdIn, strict: true)) {
+                return $this->emptyStats($programIdIn);
+            }
+
+            $programId   = $requestedProgramId;
+            $programIdIn = null;
+        }
 
         $stats = $this->alumniRepo->countStatsByProgram($programId, $graduationYear, $programIdIn);
 
@@ -78,6 +102,45 @@ class AdminAlumniService
         $stats['graduation_years'] = $this->alumniRepo->getAvailableGraduationYears($programId, $programIdIn);
 
         return $stats;
+    }
+
+    /**
+     * Angka nol untuk prodi di luar jangkauan pemanggil.
+     *
+     * Daftar tahun lulusan tetap diisi sesuai cakupan perannya supaya
+     * dropdown angkatan di halaman tidak ikut kosong hanya karena satu
+     * prodi yang tidak boleh dibaca sempat diminta.
+     *
+     * @param array<int>|null $programIdIn
+     */
+    private function emptyStats(?array $programIdIn): array
+    {
+        return [
+            'total'            => 0,
+            'finished'         => 0,
+            'ongoing'          => 0,
+            'not_started'      => 0,
+            'answered'         => 0,
+            'unanswered'       => 0,
+            'response_rate'    => 0.0,
+            'graduation_years' => $this->alumniRepo->getAvailableGraduationYears(null, $programIdIn),
+        ];
+    }
+
+    /**
+     * Stats alumni per prodi, untuk layar kartu prodi di halaman Data Alumni.
+     *
+     * Cakupannya mengikuti getStats() persis: Kaprodi hanya prodinya sendiri,
+     * Kajur dan Dekan sebatas prodi dalam jangkauannya, peran lain seluruhnya.
+     * Menuliskannya ulang di sini, bukan memanggil getStats(), karena yang
+     * berbeda hanya bentuk keluarannya -- aturan cakupannya harus tetap satu.
+     */
+    public function getStatsByProgram(User $user, ?int $graduationYear = null): array
+    {
+        $programId   = $user->isKaprodi() ? $user->program_id : null;
+        $programIdIn = ($user->isKajur() || $user->isDekan()) ? $user->scopedProgramIds() : null;
+
+        return $this->alumniRepo->countStatsGroupedByProgram($programId, $graduationYear, $programIdIn);
     }
 
     // ═══════════════════════════════════════════════════════════

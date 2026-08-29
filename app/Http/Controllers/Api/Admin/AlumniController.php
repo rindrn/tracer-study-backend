@@ -87,7 +87,28 @@ class AlumniController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data'    => $this->service->getStats($request->user(), $request->query('graduation_year') ? (int) $request->query('graduation_year') : null),
+            'data'    => $this->service->getStats(
+                $request->user(),
+                $request->query('graduation_year') ? (int) $request->query('graduation_year') : null,
+                $request->query('program_id') ? (int) $request->query('program_id') : null,
+            ),
+        ]);
+    }
+
+    /**
+     * GET /api/alumni/stats-by-program
+     *
+     * Stats yang sama, dipecah per prodi. Dipakai layar kartu prodi di
+     * halaman Data Alumni sebelum tabelnya ditampilkan.
+     */
+    public function statsByProgram(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->getStatsByProgram(
+                $request->user(),
+                $request->query('graduation_year') ? (int) $request->query('graduation_year') : null,
+            ),
         ]);
     }
 
