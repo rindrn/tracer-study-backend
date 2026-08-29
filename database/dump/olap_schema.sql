@@ -32,7 +32,7 @@ CREATE TABLE public.dim_alumni (
 );
 
 
-ALTER TABLE public.dim_alumni OWNER TO postgres;
+ALTER TABLE public.dim_alumni OWNER TO smarttracer;
 
 --
 -- TOC entry 220 (class 1259 OID 99097)
@@ -48,7 +48,7 @@ CREATE SEQUENCE public.dim_alumni_id_alumni_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_alumni_id_alumni_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_alumni_id_alumni_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4154 (class 0 OID 0)
@@ -74,7 +74,7 @@ CREATE TABLE public.dim_indikator_evaluasi (
 );
 
 
-ALTER TABLE public.dim_indikator_evaluasi OWNER TO postgres;
+ALTER TABLE public.dim_indikator_evaluasi OWNER TO smarttracer;
 
 --
 -- TOC entry 222 (class 1259 OID 99103)
@@ -90,7 +90,7 @@ CREATE SEQUENCE public.dim_indikator_evaluasi_id_indikator_evaluasi_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_indikator_evaluasi_id_indikator_evaluasi_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_indikator_evaluasi_id_indikator_evaluasi_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4155 (class 0 OID 0)
@@ -113,7 +113,7 @@ CREATE TABLE public.dim_kesesuaian_bidang (
 );
 
 
-ALTER TABLE public.dim_kesesuaian_bidang OWNER TO postgres;
+ALTER TABLE public.dim_kesesuaian_bidang OWNER TO smarttracer;
 
 --
 -- TOC entry 224 (class 1259 OID 99107)
@@ -129,7 +129,7 @@ CREATE SEQUENCE public.dim_kesesuaian_bidang_kesesuaian_bidang_sk_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_kesesuaian_bidang_kesesuaian_bidang_sk_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_kesesuaian_bidang_kesesuaian_bidang_sk_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4156 (class 0 OID 0)
@@ -152,7 +152,7 @@ CREATE TABLE public.dim_kesesuaian_level (
 );
 
 
-ALTER TABLE public.dim_kesesuaian_level OWNER TO postgres;
+ALTER TABLE public.dim_kesesuaian_level OWNER TO smarttracer;
 
 --
 -- TOC entry 226 (class 1259 OID 99111)
@@ -168,7 +168,7 @@ CREATE SEQUENCE public.dim_kesesuaian_level_kesesuaian_level_sk_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_kesesuaian_level_kesesuaian_level_sk_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_kesesuaian_level_kesesuaian_level_sk_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4157 (class 0 OID 0)
@@ -198,7 +198,7 @@ CREATE TABLE public.dim_perusahaan (
 );
 
 
-ALTER TABLE public.dim_perusahaan OWNER TO postgres;
+ALTER TABLE public.dim_perusahaan OWNER TO smarttracer;
 
 --
 -- TOC entry 228 (class 1259 OID 99118)
@@ -214,7 +214,7 @@ CREATE SEQUENCE public.dim_perusahaan_perusahaan_sk_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_perusahaan_perusahaan_sk_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_perusahaan_perusahaan_sk_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4158 (class 0 OID 0)
@@ -245,7 +245,7 @@ CREATE TABLE public.dim_prodi (
 );
 
 
-ALTER TABLE public.dim_prodi OWNER TO postgres;
+ALTER TABLE public.dim_prodi OWNER TO smarttracer;
 
 --
 -- TOC entry 230 (class 1259 OID 99123)
@@ -261,7 +261,7 @@ CREATE SEQUENCE public.dim_prodi_prodi_sk_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_prodi_prodi_sk_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_prodi_prodi_sk_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4159 (class 0 OID 0)
@@ -284,7 +284,7 @@ CREATE TABLE public.dim_status_alumni (
 );
 
 
-ALTER TABLE public.dim_status_alumni OWNER TO postgres;
+ALTER TABLE public.dim_status_alumni OWNER TO smarttracer;
 
 --
 -- TOC entry 232 (class 1259 OID 99127)
@@ -300,7 +300,7 @@ CREATE SEQUENCE public.dim_status_alumni_status_alumni_sk_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_status_alumni_status_alumni_sk_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_status_alumni_status_alumni_sk_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4160 (class 0 OID 0)
@@ -324,7 +324,7 @@ CREATE TABLE public.dim_studi_lanjut (
 );
 
 
-ALTER TABLE public.dim_studi_lanjut OWNER TO postgres;
+ALTER TABLE public.dim_studi_lanjut OWNER TO smarttracer;
 
 --
 -- TOC entry 234 (class 1259 OID 99131)
@@ -340,7 +340,7 @@ CREATE SEQUENCE public.dim_studi_lanjut_id_studi_lanjut_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_studi_lanjut_id_studi_lanjut_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_studi_lanjut_id_studi_lanjut_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4161 (class 0 OID 0)
@@ -365,7 +365,7 @@ CREATE TABLE public.dim_ump (
 );
 
 
-ALTER TABLE public.dim_ump OWNER TO postgres;
+ALTER TABLE public.dim_ump OWNER TO smarttracer;
 
 --
 -- TOC entry 236 (class 1259 OID 99135)
@@ -380,7 +380,7 @@ CREATE SEQUENCE public.dim_ump_ump_sk_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_ump_ump_sk_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_ump_ump_sk_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4162 (class 0 OID 0)
@@ -405,7 +405,7 @@ CREATE TABLE public.dim_waktu (
 );
 
 
-ALTER TABLE public.dim_waktu OWNER TO postgres;
+ALTER TABLE public.dim_waktu OWNER TO smarttracer;
 
 --
 -- TOC entry 238 (class 1259 OID 99139)
@@ -421,7 +421,7 @@ CREATE SEQUENCE public.dim_waktu_id_waktu_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_waktu_id_waktu_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_waktu_id_waktu_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4163 (class 0 OID 0)
@@ -450,7 +450,7 @@ CREATE TABLE public.dim_wirausaha (
 );
 
 
-ALTER TABLE public.dim_wirausaha OWNER TO postgres;
+ALTER TABLE public.dim_wirausaha OWNER TO smarttracer;
 
 --
 -- TOC entry 240 (class 1259 OID 99144)
@@ -466,7 +466,7 @@ CREATE SEQUENCE public.dim_wirausaha_wirausaha_sk_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.dim_wirausaha_wirausaha_sk_seq OWNER TO postgres;
+ALTER SEQUENCE public.dim_wirausaha_wirausaha_sk_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4164 (class 0 OID 0)
@@ -497,7 +497,7 @@ CREATE TABLE public.etl_anomaly_log (
 );
 
 
-ALTER TABLE public.etl_anomaly_log OWNER TO postgres;
+ALTER TABLE public.etl_anomaly_log OWNER TO smarttracer;
 
 --
 -- TOC entry 4165 (class 0 OID 0)
@@ -546,7 +546,7 @@ CREATE TABLE public.fact_multi_select (
 );
 
 
-ALTER TABLE public.fact_multi_select OWNER TO postgres;
+ALTER TABLE public.fact_multi_select OWNER TO smarttracer;
 
 --
 -- TOC entry 242 (class 1259 OID 99148)
@@ -562,7 +562,7 @@ CREATE SEQUENCE public.fact_multi_select_id_multi_select_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.fact_multi_select_id_multi_select_seq OWNER TO postgres;
+ALTER SEQUENCE public.fact_multi_select_id_multi_select_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4167 (class 0 OID 0)
@@ -589,7 +589,7 @@ CREATE TABLE public.fact_range_evaluasi (
 );
 
 
-ALTER TABLE public.fact_range_evaluasi OWNER TO postgres;
+ALTER TABLE public.fact_range_evaluasi OWNER TO smarttracer;
 
 --
 -- TOC entry 244 (class 1259 OID 99153)
@@ -605,7 +605,7 @@ CREATE SEQUENCE public.fact_range_evaluasi_id_range_evaluasi_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.fact_range_evaluasi_id_range_evaluasi_seq OWNER TO postgres;
+ALTER SEQUENCE public.fact_range_evaluasi_id_range_evaluasi_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4168 (class 0 OID 0)
@@ -642,7 +642,7 @@ CREATE TABLE public.fact_tracer_study (
 );
 
 
-ALTER TABLE public.fact_tracer_study OWNER TO postgres;
+ALTER TABLE public.fact_tracer_study OWNER TO smarttracer;
 
 --
 -- TOC entry 246 (class 1259 OID 99157)
@@ -658,7 +658,7 @@ CREATE SEQUENCE public.fact_tracer_study_id_fact_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.fact_tracer_study_id_fact_seq OWNER TO postgres;
+ALTER SEQUENCE public.fact_tracer_study_id_fact_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4169 (class 0 OID 0)
@@ -692,7 +692,7 @@ CREATE TABLE public.kpi_category_mapping (
 );
 
 
-ALTER TABLE public.kpi_category_mapping OWNER TO postgres;
+ALTER TABLE public.kpi_category_mapping OWNER TO smarttracer;
 
 --
 -- TOC entry 4170 (class 0 OID 0)
@@ -739,7 +739,7 @@ CREATE TABLE public.migrations (
 );
 
 
-ALTER TABLE public.migrations OWNER TO postgres;
+ALTER TABLE public.migrations OWNER TO smarttracer;
 
 --
 -- TOC entry 248 (class 1259 OID 99161)
@@ -755,7 +755,7 @@ CREATE SEQUENCE public.migrations_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.migrations_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.migrations_id_seq OWNER TO smarttracer;
 
 --
 -- TOC entry 4172 (class 0 OID 0)

@@ -56,6 +56,24 @@ x-laravel-env: &laravel-env
   PRIVACY_NOTICE_VERSION: ${PRIVACY_NOTICE_VERSION}
   PERSONAL_DATA_RETENTION_YEARS: ${PERSONAL_DATA_RETENTION_YEARS}
 
+  # Dipakai UmpBpsService untuk fetch data UMP dari webapi.bps.go.id.
+  BPS_API_KEY: ${BPS_API_KEY}
+
+  # --- Email (Brevo SMTP relay) ---------------------------------------------
+  # Dipakai fitur "Terbitkan Akun" (kirim kredensial alumni via email bulk).
+  MAIL_MAILER: smtp
+  MAIL_HOST: smtp-relay.brevo.com
+  MAIL_PORT: 587
+  MAIL_ENCRYPTION: tls
+  MAIL_USERNAME: ${MAIL_USERNAME}
+  MAIL_PASSWORD: ${MAIL_PASSWORD}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
+  MAIL_FROM_NAME: SmartTracer
+
+  # API key Brevo (Settings > SMTP & API > tab API Keys) -- belum dipakai
+  # kode manapun, disimpan untuk kebutuhan transactional email API nanti.
+  BREVO_API_KEY: ${BREVO_API_KEY}
+
 services:
   # --- Basis data --------------------------------------------------------
   postgres:
@@ -112,10 +130,15 @@ services:
       CUBEJS_DB_NAME: ${POSTGRES_DB}
       CUBEJS_DB_USER: ${POSTGRES_USER}
       CUBEJS_DB_PASS: ${POSTGRES_PASSWORD}
-
+      CUBEJS_CACHE_AND_QUEUE_DRIVER: memory
       # WAJIB false di produksi. Dengan true, Developer Playground terbuka
       # tanpa autentikasi apa pun bagi siapa saja yang bisa menjangkau :4000.
       CUBEJS_DEV_MODE: "false"
+      # Tanpa ini, tidak ada proses yang membangun tabel pre-aggregation --
+      # CUBEJS_SCHEDULED_REFRESH_DEFAULT saja tidak cukup di luar dev mode.
+      # VPS ini cuma satu instance cube, jadi instance yang sama juga
+      # merangkap sebagai refresh worker (bukan container terpisah).
+      CUBEJS_REFRESH_WORKER: "true"
       CUBEJS_API_SECRET: ${CUBEJS_API_SECRET}
       CUBEJS_SCHEMA_PATH: model
       CUBEJS_PORT: 4000
@@ -137,13 +160,13 @@ services:
     volumes:
       # Model dipasang read-only langsung dari repositori analitik supaya
       # perubahan definisi cube tidak perlu build image.
-      - ../../tracer-study-analytics/tracer-analytics/model:/cube/conf/model:ro
-      - ../../tracer-study-analytics/tracer-analytics/cube.js:/cube/conf/cube.js:ro
+      - ../../cube/tracer-analytics/model:/cube/conf/model:ro
+      - ../../cube/tracer-analytics/cube.js:/cube/conf/cube.js:ro
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://localhost:4000/readyz || exit 1"]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:4000/readyz', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))\""]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -226,6 +249,7 @@ services:
         # lewat nginx edge, sehingga tidak ada CORS dan tidak perlu build
         # ulang saat domain berubah.
         VITE_API_URL: /api
+        VITE_METABASE_DASHBOARD_URL: https://analyst.smart-tracer.id
         VITE_INSTITUTION_NAME: ${VITE_INSTITUTION_NAME}
         VITE_INSTITUTION_SHORT_NAME: ${VITE_INSTITUTION_SHORT_NAME}
         VITE_INSTITUTION_DOMAIN: ${VITE_INSTITUTION_DOMAIN}
@@ -239,15 +263,37 @@ services:
     mem_limit: 128m
     networks: [internal]
 
+  metabase:
+    image: metabase/metabase:latest
+    restart: unless-stopped
+    ports:
+      - "3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: smarttracer
+      MB_DB_PASS: ${POSTGRES_PASSWORD}
+      MB_DB_HOST: postgres
+      MB_SITE_URL: https://analyst.smart-tracer.id
+      JAVA_OPTS: "-Xmx384m"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 512m
+    networks: [internal]
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       # Read-only: nginx hanya menyajikan berkas statis Laravel, tidak menulis.
       - laravel_public:/var/www/html/public:ro
+      - /opt/tracer-study/certbot/conf:/etc/letsencrypt:ro
+      - /opt/tracer-study/certbot/www:/var/www/certbot:ro
     depends_on:
       - app
       - fe

@@ -39,6 +39,10 @@ return [
         'api_key' => env('BPS_API_KEY'),
     ],
 
+    'brevo' => [
+        'api_key' => env('BREVO_API_KEY'),
+    ],
+
     // URL portal alumni (fe-tracer-study), dipakai untuk membangun link login
     // di email "Terbitkan Akun" (App\Mail\AlumniAccountIssuedMail).
     'frontend' => [

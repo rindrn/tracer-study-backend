@@ -138,5 +138,21 @@
     {
         "code": "70000",
         "name": "Prov. Sumatera Utara"
+    },
+    {
+        "code": "360000",
+        "name": "Prov. Papua Barat Daya"
+    },
+    {
+        "code": "370000",
+        "name": "Prov. Papua Selatan"
+    },
+    {
+        "code": "380000",
+        "name": "Prov. Papua Tengah"
+    },
+    {
+        "code": "390000",
+        "name": "Prov. Papua Pegunungan"
     }
 ]
