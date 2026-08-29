@@ -164,6 +164,55 @@ class AlumniProfileRepository
     }
 
     /**
+     * ID kuesioner global (program_id NULL) yang sedang published --
+     * satu-satunya cakupan yang dipakai `response_status` di seluruh
+     * repository ini (lihat paginateForAdminWithResponseStatus() dan
+     * applyNotFinishedConstraint()). Diekstrak jadi method sendiri supaya
+     * kedua pemakai itu tidak menduplikasi query id kuesioner + placeholder
+     * "tidak ada id 0" untuk daftar kosong.
+     *
+     * @return list<int>
+     */
+    private function globalPublishedQuestionnaireIds(): array
+    {
+        $ids = DB::connection(self::CONN)->table('questionnaires')
+            ->whereNull('program_id')
+            ->where('status', 'published')
+            ->pluck('id')
+            ->all();
+
+        // Placeholder yang aman untuk daftar kosong — tidak ada id 0.
+        return $ids ?: [0];
+    }
+
+    /**
+     * Tambahkan syarat "BELUM menyelesaikan kuesioner global" ke query
+     * builder yang diberikan (harus sudah berbasis tabel `alumni_profiles`).
+     *
+     * Dipakai fitur reminder (lewat AlumniSelectionResolver::resolveChunk()
+     * $extra, bukan dipanggil manual) untuk menyaring target: 'finished'
+     * di sini didefinisikan SAMA PERSIS dengan cabang pertama CASE di
+     * paginateForAdminWithResponseStatus() -- respons submitted/verified
+     * pada kuesioner global. 'ongoing' TIDAK dikecualikan: alumni yang baru
+     * mendraf tetap berhak diingatkan.
+     */
+    public function applyNotFinishedConstraint(Builder $query): Builder
+    {
+        $globalQnrIds = $this->globalPublishedQuestionnaireIds();
+        $inList       = implode(',', array_fill(0, count($globalQnrIds), '?'));
+
+        return $query->whereRaw(
+            "NOT EXISTS (
+                SELECT 1 FROM responses rf
+                WHERE rf.alumni_id = alumni_profiles.id
+                  AND rf.questionnaire_id IN ({$inList})
+                  AND rf.status IN ('submitted','verified')
+            )",
+            $globalQnrIds,
+        );
+    }
+
+    /**
      * Sama seperti paginateForAdmin tapi ditambah kolom `response_status`:
      *   - 'finished'    → punya response berstatus submitted/verified
      *   - 'ongoing'     → punya response berstatus started, belum ada yang selesai
@@ -194,15 +243,7 @@ class AlumniProfileRepository
     {
         $conn = DB::connection(self::CONN);
 
-        // Subquery: ambil id kuesioner global published
-        $globalQnrIds = $conn->table('questionnaires')
-            ->whereNull('program_id')
-            ->where('status', 'published')
-            ->pluck('id')
-            ->all();
-
-        // Placeholder yang aman untuk daftar kosong — tidak ada id 0.
-        $globalQnrIds = $globalQnrIds ?: [0];
+        $globalQnrIds = $this->globalPublishedQuestionnaireIds();
         $inList       = implode(',', array_fill(0, count($globalQnrIds), '?'));
 
         // Selesai menang atas sedang mengisi: alumni yang sudah mengirim satu
@@ -272,6 +313,30 @@ class AlumniProfileRepository
                 'programs.dikti_code as program_dikti_code',
             )
             ->selectRaw($statusSql, array_merge($globalQnrIds, $globalQnrIds));
+
+        // Status pengiriman email TERAKHIR per alumni (kolom "Email
+        // Terakhir" di halaman Manajemen Email) -- OPSIONAL, lewat LEFT
+        // JOIN LATERAL, bukan disertakan selalu: pemanggil lain method ini
+        // (Data Alumni Prodi, dsb.) tidak butuh info ini dan tidak
+        // seharusnya menanggung biaya join tambahan untuk sesuatu yang
+        // tidak mereka tampilkan.
+        if (!empty($filters['with_last_email_status'])) {
+            $query->leftJoinSub(
+                'SELECT DISTINCT ON (nim) nim, kind, status, error_message, updated_at
+                 FROM alumni_email_log
+                 ORDER BY nim, id DESC',
+                'last_email',
+                'last_email.nim',
+                '=',
+                'alumni_profiles.nim',
+            );
+            $query->addSelect([
+                'last_email.kind as last_email_kind',
+                'last_email.status as last_email_status',
+                'last_email.error_message as last_email_error',
+                'last_email.updated_at as last_email_at',
+            ]);
+        }
 
         if (!empty($filters['program_id'])) {
             $query->where('alumni_profiles.program_id', $filters['program_id']);

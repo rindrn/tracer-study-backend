@@ -275,6 +275,34 @@ Route::middleware('auth:sanctum')->group(function () {
         // wewenangnya dipegang Ketua Tracer saja, sejalan dengan RBAC-01.
         Route::post('alumni/credentials/issue', [\App\Http\Controllers\Api\Admin\AlumniCredentialController::class, 'issue']);
 
+        // "Terbitkan Akun": sama seperti di atas, tapi kata sandi langsung
+        // dikirim ke masing-masing alumni lewat email (bulk, via queue)
+        // alih-alih dikembalikan ke frontend sebagai berkas unduhan.
+        // Sasarannya seleksi hybrid dari tabel "Manajemen Email" (checkbox),
+        // bukan filter murni -- lihat AlumniCredentialEmailController.
+        Route::post('alumni/credentials/issue-email', [\App\Http\Controllers\Api\Admin\AlumniCredentialEmailController::class, 'issue']);
+
+        // "Kirim Reminder": pengingat isi kuesioner untuk alumni yang sudah
+        // punya akun tapi belum selesai -- TIDAK meregenerasi kata sandi.
+        // Sama-sama lewat AlumniSelectionResolver seperti "Terbitkan Akun"
+        // di atas. Lihat AlumniReminderController.
+        Route::post('alumni/reminders/issue-email', [\App\Http\Controllers\Api\Admin\AlumniReminderController::class, 'issue']);
+
+        // Batch aktif milik admin yang sedang login, dipanggil FE saat
+        // halaman Manajemen Email dimuat/direfresh untuk memulihkan progres
+        // yang sedang berjalan -- DIDAFTARKAN SEBELUM rute {batchId} di
+        // bawah, supaya "active" tidak tertangkap sebagai nilai {batchId}.
+        Route::get('alumni/email-batches/active', [\App\Http\Controllers\Api\Admin\AlumniEmailBatchController::class, 'active']);
+
+        // Status batch, dipakai KEDUA aksi di atas (account & reminder) --
+        // dipoll FE sampai `pending` nol, untuk tahu email mana yang
+        // berhasil terkirim dan mana yang gagal. Lihat AlumniEmailBatchController.
+        Route::get('alumni/email-batches/{batchId}', [\App\Http\Controllers\Api\Admin\AlumniEmailBatchController::class, 'status']);
+
+        // Membatalkan sisa baris `queued` di satu batch -- lihat
+        // AlumniEmailBatchController::cancel().
+        Route::post('alumni/email-batches/{batchId}/cancel', [\App\Http\Controllers\Api\Admin\AlumniEmailBatchController::class, 'cancel']);
+
         // LAMs
         Route::post('lams',        [LamController::class, 'store']);
         Route::put('lams/{id}',    [LamController::class, 'update']);

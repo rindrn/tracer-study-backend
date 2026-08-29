@@ -40,6 +40,11 @@ class AlumniController extends Controller
                 'program_id' => $request->query('program_id') ? (int) $request->query('program_id') : null,
                 'graduation_year' => $request->query('graduation_year') ? (int) $request->query('graduation_year') : null,
                 'response_status' => $request->query('response_status'),
+                // Kolom "Email Terakhir" di halaman Manajemen Email --
+                // opsional (lihat AlumniProfileRepository::
+                // paginateForAdminWithResponseStatus()) supaya pemanggil
+                // lain endpoint ini tidak menanggung biaya join tambahan.
+                'with_last_email_status' => $request->boolean('with_last_email_status'),
             ],
             perPage: (int) $request->query('per_page', 15),
         );

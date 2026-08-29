@@ -37,6 +37,7 @@ class AlumniCredentialService
 
     public function __construct(
         private readonly AuditLogService $audit,
+        private readonly AlumniSelectionResolver $selectionResolver,
     ) {}
 
     /**
@@ -149,6 +150,83 @@ class AlumniCredentialService
             return ['issued' => collect(), 'remaining' => 0, 'last_nim' => null];
         }
 
+        $issued  = $this->issueForTargets($targets);
+        $lastNim = (string) $targets->last()->nim;
+
+        // Penerbitan kredensial mengubah siapa yang bisa masuk sebagai
+        // alumni, jadi ia dicatat. Yang disimpan CACAHNYA saja: daftar NIM
+        // beserta kata sandi memang beredar di berkas unduhan petugas, tapi
+        // tidak boleh ikut mengendap di tabel yang dibaca lewat API.
+        $this->audit->record('alumni.credentials_issued', [
+            'entity_type' => 'alumni_profiles',
+            'context'     => [
+                'count'           => $issued->count(),
+                'graduation_year' => $filters['graduation_year'] ?? null,
+                'program_id'      => $filters['program_id'] ?? null,
+                'jurusan'         => $filters['jurusan'] ?? null,
+            ],
+        ]);
+
+        return [
+            'issued'    => $issued,
+            'remaining' => $this->countRemaining($filters, $lastNim),
+            'last_nim'  => $lastNim,
+        ];
+    }
+
+    /**
+     * Sama seperti issue() di atas, tapi sasarannya datang dari
+     * AlumniSelectionResolver (checkbox tabel "Manajemen Email" -- pilih
+     * semua sesuai filter dengan pengecualian manual, ATAU daftar NIM
+     * eksplisit) alih-alih filter murni. Dipakai
+     * AlumniCredentialEmailController, TIDAK dipakai AlumniCredentialController
+     * (fitur "Terbitkan Kredensial" xlsx tetap lewat issue() di atas, tidak
+     * berubah).
+     *
+     * @param  array{mode: 'explicit'|'filtered', nims?: list<string>, filters?: array, excluded_nims?: list<string>} $selection
+     * @return array{issued: Collection<int, array{nim: string, name: string, email: string, password: string}>, remaining: int, last_nim: ?string}
+     */
+    public function issueForSelection(array $selection, ?string $afterNim, int $limit): array
+    {
+        $limit   = max(1, min($limit, self::MAX_BATCH));
+        $targets = $this->selectionResolver->resolveChunk($selection, $afterNim, $limit);
+
+        if ($targets->isEmpty()) {
+            return ['issued' => collect(), 'remaining' => 0, 'last_nim' => null];
+        }
+
+        $issued  = $this->issueForTargets($targets);
+        $lastNim = (string) $targets->last()->nim;
+
+        $this->audit->record('alumni.credentials_issued', [
+            'entity_type' => 'alumni_profiles',
+            'context'     => [
+                'count'           => $issued->count(),
+                'selection_mode'  => $selection['mode'] ?? 'filtered',
+                'graduation_year' => $selection['filters']['graduation_year'] ?? null,
+                'program_id'      => $selection['filters']['program_id'] ?? null,
+                'jurusan'         => $selection['filters']['jurusan'] ?? null,
+            ],
+        ]);
+
+        return [
+            'issued'    => $issued,
+            'remaining' => $this->selectionResolver->countRemaining($selection, $lastNim),
+            'last_nim'  => $lastNim,
+        ];
+    }
+
+    /**
+     * Inti bersama issue() dan issueForSelection(): bangkitkan+cincang kata
+     * sandi untuk SATU POTONG target yang sudah diresolusi, simpan, cabut
+     * token lama. Sengaja diekstrak supaya kedua jalur publik di atas tidak
+     * menduplikasi loop hash + transaksi DB ini.
+     *
+     * @param  Collection<int, object{id:int, nim:string, name:?string, email:?string}> $targets
+     * @return Collection<int, array{nim: string, name: string, email: string, password: string}>
+     */
+    private function issueForTargets(Collection $targets): Collection
+    {
         // Bangkitkan dan cincang seluruh potongan lebih dulu. $hashes hanya
         // berisi cincangan; teks polosnya tidak pernah keluar dari $issued.
         $issued = collect();
@@ -172,27 +250,7 @@ class AlumniCredentialService
             $this->revokeTokens(array_keys($hashes));
         });
 
-        $lastNim = (string) $targets->last()->nim;
-
-        // Penerbitan kredensial mengubah siapa yang bisa masuk sebagai
-        // alumni, jadi ia dicatat. Yang disimpan CACAHNYA saja: daftar NIM
-        // beserta kata sandi memang beredar di berkas unduhan petugas, tapi
-        // tidak boleh ikut mengendap di tabel yang dibaca lewat API.
-        $this->audit->record('alumni.credentials_issued', [
-            'entity_type' => 'alumni_profiles',
-            'context'     => [
-                'count'           => $issued->count(),
-                'graduation_year' => $filters['graduation_year'] ?? null,
-                'program_id'      => $filters['program_id'] ?? null,
-                'jurusan'         => $filters['jurusan'] ?? null,
-            ],
-        ]);
-
-        return [
-            'issued'    => $issued,
-            'remaining' => $this->countRemaining($filters, $lastNim),
-            'last_nim'  => $lastNim,
-        ];
+        return $issued;
     }
 
     /**
@@ -285,44 +343,18 @@ class AlumniCredentialService
         );
     }
 
-    /** Penyaring bersama findTargets() dan countRemaining(), tanpa kursor. */
+    /**
+     * Penyaring bersama findTargets() dan countRemaining(), tanpa kursor.
+     *
+     * Mendelegasikan ke AlumniSelectionResolver::buildFilteredQuery() --
+     * WHERE clause-nya sekarang SATU sumber kebenaran, dipakai juga oleh
+     * mode 'filtered' di issueForSelection(). Perilaku issue() di atas
+     * tidak berubah: resolver dipanggil tanpa excluded_nims, persis kueri
+     * yang sebelumnya dibangun inline di sini.
+     */
     private function baseQuery(array $filters): \Illuminate\Database\Query\Builder
     {
-        $query = DB::connection(self::CONN)->table('alumni_profiles')
-            ->where('is_active', true);
-
-        if (!empty($filters['graduation_year'])) {
-            $query->where('graduation_year', (int) $filters['graduation_year']);
-        }
-
-        // Jurusan disaring lewat subkueri ke `programs`, bukan JOIN. Alasannya
-        // praktis: findTargets() memilih kolom tanpa awalan nama tabel, dan
-        // sebuah JOIN akan membuat `id` maupun `name` menjadi ambigu di
-        // PostgreSQL. Subkueri menjaga kueri utamanya tetap satu tabel.
-        //
-        // Penyaring ini INDEPENDEN dari program_id. Memilih jurusan saja
-        // berarti seluruh program studi di bawahnya; memilih keduanya berarti
-        // irisannya — dan karena tiap program studi hanya bernaung di satu
-        // jurusan, irisan itu sama dengan program studi tersebut.
-        if (!empty($filters['jurusan'])) {
-            $jurusan = (string) $filters['jurusan'];
-            $query->whereIn('program_id', function ($sub) use ($jurusan) {
-                $sub->from('programs')->select('id')->where('jurusan', $jurusan);
-            });
-        }
-
-        if (!empty($filters['program_id'])) {
-            $query->where('program_id', (int) $filters['program_id']);
-        }
-
-        // Penerbitan bertahap: lewati yang kredensialnya sudah pernah dikirim,
-        // supaya menjalankan ulang untuk menjangkau alumni baru tidak
-        // mengacak kata sandi orang yang sudah terlanjur menerima surel.
-        if (!empty($filters['only_without_credentials'])) {
-            $query->whereNull('password_issued_at');
-        }
-
-        return $query;
+        return $this->selectionResolver->buildFilteredQuery($filters);
     }
 
     /**
