@@ -36,4 +36,4 @@ docs/
 # privat. Bangun ulang lewat scripts/rebuild-data-dumps.sh kalau datanya
 # berubah.
 /database/dump/*.bak
-.env.bak*
+.env.bak*.scannerwork/
