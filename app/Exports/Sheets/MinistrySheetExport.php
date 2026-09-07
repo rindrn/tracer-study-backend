@@ -175,7 +175,13 @@ class MinistrySheetExport extends DefaultValueBinder implements FromQuery, WithH
             : [];
 
         $row = [
-            $alumni->kode_pt ?? '-',
+            // Impor alumni tidak pernah membawa kolom Kode PT, sehingga
+            // sebagian besar baris menyimpannya kosong dan berkas pelaporan
+            // dulu memuat '-' yang ditolak portal. Satu pemasangan melayani
+            // satu perguruan tinggi, jadi konfigurasinya adalah jawaban yang
+            // benar untuk baris mana pun yang tidak membawa kodenya sendiri —
+            // sebagaimana sudah dinyatakan config/institution.php.
+            ($alumni->kode_pt ?: config('institution.code')) ?: '-',
             // Portal Kementerian mencocokkan prodi dari kode PDDIKTI, bukan
             // singkatan internal. Fallback ke program_code kalau dikti_code
             // belum diisi di master data -- lebih baik kode yang salah tapi

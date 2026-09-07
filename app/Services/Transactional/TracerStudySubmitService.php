@@ -252,16 +252,36 @@ class TracerStudySubmitService
         // berawalan '+62'.
         $phone = PhoneNumber::normalize($validated['phone'] ?? null);
 
-        return $this->alumniRepo->upsertByNim($validated['nim'], [
+        $data = [
             'name'            => $validated['name'],
             'email'           => $validated['email'],
             'phone'           => $phone,
             'program_id'      => $programId,
             'graduation_year' => $validated['tahun_lulus'],
-            'kode_pt'         => $validated['kode_pt'] ?? null,
             'nik'             => $validated['nik'],
             'npwp'            => $validated['npwp'] ?? null,
-        ]);
+        ];
+
+        // Kode PT ditulis HANYA bila ada nilainya. Dulu barisnya berbunyi
+        // `$validated['kode_pt'] ?? null`, dan itu keliru pada dua hal
+        // sekaligus. Formulir mengirim isian ini dengan kode pertanyaannya,
+        // `kdptimsmh`, sehingga kunci `kode_pt` tidak pernah ada dan nilai
+        // yang diketik alumni selalu terbuang. Lalu `?? null` menuliskan
+        // kekosongan itu ke basis data, sehingga setiap pengiriman MENGHAPUS
+        // kode_pt yang sudah terisi.
+        //
+        // Konfigurasi didahulukan karena satu pemasangan melayani satu
+        // perguruan tinggi: kodenya milik institusi, bukan sesuatu yang perlu
+        // dihafal alumni. Isian formulir dipakai hanya bila konfigurasinya
+        // memang belum diisi.
+        $kodePt = config('institution.code')
+            ?: trim((string) ($validated['kdptimsmh'] ?? $validated['kode_pt'] ?? ''));
+
+        if ($kodePt !== '') {
+            $data['kode_pt'] = $kodePt;
+        }
+
+        return $this->alumniRepo->upsertByNim($validated['nim'], $data);
     }
 
     /**
