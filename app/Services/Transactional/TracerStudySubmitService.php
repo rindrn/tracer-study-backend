@@ -366,12 +366,18 @@ class TracerStudySubmitService
         3 => 'Wiraswasta',
         4 => 'Melanjutkan Pendidikan',
         5 => 'Tidak kerja tetapi sedang mencari kerja',
-        6 => 'Melanjutkan pendidikan sambil bekerja',
-        7 => 'Melanjutkan pendidikan sambil wiraswasta',
     ];
 
-    /** f8 yang berarti alumni sedang menempuh pendidikan lanjut. */
-    private const FURTHER_STUDY_STATUSES = [4, 6, 7];
+    /**
+     * f8 yang berarti alumni sedang menempuh pendidikan lanjut.
+     *
+     * Dulu berisi [4, 6, 7]. Kode 6 dan 7 — "Melanjutkan pendidikan sambil
+     * bekerja" dan "sambil wiraswasta" — dihapus oleh migrasi
+     * 2026_09_07_000003_hapus_opsi_f8_gabungan karena tidak dikenal instrumen
+     * kementerian; alumninya dilebur ke status 1 dan 3, dan jejak studi
+     * lanjutnya dipindahkan ke education_records.
+     */
+    private const FURTHER_STUDY_STATUSES = [4];
 
     /**
      * Berdasarkan f8 (status alumni) — replace employment / education record.
