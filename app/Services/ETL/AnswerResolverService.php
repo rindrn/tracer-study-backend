@@ -38,8 +38,29 @@ class AnswerResolverService
     /** Question_code yang isinya ID kota (FK ke cities.id), bukan teks bebas. */
     private const CITY_ID_CODES = ['f5a2'];
 
+    /**
+     * Batas panjang teks pengganti dari companion "Lainnya, tuliskan" --
+     * konservatif, disetel ke kolom OLAP TERSEMPIT yang diketahui saat ini
+     * dipakai role narrow (dim_alumni.label_sumber_biaya_dipolban,
+     * dim_perusahaan.label_jenis_perusahaan -- keduanya varchar(100),
+     * dikonfirmasi di database/dump/init.sql). LEBIH KETAT dari default
+     * truncateFreeText() 180 char (disetel untuk kolom company_name/
+     * perguruan_tinggi varchar(200)) supaya tidak overflow kolom sempit
+     * ini. Kalau nanti ada role narrow baru dengan kolom target lebih
+     * sempit dari 100, cek ulang lebar kolomnya langsung di
+     * database/dump/init.sql -- JANGAN percaya
+     * semantic_role_registry.target_column sebagai acuan lebar kolom,
+     * sudah ditemukan tidak sinkron dengan nama kolom OLAP sesungguhnya
+     * untuk role jenis_perusahaan (registry bilang 'jenis_perusahaan',
+     * kolom aslinya 'label_jenis_perusahaan').
+     */
+    private const COMPANION_TEXT_MAX_LENGTH = 100;
+
     /** @var array<int, Collection> cache: questionnaire_id => questionnaire_options */
     private array $optionsCache = [];
+
+    /** @var array<int, Collection> cache: questionnaire_id => companion definitions (lihat applyCompanionSubstitutions()) */
+    private array $companionDefsCache = [];
 
     /** @var array<int, Collection> cache: questionnaire_id => question meta (type+metadata) */
     private array $questionMetaCache = [];
@@ -122,6 +143,103 @@ class AnswerResolverService
             'single_choice', 'multiple_choice' => $this->resolveChoiceLabel($questionnaireId, $questionCode, $rawAnswer->answer_text),
             default => $this->truncateFreeText($rawAnswer->answer_text), // short_text, long_text, date
         };
+    }
+
+    /**
+     * Timpa $resolved[parent_code] dengan jawaban teks bebas dari
+     * pertanyaan companion-nya, KHUSUS untuk alumni yang benar-benar
+     * memilih opsi "Lainnya, tuliskan" pada pertanyaan induk (bukan opsi
+     * lain) DAN companion-nya benar-benar terisi. Kalau companion
+     * kosong/tidak dijawab, $resolved[parent_code] dibiarkan seperti
+     * hasil resolve semula (label opsi tetap, mis. "Lainnya, tuliskan")
+     * -- fail-visible, bukan fail-silent, sama filosofinya dengan
+     * resolveProvinceName() di atas: respondennya memang tidak menuliskan
+     * apa-apa, itu bukan bug ETL yang perlu disamarkan.
+     *
+     * $answersForResponse adalah collection jawaban MENTAH satu response
+     * yang SAMA (sudah dipunyai caller sebelum pivot $resolved dibangun --
+     * lihat AlumniFactBuilderService), sehingga tidak perlu query OLTP
+     * baru per-alumni; hanya getShowIfCompanionDefinitions() yang
+     * melakukan I/O baru, dan itu di-cache sekali per proses ETL.
+     *
+     * Definisi companion PASANGAN INI TIDAK PERNAH mengubah nilai
+     * $resolved untuk parent yang jawabannya BUKAN opsi Lainnya -- resolve
+     * biasa (resolveChoiceLabel()) tetap satu-satunya sumber nilai untuk
+     * kasus itu.
+     */
+    public function applyCompanionSubstitutions(int $questionnaireId, array $resolved, Collection $answersForResponse): array
+    {
+        foreach ($this->getCompanionDefinitions($questionnaireId) as $def) {
+            $parentAnswer = $answersForResponse->firstWhere('question_code', $def->parent_code);
+
+            if ($parentAnswer === null) {
+                continue; // alumni tidak menjawab pertanyaan induk sama sekali
+            }
+
+            $rawParentValue = $parentAnswer->answer_text !== null ? (string) $parentAnswer->answer_text : null;
+
+            if ($rawParentValue === null || !in_array($rawParentValue, $def->trigger_values, true)) {
+                continue; // opsi lain yang dipilih -- nilai resolve semula sudah benar
+            }
+
+            $companionAnswer = $answersForResponse->firstWhere('question_code', $def->companion_code);
+            $companionText = $companionAnswer->answer_text ?? null;
+
+            if ($companionText === null || trim($companionText) === '') {
+                continue; // companion kosong -- biarkan label "Lainnya, tuliskan" apa adanya
+            }
+
+            $resolved[$def->parent_code] = $this->truncateFreeText($companionText, self::COMPANION_TEXT_MAX_LENGTH);
+        }
+
+        return $resolved;
+    }
+
+    private function getCompanionDefinitions(int $questionnaireId): Collection
+    {
+        return $this->companionDefsCache[$questionnaireId] ??= $this->oltpRepo
+            ->getShowIfCompanionDefinitions()
+            ->filter(fn ($def) => $def->questionnaire_id === $questionnaireId)
+            ->values();
+    }
+
+    /**
+     * Versi applyCompanionSubstitutions() untuk anggota grup multi-select
+     * (boolean) -- dipakai MultiSelectFactBuilderService, BUKAN untuk role
+     * narrow yang bersarang di $resolved. fact_multi_select grain-nya per-
+     * alumni (beda dari dim_indikator_evaluasi yang Type1/global), jadi teks
+     * penggantinya tidak bisa lewat applyCompanionSubstitutions() yang
+     * menimpa $resolved[parent_code] -- di sini caller (MultiSelectFactBuilderService)
+     * sendiri yang menaruh hasilnya ke kolom fact_multi_select.jawaban_lainnya.
+     *
+     * Beda dengan applyCompanionSubstitutions(), TIDAK perlu cek "apakah
+     * $questionCode ini benar-benar yang dipilih" -- caller HANYA memanggil
+     * method ini untuk jawaban boolean yang SUDAH dikonfirmasi true (lihat
+     * MultiSelectFactBuilderService::buildForAlumni()), jadi kalau
+     * $questionCode terdaftar sebagai parent_code companion, otomatis berarti
+     * alumni ini memilih opsi "Lainnya" tersebut.
+     *
+     * Return null kalau $questionCode bukan companion-parent (mis. checkbox
+     * biasa, bukan "Lainnya"), atau companion-nya kosong/tidak dijawab --
+     * caller lalu membiarkan fact_multi_select.jawaban_lainnya NULL.
+     */
+    public function getCompanionText(int $questionnaireId, string $questionCode, Collection $answersForResponse): ?string
+    {
+        $def = $this->getCompanionDefinitions($questionnaireId)
+            ->firstWhere('parent_code', $questionCode);
+
+        if ($def === null) {
+            return null;
+        }
+
+        $companionAnswer = $answersForResponse->firstWhere('question_code', $def->companion_code);
+        $companionText = $companionAnswer->answer_text ?? null;
+
+        if ($companionText === null || trim($companionText) === '') {
+            return null;
+        }
+
+        return $this->truncateFreeText($companionText, self::COMPANION_TEXT_MAX_LENGTH);
     }
 
     /**

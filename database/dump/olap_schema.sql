@@ -542,7 +542,8 @@ CREATE TABLE public.fact_multi_select (
     id_alumni integer NOT NULL,
     prodi_sk integer NOT NULL,
     id_waktu integer NOT NULL,
-    id_indikator_evaluasi integer NOT NULL
+    id_indikator_evaluasi integer NOT NULL,
+    jawaban_lainnya character varying(100)
 );
 
 

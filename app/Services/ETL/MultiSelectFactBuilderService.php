@@ -62,11 +62,25 @@ class MultiSelectFactBuilderService
                 continue;
             }
 
+            // Kalau pertanyaan ini adalah anggota grup multi-select yang
+            // labelnya "Lainnya" (terdeteksi otomatis, lihat
+            // OltpExtractRepository::getShowIfCompanionDefinitions() jalur
+            // boolean), ambil teks bebas dari pertanyaan lanjutannya --
+            // fact_multi_select grain-nya per-alumni jadi aman ditimpa di
+            // sini, TIDAK BOLEH di dim_indikator_evaluasi (itu Type1/global,
+            // dipakai bareng semua alumni yang pernah mencentang opsi sama).
+            $jawabanLainnya = $this->resolver->getCompanionText(
+                $questionnaireId,
+                $answer->question_code,
+                $answersForOneAlumni
+            );
+
             $this->olapRepo->insertFactMultiSelect([
                 'id_alumni'             => $alumniSk,
                 'prodi_sk'              => $prodiSk,
                 'id_waktu'              => $idWaktu,
                 'id_indikator_evaluasi' => $idIndikatorEvaluasi,
+                'jawaban_lainnya'       => $jawabanLainnya,
             ]);
 
             $insertedCount++;

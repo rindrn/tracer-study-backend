@@ -256,6 +256,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
                 'DimAlumni.nama',
                 'DimAlumni.nim',
                 'DimProdi.nama_prodi',
+                'DimProdi.jenjang',
                 'DimAlumni.tahun_lulus',
                 'DimPerusahaan.company_name',
             ],
@@ -269,6 +270,7 @@ class PendapatanRepository extends BaseAnalyticalRepository
             'nama'          => $r['DimAlumni.nama']              ?? '',
             'nim'           => $r['DimAlumni.nim']               ?? '',
             'nama_prodi'    => $r['DimProdi.nama_prodi']         ?? '',
+            'jenjang'       => $r['DimProdi.jenjang']            ?? '',
             'tahun_lulus'   => $r['DimAlumni.tahun_lulus']       ?? '',
             'perusahaan'    => $r['DimPerusahaan.company_name']  ?? '-',
         ])->toArray();

@@ -67,6 +67,7 @@ class WirausahaController extends Controller
             // ('Owner', 'CEO', 'Manager', 'Direktur') tidak pernah ada di data,
             // sementara opsi asli 'Freelance / Kerja Lepas' justru ditolak 422.
             'jabatan'         => 'nullable|string|max:100',
+            'jabatan_lainnya' => 'nullable|boolean',
             'jenjang'         => Degree::filterRule(),
             'nama_prodi'      => 'nullable|string|max:100',
             'tahun_lulus'     => 'nullable|string|max:5',
@@ -78,10 +79,11 @@ class WirausahaController extends Controller
 
         // scopedParams() hanya meneruskan global filters — params spesifik diambil langsung
         $p = array_merge($this->scopedParams($request), [
-            'jabatan'  => $request->input('jabatan'),
-            'search'   => $request->input('search'),
-            'page'     => $request->input('page'),
-            'per_page' => $request->input('per_page'),
+            'jabatan'         => $request->input('jabatan'),
+            'jabatan_lainnya' => $request->boolean('jabatan_lainnya'),
+            'search'          => $request->input('search'),
+            'page'            => $request->input('page'),
+            'per_page'        => $request->input('per_page'),
         ]);
 
         try {

@@ -116,6 +116,21 @@ class AlumniFactBuilderService
                 );
             }
 
+            // ── Substitusi teks bebas companion untuk pasangan "Lainnya,
+            // tuliskan" (mis. f1201->f1202 sumber biaya, f1101->f1102
+            // jenis instansi) -- terdeteksi otomatis dari metadata
+            // show_if, lihat AnswerResolverService::applyCompanionSubstitutions().
+            // HARUS di sini: SETELAH pivot $resolved selesai (butuh nilai
+            // resolve semula sebagai fallback), tapi SEBELUM
+            // $resolvedByRole dibaca dari $resolved di bawah, supaya role
+            // narrow (sumber_biaya_studi, jenis_perusahaan, dst) ikut
+            // membawa teks penggantinya. ──
+            $resolved = $this->resolver->applyCompanionSubstitutions(
+                $response->questionnaire_id,
+                $resolved,
+                $answersForThisAlumni
+            );
+
             // ── Resolve alumni_sk & prodi_sk (dim harus sudah sync) ──
             $alumniRow = $this->oltpRepo->getAlumniByIds([$response->alumni_id])->first();
             $alumniSk = $alumniRow !== null ? $this->olapRepo->getAlumniSkByNim($alumniRow->nim) : null;

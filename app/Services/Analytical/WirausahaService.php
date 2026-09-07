@@ -109,9 +109,12 @@ class WirausahaService
 
             if ($countLain > 0) {
                 $posisi[] = [
-                    'label' => 'Lainnya',
-                    'count' => $countLain,
-                    'pct'   => $total > 0 ? round($countLain / $total * 100, 1) : 0.0,
+                    'label'      => 'Lainnya',
+                    'count'      => $countLain,
+                    'pct'        => $total > 0 ? round($countLain / $total * 100, 1) : 0.0,
+                    // Penanda buat FE: slice ini agregat, drill-down-nya harus
+                    // pakai jabatan_lainnya=1, bukan filter jabatan=Lainnya.
+                    'is_lainnya' => true,
                 ];
             }
 
@@ -139,9 +142,29 @@ class WirausahaService
         $page    = max(1, (int) ($params['page']     ?? 1));
         $perPage = min(100, max(5, (int) ($params['per_page'] ?? 15)));
         $jabatan = $params['jabatan'] ?? null;
+        $jabatanNotIn = null;
+
+        // Slice "Lainnya" di pie (lihat getPie()) adalah agregat jabatan
+        // ke-4+ -- bukan nilai asli DimWirausaha.jabatan -- jadi tidak bisa
+        // di-drill-down dengan equals ke 'Lainnya'. Hitung ulang top-3 label
+        // pakai filter yang sama persis dengan yang membentuk pie, lalu
+        // drill-down dengan jabatanNotIn (notEquals di repo) supaya isinya
+        // konsisten dengan slice-nya.
+        if (!empty($params['jabatan_lainnya'])) {
+            $jabatan = null;
+            $jabatanNotIn = $this->repo->getPiePosisi(
+                jenjang:        $params['jenjang']         ?? null,
+                jurusan:        $params['jurusan']         ?? null,
+                idProdiIn:      $params['id_prodi_in']     ?? null,
+                namaProdi:      $params['nama_prodi']      ?? null,
+                tahunLulus:     $params['tahun_lulus']     ?? null,
+                mingguSnapshot: $params['minggu_snapshot'] ?? null,
+            )->take(3)->pluck('label')->values()->toArray();
+        }
 
         $result = $this->repo->getDetailAlumni(
             jabatan:        $jabatan,
+            jabatanNotIn:   $jabatanNotIn,
             jenjang:        $params['jenjang']         ?? null,
             idProdiIn:      $params['id_prodi_in'] ?? null,
             namaProdi:      $params['nama_prodi']      ?? null,
@@ -154,7 +177,7 @@ class WirausahaService
 
         return new WirausahaDrillDownDTO(
             data:        $result['data'],
-            jabatan:     $jabatan,
+            jabatan:     $jabatan ?? ($jabatanNotIn !== null ? 'Lainnya' : null),
             page:        $page,
             perPage:     $perPage,
             totalOnPage: $result['total_on_page'],

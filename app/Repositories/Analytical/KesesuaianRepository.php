@@ -257,6 +257,7 @@ class KesesuaianRepository extends BaseAnalyticalRepository
                 'DimProdi.jenjang',
                 'DimAlumni.tahun_lulus',
                 'DimIndikatorEvaluasi.label_pertanyaan',
+                'FactMultiSelect.jawaban_lainnya',
             ],
             'filters' => $filters,
             'order'   => [['DimAlumni.nama', 'asc']],
@@ -264,13 +265,22 @@ class KesesuaianRepository extends BaseAnalyticalRepository
             'offset'  => ($page - 1) * $perPage,
         ]);
 
+        // "Lainnya" adalah label BERSAMA (dim_indikator_evaluasi Type1,
+        // satu baris dipakai semua alumni yang pernah pilih opsi ini) --
+        // kalau alumni ini punya jawaban lanjutan sendiri (jawaban_lainnya,
+        // hasil AnswerResolverService::getCompanionText() saat ETL), pakai
+        // itu supaya tiap alumni menampilkan teks aslinya, bukan label
+        // generik yang sama untuk semua orang. Kosong/NULL -> label asli
+        // apa adanya (fail-visible, sama filosofinya dengan companion
+        // substitution di AnswerResolverService).
         $data = $result->map(fn($r) => [
             'nama'        => $r['DimAlumni.nama']                        ?? '',
             'nim'         => $r['DimAlumni.nim']                         ?? '',
             'nama_prodi'  => $r['DimProdi.nama_prodi']                   ?? '',
             'jenjang'     => $r['DimProdi.jenjang']                      ?? '',
             'tahun_lulus' => $r['DimAlumni.tahun_lulus']                 ?? '',
-            'alasan'      => $r['DimIndikatorEvaluasi.label_pertanyaan'] ?? '',
+            'alasan'      => $r['FactMultiSelect.jawaban_lainnya']
+                              ?: ($r['DimIndikatorEvaluasi.label_pertanyaan'] ?? ''),
         ])->toArray();
 
         return [

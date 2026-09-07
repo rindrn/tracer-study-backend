@@ -204,6 +204,7 @@ class WirausahaRepository extends BaseAnalyticalRepository
      */
     public function getDetailAlumni(
         ?string $jabatan        = null,
+        ?array  $jabatanNotIn   = null,
         ?string $jenjang        = null,
         ?string $namaProdi      = null,
         ?array  $idProdiIn      = null,
@@ -225,6 +226,21 @@ class WirausahaRepository extends BaseAnalyticalRepository
                 'operator' => 'equals',
                 'values'   => [$jabatan],
             ];
+        } elseif ($jabatanNotIn !== null && count($jabatanNotIn) > 0) {
+            // Drill-down slice "Lainnya" dari getPie() -- itu label agregat
+            // buatan (bukan nilai asli DimWirausaha.jabatan), jadi filter-nya
+            // notEquals ke top-3 label asli (Cube.js: notEquals + array
+            // values = semantik NOT IN, simetris dgn equals + array = IN --
+            // lihat catatan di buildGlobalFilters()), bukan equals ke
+            // string 'Lainnya'.
+            $extra[] = [
+                'member'   => 'DimWirausaha.jabatan',
+                'operator' => 'notEquals',
+                'values'   => $jabatanNotIn,
+            ];
+            // getPiePosisi() juga buang baris jabatan kosong -- samakan biar
+            // total di modal konsisten dengan angka "Lainnya" di pie.
+            $extra[] = ['member' => 'DimWirausaha.jabatan', 'operator' => 'set'];
         }
 
         $filters = array_merge(

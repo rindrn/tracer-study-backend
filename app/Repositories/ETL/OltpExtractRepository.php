@@ -44,13 +44,20 @@ class OltpExtractRepository
      */
     private ?array $relevantQuestionCodesCache = null;
 
+    /**
+     * @var Collection|null cache: definisi pasangan "pertanyaan induk opsi
+     *      Lainnya -> pertanyaan lanjutan teks bebas", lihat
+     *      getShowIfCompanionDefinitions().
+     */
+    private ?Collection $companionDefinitionsCache = null;
+
     private function oltp(): \Illuminate\Database\Connection
     {
         return DB::connection('oltp');
     }
 
     /**
-     * Union dua sumber:
+     * Union tiga sumber:
      *   1. question_code AKTIF di question_semantic_mapping -- sumber
      *      kebenaran utama sekarang, mencakup role narrow MAUPUN wide
      *      (kompetensi/metode/alasan semuanya sudah termapping, lihat
@@ -61,6 +68,14 @@ class OltpExtractRepository
      *      suatu saat mapping wide-grain dinonaktifkan tanpa sengaja, ETL
      *      tidak langsung berhenti menarik jawaban untuk kode yang dim-nya
      *      sudah established dari run-run sebelumnya.
+     *   3. companion_code dari getShowIfCompanionDefinitions() yang
+     *      parent_code-nya SUDAH termasuk di union (1)+(2) -- supaya
+     *      jawaban teks bebas pasangan "Lainnya, tuliskan" (mis. f1202
+     *      companion dari f1201) ikut ditarik dari OLTP. Filter "parent
+     *      sudah relevan" ini yang membuat companion tetap TIDAK ditarik
+     *      kalau induknya sendiri belum dipetakan (mis. f1002/f1001 hari
+     *      ini) -- begitu induknya dipetakan, companion-nya otomatis ikut
+     *      tanpa perubahan kode lagi.
      */
     public function getRelevantQuestionCodes(): array
     {
@@ -75,7 +90,121 @@ class OltpExtractRepository
 
         $impliedByIndikator = DB::connection('olap')->table('dim_indikator_evaluasi')->pluck('kode_field');
 
-        return $this->relevantQuestionCodesCache = $mapped->merge($impliedByIndikator)->unique()->values()->all();
+        $baseCodes = $mapped->merge($impliedByIndikator)->unique()->values();
+
+        $companionCodes = $this->getShowIfCompanionDefinitions()
+            ->filter(fn ($def) => $baseCodes->contains($def->parent_code))
+            ->pluck('companion_code');
+
+        return $this->relevantQuestionCodesCache = $baseCodes->merge($companionCodes)->unique()->values()->all();
+    }
+
+    /**
+     * Deteksi OTOMATIS pasangan "pertanyaan induk (opsi/checkbox Lainnya) ->
+     * pertanyaan lanjutan teks bebas" dari data kuesioner itu sendiri --
+     * BUKAN daftar hardcode question_code. Sebuah pertanyaan C adalah
+     * companion Lainnya dari induk P untuk nilai pemicu V jika DAN HANYA
+     * JIKA metadata C punya show_if: {P: [..., V, ...]}, DAN salah satu dari:
+     *
+     *   (a) P single_choice/multiple_choice: punya baris questionnaire_options
+     *       untuk option_code=V yang option_label-nya mengandung substring
+     *       "lainnya" (case-insensitive). Contoh: f1101->f1102, f1201->f1202.
+     *   (b) P boolean anggota grup multi-select (metadata.group_code ada):
+     *       tidak punya baris questionnaire_options sama sekali (boolean
+     *       tidak pernah diberi opsi), jadi dicek dari metadata.group_label
+     *       milik P sendiri (label checkbox itu, bukan label opsi) yang
+     *       mengandung substring "lainnya". Contoh: f415->f416, f1613->f1614.
+     *       Untuk boolean, checked=true SUDAH BERARTI opsi ini yang dipilih
+     *       (tidak ada opsi lain untuk dibandingkan seperti single_choice),
+     *       jadi trigger_values dipakai apa adanya dari show_if.
+     *
+     * Dibaca UTUH tanpa filter whitelist (tabel kuesioner kecil, method
+     * inilah yang justru membangun whitelist companion untuk
+     * getRelevantQuestionCodes() -- filter whitelist di sini akan jadi
+     * lingkaran ayam-telur).
+     *
+     * @return Collection<int, object{questionnaire_id:int, parent_code:string, companion_code:string, trigger_values:array<string>}>
+     */
+    public function getShowIfCompanionDefinitions(): Collection
+    {
+        if ($this->companionDefinitionsCache !== null) {
+            return $this->companionDefinitionsCache;
+        }
+
+        $questions = $this->oltp()->table('questionnaire_questions')
+            ->whereNotNull('metadata')
+            ->select(['questionnaire_id', 'code', 'question_type', 'metadata'])
+            ->get();
+
+        $questionsByCode = $questions->keyBy(fn ($row) => $row->questionnaire_id . ':' . $row->code);
+
+        $optionsByQuestion = $this->oltp()->table('questionnaire_options as qo')
+            ->join('questionnaire_questions as qq', 'qq.id', '=', 'qo.question_id')
+            ->select(['qq.questionnaire_id', 'qq.code as question_code', 'qo.option_code', 'qo.option_label'])
+            ->get()
+            ->groupBy(fn ($row) => $row->questionnaire_id . ':' . $row->question_code);
+
+        $definitions = collect();
+
+        foreach ($questions as $row) {
+            $metadata = json_decode((string) $row->metadata, true);
+            $showIf = $metadata['show_if'] ?? null;
+
+            if (!is_array($showIf) || $showIf === []) {
+                continue;
+            }
+
+            foreach ($showIf as $parentCode => $triggerValues) {
+                if (!is_array($triggerValues) || $triggerValues === []) {
+                    continue;
+                }
+
+                $parentKey     = $row->questionnaire_id . ':' . $parentCode;
+                $parentOptions = $optionsByQuestion->get($parentKey);
+                $matchingTriggers = collect();
+
+                if ($parentOptions !== null && $parentOptions->isNotEmpty()) {
+                    // ── Jalur (a): single_choice/multiple_choice ──
+                    $lainnyaCodes = $parentOptions
+                        ->filter(fn ($opt) => stripos((string) $opt->option_label, 'lainnya') !== false)
+                        ->pluck('option_code')
+                        ->map(fn ($code) => (string) $code)
+                        ->values();
+
+                    $triggerValuesAsString = collect($triggerValues)->map(fn ($v) => (string) $v)->values();
+                    $matchingTriggers = $lainnyaCodes->intersect($triggerValuesAsString)->values();
+                } else {
+                    // ── Jalur (b): boolean anggota grup multi-select ──
+                    // Tidak ada questionnaire_options untuk dicocokkan --
+                    // deteksi dari group_label milik pertanyaan induk
+                    // sendiri (checkbox ini LABELNYA "Lainnya", bukan salah
+                    // satu opsi jawabannya).
+                    $parentRow = $questionsByCode->get($parentKey);
+
+                    if ($parentRow !== null && $parentRow->question_type === 'boolean') {
+                        $parentMetadata = json_decode((string) $parentRow->metadata, true);
+                        $groupLabel     = $parentMetadata['group_label'] ?? '';
+
+                        if (is_string($groupLabel) && stripos($groupLabel, 'lainnya') !== false) {
+                            $matchingTriggers = collect($triggerValues)->map(fn ($v) => (string) $v)->values();
+                        }
+                    }
+                }
+
+                if ($matchingTriggers->isEmpty()) {
+                    continue;
+                }
+
+                $definitions->push((object) [
+                    'questionnaire_id' => $row->questionnaire_id,
+                    'parent_code'      => (string) $parentCode,
+                    'companion_code'   => $row->code,
+                    'trigger_values'   => $matchingTriggers->all(),
+                ]);
+            }
+        }
+
+        return $this->companionDefinitionsCache = $definitions;
     }
 
     /**
