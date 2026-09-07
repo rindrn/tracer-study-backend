@@ -43,15 +43,35 @@ class SubmitTracerStudyRequest extends FormRequest
         return $rules;
     }
 
+    /**
+     * Pertanyaan milik kuesioner yang sedang dikirim, diambil sekali saja.
+     *
+     * rules() dan withValidator() sama-sama membutuhkannya, dan keduanya
+     * dipanggil pada satu daur permintaan yang sama.
+     */
+    private ?\Illuminate\Support\Collection $questionCache = null;
+
+    private function questions(): \Illuminate\Support\Collection
+    {
+        if ($this->questionCache !== null) {
+            return $this->questionCache;
+        }
+
+        $qIds = $this->input('questionnaire_ids', []);
+
+        return $this->questionCache = empty($qIds)
+            ? collect()
+            : DB::connection('oltp')->table('questionnaire_questions')
+                ->whereIn('questionnaire_id', $qIds)
+                ->select('code', 'question_type', 'is_required', 'metadata')
+                ->get();
+    }
+
     private function buildDynamicRules(array $questionnaireIds): array
     {
         $conn = DB::connection('oltp');
 
-        // Get all questions for these questionnaires
-        $questions = $conn->table('questionnaire_questions')
-            ->whereIn('questionnaire_id', $questionnaireIds)
-            ->select('code', 'question_type', 'is_required', 'metadata')
-            ->get();
+        $questions = $this->questions();
 
         // Get options keyed by question code
         $options = $conn->table('questionnaire_options as o')
@@ -71,7 +91,14 @@ class SubmitTracerStudyRequest extends FormRequest
             if (isset($seen[$q->code]) || in_array($q->code, $identityKeys, true)) continue;
             $seen[$q->code] = true;
 
-            $rule = $q->is_required ? ['required'] : ['nullable'];
+            // Wajib BERSYARAT tidak dinyatakan di sini. Pertanyaan seperti f5c
+            // hanya wajib bila alumni memilih wiraswasta; menandainya `required`
+            // akan menolak alumni yang memilih bekerja, padahal pertanyaan itu
+            // tidak pernah muncul di layarnya. Aturannya ditegakkan
+            // withValidator(), yang bisa membaca jawaban pemicunya.
+            $rule = ($q->is_required && $this->requiredCondition($q->metadata) === null)
+                ? ['required']
+                : ['nullable'];
 
             // Isian lookup (f5a1/f5a2/kdpstmsmh) tetap bertipe short_text di
             // skema, tapi isinya kunci baris tabel referensi — bukan teks
@@ -95,7 +122,9 @@ class SubmitTracerStudyRequest extends FormRequest
 
                 case 'multiple_choice':
                     // Can be array or string
-                    $rule = $q->is_required ? ['required'] : ['nullable'];
+                    $rule = ($q->is_required && $this->requiredCondition($q->metadata) === null)
+                        ? ['required']
+                        : ['nullable'];
                     break;
 
                 case 'number':
@@ -144,6 +173,100 @@ class SubmitTracerStudyRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * Syarat yang membuat sebuah pertanyaan wajib diisi, atau null bila
+     * kewajibannya tidak bersyarat.
+     *
+     * Bentuknya `['f8' => [1, 3]]` — baca: wajib bila jawaban f8 bernilai 1
+     * atau 3. Beberapa kunci sekaligus berarti seluruhnya harus terpenuhi.
+     *
+     * Umumnya syarat wajib sama persis dengan syarat tampil, jadi `show_if`
+     * dipakai apa adanya dan tidak perlu ditulis dua kali. Yang berbeda cukup
+     * menuliskan `required_if` sendiri: f5d misalnya tampil bagi yang bekerja
+     * maupun berwiraswasta, tetapi lembar kementerian hanya mewajibkannya bagi
+     * yang berwiraswasta.
+     */
+    private function requiredCondition(?string $rawMetadata): ?array
+    {
+        $meta = $rawMetadata ? json_decode($rawMetadata, true) : null;
+        if (!is_array($meta)) {
+            return null;
+        }
+
+        $condition = $meta['required_if'] ?? $meta['show_if'] ?? null;
+
+        return (is_array($condition) && $condition !== []) ? $condition : null;
+    }
+
+    /**
+     * Apakah seluruh syarat pada $condition terpenuhi oleh jawaban yang masuk.
+     *
+     * Syarat atas pertanyaan yang tidak terjawab dianggap TIDAK terpenuhi.
+     * Dengan begitu alumni yang mengosongkan pemicunya tidak ikut dituntut
+     * mengisi turunannya — kekosongan pemicu sudah dipersoalkan oleh aturan
+     * `required` milik pemicu itu sendiri.
+     */
+    private function conditionMet(array $condition): bool
+    {
+        foreach ($condition as $depCode => $allowed) {
+            $value = $this->answerFor((string) $depCode);
+            if ($value === null) {
+                return false;
+            }
+
+            $allowed = array_map('strval', (array) $allowed);
+            $given   = array_map('strval', is_array($value) ? $value : [$value]);
+
+            if (array_intersect($given, $allowed) === []) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Jawaban atas satu kode pertanyaan, termasuk yang datang terbungkus
+     * kelompok checkbox.
+     *
+     * f416 wajib diisi bila alumni mencentang f415, tetapi f415 tidak pernah
+     * tiba sebagai kunci tersendiri: peramban mengirim seluruh kelompoknya
+     * sebagai satu larik di bawah kode kelompok (`q16_cara_cari_kerja`), dan
+     * pemekarannya menjadi 0/1 per kode baru dikerjakan
+     * TracerStudySubmitService — sesudah validasi. Keanggotaan larik itulah
+     * yang dibaca di sini, sehingga syaratnya tetap dapat dinilai tanpa
+     * mengubah bentuk masukan.
+     */
+    private function answerFor(string $code): mixed
+    {
+        $value = $this->input($code);
+        if ($value !== null && $value !== '') {
+            return $value;
+        }
+
+        $group = $this->groupCodeOf($code);
+        if ($group === null) {
+            return null;
+        }
+
+        $selected = $this->input($group);
+
+        return is_array($selected)
+            ? (in_array($code, array_map('strval', $selected), true) ? '1' : '0')
+            : null;
+    }
+
+    /** Kode kelompok checkbox yang menaungi sebuah kode pertanyaan, bila ada. */
+    private function groupCodeOf(string $code): ?string
+    {
+        $meta = $this->questions()->firstWhere('code', $code)?->metadata;
+        $meta = $meta ? json_decode($meta, true) : null;
+
+        return is_array($meta) && is_string($meta['group_code'] ?? null)
+            ? $meta['group_code']
+            : null;
     }
 
     /** Format isian yang ditandai metadata pertanyaan (email, phone, url). */
@@ -246,6 +369,10 @@ class SubmitTracerStudyRequest extends FormRequest
     public function withValidator(\Illuminate\Validation\Validator $validator): void
     {
         $validator->after(function (\Illuminate\Validation\Validator $v) {
+            $this->validateConditionallyRequired($v);
+        });
+
+        $validator->after(function (\Illuminate\Validation\Validator $v) {
             $numeric = function (string $code): ?float {
                 $value = $this->input($code);
                 return ($value === null || $value === '' || !is_numeric($value))
@@ -294,6 +421,44 @@ class SubmitTracerStudyRequest extends FormRequest
                 }
             }
         });
+    }
+
+    /**
+     * Tegakkan kewajiban bersyarat — pasangan dari requiredCondition().
+     *
+     * Lembar kementerian mewajibkan sejumlah pertanyaan hanya pada cabang
+     * jawaban tertentu: f502 bagi yang bekerja atau berwiraswasta, f18a-f18d
+     * bagi yang melanjutkan pendidikan, f1202 bagi yang memilih sumber dana
+     * lainnya. Berkas ekspor yang mengosongkannya ditolak portal pelaporan,
+     * sementara menandainya wajib tanpa syarat akan menolak alumni yang
+     * cabangnya berbeda — pertanyaannya memang tidak pernah muncul di layar
+     * mereka. Keduanya dihindari dengan menilai syaratnya lebih dulu.
+     *
+     * Peramban sudah menerapkan aturan yang sama: checkSection() melewati
+     * pertanyaan yang tersembunyi sebelum memeriksa `required`. Pemeriksaan di
+     * sini menutup jalur yang tidak lewat peramban.
+     */
+    private function validateConditionallyRequired(\Illuminate\Validation\Validator $v): void
+    {
+        foreach ($this->questions() as $q) {
+            if (!$q->is_required) {
+                continue;
+            }
+
+            $condition = $this->requiredCondition($q->metadata);
+            if ($condition === null || !$this->conditionMet($condition)) {
+                continue;
+            }
+
+            $answer = $this->input($q->code);
+            $empty  = $answer === null
+                || $answer === ''
+                || (is_array($answer) && $answer === []);
+
+            if ($empty && !$v->errors()->has($q->code)) {
+                $v->errors()->add($q->code, 'Pertanyaan ini wajib diisi.');
+            }
+        }
     }
 
     /**

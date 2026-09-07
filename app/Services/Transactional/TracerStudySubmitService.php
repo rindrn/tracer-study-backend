@@ -252,16 +252,36 @@ class TracerStudySubmitService
         // berawalan '+62'.
         $phone = PhoneNumber::normalize($validated['phone'] ?? null);
 
-        return $this->alumniRepo->upsertByNim($validated['nim'], [
+        $data = [
             'name'            => $validated['name'],
             'email'           => $validated['email'],
             'phone'           => $phone,
             'program_id'      => $programId,
             'graduation_year' => $validated['tahun_lulus'],
-            'kode_pt'         => $validated['kode_pt'] ?? null,
             'nik'             => $validated['nik'],
             'npwp'            => $validated['npwp'] ?? null,
-        ]);
+        ];
+
+        // Kode PT ditulis HANYA bila ada nilainya. Dulu barisnya berbunyi
+        // `$validated['kode_pt'] ?? null`, dan itu keliru pada dua hal
+        // sekaligus. Formulir mengirim isian ini dengan kode pertanyaannya,
+        // `kdptimsmh`, sehingga kunci `kode_pt` tidak pernah ada dan nilai
+        // yang diketik alumni selalu terbuang. Lalu `?? null` menuliskan
+        // kekosongan itu ke basis data, sehingga setiap pengiriman MENGHAPUS
+        // kode_pt yang sudah terisi.
+        //
+        // Konfigurasi didahulukan karena satu pemasangan melayani satu
+        // perguruan tinggi: kodenya milik institusi, bukan sesuatu yang perlu
+        // dihafal alumni. Isian formulir dipakai hanya bila konfigurasinya
+        // memang belum diisi.
+        $kodePt = config('institution.code')
+            ?: trim((string) ($validated['kdptimsmh'] ?? $validated['kode_pt'] ?? ''));
+
+        if ($kodePt !== '') {
+            $data['kode_pt'] = $kodePt;
+        }
+
+        return $this->alumniRepo->upsertByNim($validated['nim'], $data);
     }
 
     /**
@@ -346,12 +366,18 @@ class TracerStudySubmitService
         3 => 'Wiraswasta',
         4 => 'Melanjutkan Pendidikan',
         5 => 'Tidak kerja tetapi sedang mencari kerja',
-        6 => 'Melanjutkan pendidikan sambil bekerja',
-        7 => 'Melanjutkan pendidikan sambil wiraswasta',
     ];
 
-    /** f8 yang berarti alumni sedang menempuh pendidikan lanjut. */
-    private const FURTHER_STUDY_STATUSES = [4, 6, 7];
+    /**
+     * f8 yang berarti alumni sedang menempuh pendidikan lanjut.
+     *
+     * Dulu berisi [4, 6, 7]. Kode 6 dan 7 — "Melanjutkan pendidikan sambil
+     * bekerja" dan "sambil wiraswasta" — dihapus oleh migrasi
+     * 2026_09_07_000003_hapus_opsi_f8_gabungan karena tidak dikenal instrumen
+     * kementerian; alumninya dilebur ke status 1 dan 3, dan jejak studi
+     * lanjutnya dipindahkan ke education_records.
+     */
+    private const FURTHER_STUDY_STATUSES = [4];
 
     /**
      * Berdasarkan f8 (status alumni) — replace employment / education record.

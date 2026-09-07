@@ -462,12 +462,18 @@ class MasaTungguRepository extends BaseAnalyticalRepository
         // IKU 2 Kemendikbud: Terserap = bekerja + wirausaha + studi lanjut
         //   option_code "1" = Bekerja (full time / part time)
         //   option_code "3" = Wiraswasta
-        //   option_code "6" = Melanjutkan pendidikan sambil bekerja
-        //   option_code "7" = Melanjutkan pendidikan sambil wiraswasta
+        //
+        // Dua status gabungan — "Melanjutkan pendidikan sambil bekerja" dan
+        // "sambil wiraswasta" — dulu ikut disebut di sini. Keduanya sudah
+        // dilebur ke status pokoknya oleh migrasi
+        // 2026_09_07_000003_hapus_opsi_f8_gabungan, karena kode 6 dan 7 tidak
+        // dikenal instrumen kementerian. Alumni yang bersangkutan kini
+        // bernilai 1 atau 3, sehingga tetap terhitung terserap oleh penyaring
+        // di bawah; jejak studi lanjutnya pindah ke education_records.
         return [
             'member'   => 'DimStatusAlumni.label',
             'operator' => 'equals',
-            'values'   => ['Bekerja (full time / part time)', 'Wiraswasta', 'Melanjutkan pendidikan sambil bekerja', 'Melanjutkan pendidikan sambil wiraswasta'],
+            'values'   => ['Bekerja (full time / part time)', 'Wiraswasta'],
         ];
     }
 

@@ -141,7 +141,7 @@ class QuestionnaireSeeder extends Seeder
             ['5', 'Tidak kerja tetapi sedang mencari kerja'],
         ]);
 
-        $insertQuestion(1, 'f502', 'Dalam berapa bulan Anda mendapatkan pekerjaan pertama? / Dalam berapa bulan setelah lulus Anda memulai wiraswasta?', 'number', false, ['show_if' => ['f8' => [1, 3]]]);
+        $insertQuestion(1, 'f502', 'Dalam berapa bulan Anda mendapatkan pekerjaan pertama? / Dalam berapa bulan setelah lulus Anda memulai wiraswasta?', 'number', true, ['show_if' => ['f8' => [1, 3]]]);
 
         $insertQuestion(1, 'f505', 'Berapa rata-rata pendapatan Anda per bulan? (take home pay)', 'number', false, ['show_if' => ['f8' => [1, 3]]]);
 
@@ -171,7 +171,7 @@ class QuestionnaireSeeder extends Seeder
             ['5', 'Lainnya, tuliskan'],
         ]);
 
-        $insertQuestion(1, 'f1102', 'Sebutkan jenis perusahaan/instansi lainnya', 'short_text', false, ['show_if' => ['f1101' => [5]]]);
+        $insertQuestion(1, 'f1102', 'Sebutkan jenis perusahaan/instansi lainnya', 'short_text', true, ['show_if' => ['f1101' => [5]]]);
 
         $insertQuestion(1, 'f5b', 'Apa nama perusahaan/kantor tempat Anda bekerja?', 'short_text', false, ['show_if' => ['f8' => [1]]]);
 
@@ -179,7 +179,7 @@ class QuestionnaireSeeder extends Seeder
         // 2026_06_21_000001_fix_f5c_jabatan_wirausaha_to_choice.php. Kode angka
         // (1-4) mengikuti POSITIONS di migration itu; jangan diubah tanpa
         // menyesuaikan migration-nya juga, karena keduanya harus tetap sinkron.
-        $insertQuestion(1, 'f5c', 'Bila berwiraswasta, apa posisi/jabatan Anda saat ini?', 'single_choice', false, [
+        $insertQuestion(1, 'f5c', 'Bila berwiraswasta, apa posisi/jabatan Anda saat ini?', 'single_choice', true, [
             'show_if'      => ['f8' => [3]],
             'option_hints' => [
                 '1' => 'Pendiri utama usaha',
@@ -194,7 +194,15 @@ class QuestionnaireSeeder extends Seeder
             ['4', 'Freelance / Kerja Lepas'],
         ]);
 
-        $insertQuestion(1, 'f5d', 'Apa tingkat tempat kerja Anda?', 'single_choice', false, ['show_if' => ['f8' => [1, 3]]], [
+        // Satu-satunya pertanyaan yang syarat tampil dan syarat wajibnya
+        // berbeda. Lembar kementerian menampilkannya bagi yang bekerja maupun
+        // berwiraswasta, tetapi hanya menandainya wajib bagi yang
+        // berwiraswasta — karena itu 'required_if' ditulis terpisah, bukan
+        // mengandalkan 'show_if' seperti pertanyaan bersyarat lainnya.
+        $insertQuestion(1, 'f5d', 'Apa tingkat tempat kerja Anda?', 'single_choice', true, [
+            'show_if'     => ['f8' => [1, 3]],
+            'required_if' => ['f8' => [3]],
+        ], [
             ['1', 'Lokal/Wilayah/Wiraswasta tidak berbadan hukum'],
             ['2', 'Nasional/Wiraswasta berbadan hukum'],
             ['3', 'Multinasional/Internasional'],
@@ -202,18 +210,18 @@ class QuestionnaireSeeder extends Seeder
 
 
         // SECTION 2: STUDI LANJUT
-        $insertQuestion(2, 'f18a', 'Sumber biaya untuk studi lanjut?', 'single_choice', false, ['show_if' => ['f8' => [4]]], [
+        $insertQuestion(2, 'f18a', 'Sumber biaya untuk studi lanjut?', 'single_choice', true, ['show_if' => ['f8' => [4]]], [
             ['1', 'Biaya Sendiri/Keluarga'],
             ['2', 'Beasiswa'],
             ['3', 'Asisten/Mengajar'],
             ['4', 'Lainnya'],
         ]);
 
-        $insertQuestion(2, 'f18b', 'Perguruan Tinggi tempat studi lanjut?', 'short_text', false, ['show_if' => ['f8' => [4]]]);
+        $insertQuestion(2, 'f18b', 'Perguruan Tinggi tempat studi lanjut?', 'short_text', true, ['show_if' => ['f8' => [4]]]);
 
-        $insertQuestion(2, 'f18c', 'Program Studi studi lanjut?', 'short_text', false, ['show_if' => ['f8' => [4]]]);
+        $insertQuestion(2, 'f18c', 'Program Studi studi lanjut?', 'short_text', true, ['show_if' => ['f8' => [4]]]);
 
-        $insertQuestion(2, 'f18d', 'Tanggal Masuk studi lanjut? (dd/mm/yyyy)', 'date', false, ['show_if' => ['f8' => [4]]]);
+        $insertQuestion(2, 'f18d', 'Tanggal Masuk studi lanjut? (dd/mm/yyyy)', 'date', true, ['show_if' => ['f8' => [4]]]);
 
         // SECTION 3: SUMBER DANA KULIAH
         $insertQuestion(3, 'f1201', 'Sebutkan sumber dana dalam pembiayaan kuliah Anda? (bukan ketika Studi Lanjut)', 'single_choice', true, null, [
@@ -226,10 +234,10 @@ class QuestionnaireSeeder extends Seeder
             ['7', 'Lainnya, tuliskan'],
         ]);
 
-        $insertQuestion(3, 'f1202', 'Sebutkan sumber dana pembiayaan kuliah lainnya', 'short_text', false, ['show_if' => ['f1201' => [7]]]);
+        $insertQuestion(3, 'f1202', 'Sebutkan sumber dana pembiayaan kuliah lainnya', 'short_text', true, ['show_if' => ['f1201' => [7]]]);
 
         // SECTION 4: KESESUAIAN PEKERJAAN & PENDIDIKAN
-        $insertQuestion(4, 'f14', 'Seberapa erat hubungan bidang studi dengan pekerjaan Anda?', 'single_choice', false, ['show_if' => ['f8' => [1]]], [
+        $insertQuestion(4, 'f14', 'Seberapa erat hubungan bidang studi dengan pekerjaan Anda?', 'single_choice', true, ['show_if' => ['f8' => [1]]], [
             ['1', 'Sangat Erat'],
             ['2', 'Erat'],
             ['3', 'Cukup Erat'],
@@ -237,7 +245,7 @@ class QuestionnaireSeeder extends Seeder
             ['5', 'Tidak Sama Sekali'],
         ]);
 
-        $insertQuestion(4, 'f15', 'Tingkat pendidikan apa yang paling tepat/sesuai untuk pekerjaan Anda saat ini?', 'single_choice', false, ['show_if' => ['f8' => [1]]], [
+        $insertQuestion(4, 'f15', 'Tingkat pendidikan apa yang paling tepat/sesuai untuk pekerjaan Anda saat ini?', 'single_choice', true, ['show_if' => ['f8' => [1]]], [
             ['1', 'Setingkat Lebih Tinggi'],
             ['2', 'Tingkat yang Sama'],
             ['3', 'Setingkat Lebih Rendah'],
@@ -291,9 +299,9 @@ class QuestionnaireSeeder extends Seeder
             ['3', 'Saya tidak mencari kerja'],
         ]);
 
-        $insertQuestion(7, 'f302', 'Kira-kira berapa bulan sebelum lulus Anda mulai mencari pekerjaan?', 'number', false, ['show_if' => ['f301' => [1]]]);
+        $insertQuestion(7, 'f302', 'Kira-kira berapa bulan sebelum lulus Anda mulai mencari pekerjaan?', 'number', true, ['show_if' => ['f301' => [1]]]);
 
-        $insertQuestion(7, 'f303', 'Kira-kira berapa bulan sesudah lulus Anda mulai mencari pekerjaan?', 'number', false, ['show_if' => ['f301' => [2]]]);
+        $insertQuestion(7, 'f303', 'Kira-kira berapa bulan sesudah lulus Anda mulai mencari pekerjaan?', 'number', true, ['show_if' => ['f301' => [2]]]);
 
         $jobSearchMethods = [
             ['f401', 'Melalui iklan di koran/majalah, brosur'],
@@ -325,7 +333,7 @@ class QuestionnaireSeeder extends Seeder
                 'boolean', false, $meta);
         }
 
-        $insertQuestion(7, 'f416', 'Sebutkan cara lainnya dalam mencari pekerjaan', 'short_text', false, ['show_if' => ['f415' => [1]]]);
+        $insertQuestion(7, 'f416', 'Sebutkan cara lainnya dalam mencari pekerjaan', 'short_text', true, ['show_if' => ['f415' => [1]]]);
 
 
         // SECTION 8: STATISTIK LAMARAN
@@ -344,7 +352,7 @@ class QuestionnaireSeeder extends Seeder
             ['5', 'Lainnya'],
         ]);
 
-        $insertQuestion(9, 'f1002', 'Sebutkan aktivitas lainnya dalam mencari pekerjaan', 'short_text', false, ['show_if' => ['f1001' => [5]]]);
+        $insertQuestion(9, 'f1002', 'Sebutkan aktivitas lainnya dalam mencari pekerjaan', 'short_text', true, ['show_if' => ['f1001' => [5]]]);
 
         $mismatchReasons = [
             ['f1601', 'Pertanyaan tidak sesuai; pekerjaan saya sekarang sudah sesuai dengan pendidikan saya'],
@@ -375,7 +383,7 @@ class QuestionnaireSeeder extends Seeder
                 'boolean', false, $meta);
         }
 
-        $insertQuestion(9, 'f1614', 'Sebutkan alasan lainnya mengambil pekerjaan yang tidak sesuai pendidikan', 'short_text', false, ['show_if' => ['f1613' => [1]]]);
+        $insertQuestion(9, 'f1614', 'Sebutkan alasan lainnya mengambil pekerjaan yang tidak sesuai pendidikan', 'short_text', true, ['show_if' => ['f1613' => [1]]]);
 
         // SECTION 10: KONTAK PENILAI
         //
@@ -385,9 +393,14 @@ class QuestionnaireSeeder extends Seeder
         // opsi 2 dan 5 tidak, sepadan dengan tiga nilai yang dikenal kolom
         // alumni_status di tabel tujuan.
         //
-        // Seluruhnya is_required = false. SubmitTracerStudyRequest menyusun
-        // aturan dari kolom is_required tanpa membaca show_if, jadi menandainya
-        // wajib akan menolak submisi alumni yang tidak melihat pertanyaan ini.
+        // Seluruhnya is_required = false, dan itu keputusan, bukan keterbatasan:
+        // sejak SubmitTracerStudyRequest menegakkan wajib bersyarat lewat
+        // show_if, menandainya wajib tidak lagi menolak alumni yang tidak
+        // melihat pertanyaan ini. Kontak penilai tetap dibiarkan opsional
+        // karena tidak setiap alumni punya tiga orang yang bisa disebut, dan
+        // memaksanya hanya akan memancing nama karangan. Kelengkapan yang
+        // ditegakkan hanya pasangannya — nama tanpa surel ditolak
+        // withValidator().
         $stakeholderQuestions = [
             ['stk1_nama',  'Tuliskan nama atasan Anda (bekerja) / rekan bisnis (wiraswasta) / dosen pembimbing (lanjut studi)',           'Penilai 1', 'Orang yang menilai hasil kerja Anda secara langsung.',              null],
             ['stk1_email', 'Tuliskan alamat surel Penilai 1',                                                                              null,        'Sesuai nama yang Anda tulis di atas.',                             'email'],
