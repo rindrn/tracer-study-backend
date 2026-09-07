@@ -41,7 +41,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * SESUDAHNYA
  * ----------
- * Lapisan analitik perlu dimuat ulang (php artisan etl:run --full), karena
+ * Lapisan analitik perlu dimuat ulang (php artisan etl:run), karena
  * dim_status_alumni masih memuat kedua label lama.
  *
  * Dump data-only di database/dump/ masih memuat kedua status tersebut. Restore
