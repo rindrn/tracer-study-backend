@@ -8,6 +8,7 @@ use App\Services\Analytical\ExplorerService;
 use App\Services\CubeJsClient;
 use Illuminate\Support\Collection;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -154,7 +155,7 @@ class ExplorerServiceTest extends TestCase
 
     // ── Validasi terhadap katalog ───────────────────────────────────────
 
-    /** @dataProvider permintaanTerlarang */
+    #[DataProvider('permintaanTerlarang')]
     public function test_permintaan_di_luar_katalog_ditolak_422(array $override): void
     {
         try {

@@ -59,6 +59,7 @@ use App\Http\Controllers\Api\Analytical\EducationSummaryController;
 use App\Http\Controllers\Api\Analytical\EmploymentSummaryController;
 use App\Http\Controllers\Api\Analytical\ExplorerController;
 use App\Http\Controllers\Api\Transactional\InsightQuestionController;
+use App\Http\Controllers\Api\Transactional\InsightBoardController;
 
 
 // Controllers — DataPipeline (ETL)
@@ -506,6 +507,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('{id}',    [InsightQuestionController::class, 'show'])->whereNumber('id');
             Route::put('{id}',    [InsightQuestionController::class, 'update'])->whereNumber('id');
             Route::delete('{id}', [InsightQuestionController::class, 'destroy'])->whereNumber('id');
+        });
+
+        // ── Insight: Dashboard Saya (pertanyaan tersemat) ─────────────
+        Route::prefix('insight/board')->group(function () {
+            Route::get('',         [InsightBoardController::class, 'index']);
+            Route::post('',        [InsightBoardController::class, 'store']);
+            Route::put('order',    [InsightBoardController::class, 'reorder']);
+            Route::patch('{id}',   [InsightBoardController::class, 'update'])->whereNumber('id');
+            Route::delete('{id}',  [InsightBoardController::class, 'destroy'])->whereNumber('id');
         });
  
         // ── Segmen: Tingkat Keterserapan Lulusan ─────────────────────────
