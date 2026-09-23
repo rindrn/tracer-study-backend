@@ -26,6 +26,10 @@ use Illuminate\Http\Response;
  *        body: { cube, measures[], dimensions[], filters: [{ member, values[] }] }
  *        → baris datar ber-key nama member Cube.js; pivot dikerjakan FE
  *
+ *   POST /api/dashboard/explorer/drill-down
+ *        body: { cube, measure, filters, search?, page?, per_page? }
+ *        → daftar alumni di balik satu angka (berhalaman)
+ *
  * Scope role (kaprodi/kajur/dekan) diambil dari token lewat EnforcesProdiScope,
  * tidak pernah dari body — pengguna tidak bisa melebarkan cakupannya sendiri.
  */
@@ -75,6 +79,32 @@ class ExplorerController extends Controller
 
         try {
             $data = $this->service->query($body, $this->scopedParams($request));
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\RuntimeException $e) {
+            return $this->serviceError($e);
+        }
+    }
+
+    /**
+     * POST /api/dashboard/explorer/drill-down
+     * body: { cube, measure, filters: [{ member, values[] }], search?, page?, per_page? }
+     */
+    public function drillDown(Request $request): JsonResponse
+    {
+        $body = $request->validate([
+            'cube'               => 'required|string|max:100',
+            'measure'            => 'required|string|max:100',
+            'filters'            => 'present|array',
+            'filters.*.member'   => 'required|string|max:100',
+            'filters.*.values'   => 'required|array',
+            'filters.*.values.*' => 'nullable|string|max:255',
+            'search'             => 'nullable|string|max:100',
+            'page'               => 'sometimes|integer|min:1',
+            'per_page'           => 'sometimes|integer|min:5|max:100',
+        ]);
+
+        try {
+            $data = $this->service->drillDown($body, $this->scopedParams($request));
             return response()->json(['success' => true, 'data' => $data]);
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);

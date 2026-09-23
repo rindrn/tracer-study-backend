@@ -213,6 +213,90 @@ class ExplorerServiceTest extends TestCase
         $this->assertSame(3, $this->lastQuery()['limit']);
     }
 
+    // ── Drill-down ──────────────────────────────────────────────────────
+
+    private function drill(array $override = [], array $scope = [], ?Collection $rows = null): array
+    {
+        return $this->service($rows ?? new Collection())->drillDown(array_merge([
+            'cube'    => 'FactTracerStudy',
+            'measure' => 'FactTracerStudy.count_terserap',
+            'filters' => [
+                ['member' => 'DimProdi.jurusan', 'values' => ['Akuntansi']],
+                ['member' => 'DimAlumni.tahun_lulus', 'values' => ['2022']],
+            ],
+        ], $override), $scope);
+    }
+
+    public function test_drill_down_menyaring_titik_scope_snapshot_dan_measure_cacah(): void
+    {
+        $this->drill([], ['nama_prodi' => 'Akuntansi', 'jenjang' => 'D3']);
+
+        $q = $this->lastQuery();
+        $this->assertSame(['Akuntansi'], $this->filterOn($q, 'DimProdi.jurusan')['values']);
+        $this->assertSame(['2022'], $this->filterOn($q, 'DimAlumni.tahun_lulus')['values']);
+        $this->assertSame(['D3'], $this->filterOn($q, 'DimProdi.jenjang')['values']);
+        $this->assertSame(['42'], $this->filterOn($q, 'DimWaktu.id_waktu')['values']);
+
+        // Hanya alumni yang ikut terhitung measure yang diklik.
+        $this->assertSame(
+            ['member' => 'FactTracerStudy.count_terserap', 'operator' => 'gt', 'values' => ['0']],
+            $this->filterOn($q, 'FactTracerStudy.count_terserap'),
+        );
+        $this->assertContains('DimAlumni.nama', $q['dimensions']);
+    }
+
+    public function test_drill_down_measure_rata_rata_hanya_alumni_yang_punya_nilai(): void
+    {
+        $this->drill(['measure' => 'FactTracerStudy.avg_take_home_pay']);
+
+        $this->assertSame(
+            ['member' => 'FactTracerStudy.avg_take_home_pay', 'operator' => 'set'],
+            $this->filterOn($this->lastQuery(), 'FactTracerStudy.avg_take_home_pay'),
+        );
+    }
+
+    public function test_drill_down_berhalaman_dan_mencari_nama_atau_nim(): void
+    {
+        $this->drill(['page' => 3, 'per_page' => 20, 'search' => ' budi ']);
+
+        $q = $this->lastQuery();
+        $this->assertSame(20, $q['limit']);
+        $this->assertSame(40, $q['offset']);
+
+        $or = array_values(array_filter($q['filters'], fn ($f) => isset($f['or'])))[0]['or'];
+        $this->assertSame(['DimAlumni.nama', 'DimAlumni.nim'], array_column($or, 'member'));
+        $this->assertSame(['budi'], $or[0]['values']);
+    }
+
+    public function test_drill_down_membentuk_baris_untuk_modal(): void
+    {
+        $result = $this->drill(rows: collect([[
+            'DimAlumni.id_alumni' => 7, 'DimAlumni.nama' => 'Budi', 'DimAlumni.nim' => '201',
+            'DimProdi.nama_prodi' => 'Akuntansi', 'DimProdi.jenjang' => 'D3',
+            'DimAlumni.tahun_lulus' => '2022', 'DimStatusAlumni.label' => 'Bekerja',
+            'FactTracerStudy.count_terserap' => '1',
+        ]]));
+
+        $this->assertSame([[
+            'nama' => 'Budi', 'nim' => '201', 'nama_prodi' => 'Akuntansi', 'jenjang' => 'D3',
+            'tahun_lulus' => '2022', 'status' => 'Bekerja', 'nilai' => '1',
+        ]], $result['data']);
+        $this->assertSame(1, $result['pagination']['total_on_page']);
+        $this->assertSame('integer', $result['measure']['format']);
+    }
+
+    public function test_drill_down_tetap_menolak_saringan_pii(): void
+    {
+        try {
+            $this->drill(['filters' => [['member' => 'DimAlumni.nim', 'values' => ['201']]]]);
+            $this->fail('Seharusnya ditolak');
+        } catch (BusinessException $e) {
+            $this->assertSame(422, $e->getCode());
+        }
+
+        $this->assertSame([], $this->sent);
+    }
+
     // ── Nilai dimensi ───────────────────────────────────────────────────
 
     public function test_nilai_dimensi_tersaring_scope_dan_tanpa_nilai_kosong(): void

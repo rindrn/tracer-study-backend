@@ -134,6 +134,53 @@ class ExplorerService
     }
 
     /**
+     * Alumni di balik satu angka hasil Insight.
+     *
+     * `filters` = saringan pengguna + nilai dimensi titik yang diklik. Nama dan
+     * NIM hanya keluar lewat jalur ini, selalu dalam scope role dan snapshot
+     * yang sama dengan angkanya — sama seperti drill-down dashboard lain.
+     * Katalog tetap tidak menawarkan nama/NIM sebagai dimensi atau saringan.
+     *
+     * @param array{cube: string, measure: string, filters?: array, search?: ?string, page?: int, per_page?: int} $body
+     */
+    public function drillDown(array $body, array $scope): array
+    {
+        $cubeKey = $body['cube'];
+        $measure = $body['measure'];
+        $filters = array_values(array_filter(
+            $body['filters'] ?? [],
+            fn (array $f) => !empty($f['values']),
+        ));
+
+        $cube    = $this->validate($cubeKey, [$measure], [], $filters);
+        $scope   = $this->withSnapshot($this->onlyScope($scope), $cube);
+        $page    = max(1, (int) ($body['page'] ?? 1));
+        $perPage = min(100, max(5, (int) ($body['per_page'] ?? 15)));
+        $meta    = $this->measureMeta($cube, $measure);
+        $search  = isset($body['search']) ? trim((string) $body['search']) : null;
+
+        $rows = $this->repo->drillDown(
+            $measure,
+            $meta['format'] === 'integer',
+            $filters,
+            $scope,
+            $search === '' ? null : $search,
+            $page,
+            $perPage,
+        );
+
+        return [
+            'measure'    => $meta,
+            'data'       => $rows,
+            'pagination' => [
+                'page'          => $page,
+                'per_page'      => $perPage,
+                'total_on_page' => count($rows),
+            ],
+        ];
+    }
+
+    /**
      * Validasi susunan pertanyaan berbentuk FE ({ cube, measures, rowDims,
      * colDim, filters }) — dipakai saat menyimpan pertanyaan, supaya yang
      * tersimpan pasti bisa dijalankan kembali.

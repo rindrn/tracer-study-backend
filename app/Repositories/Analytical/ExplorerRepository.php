@@ -93,6 +93,68 @@ class ExplorerRepository extends BaseAnalyticalRepository
             ->all();
     }
 
+    /**
+     * Daftar alumni di balik satu angka (drill-down).
+     *
+     * Satu baris per alumni: nama/NIM/prodi dijadikan dimensi, dan measure
+     * yang diklik ikut dihitung per alumni. Menyaring measure itu sendiri
+     * (`gt 0` untuk cacah, `set` untuk rata-rata/nilai) membuat daftar hanya
+     * berisi alumni yang benar-benar ikut terhitung — klik "Jumlah alumni
+     * terserap" tidak ikut menampilkan alumni yang belum terserap.
+     *
+     * Tidak di-cache dan tidak lewat pre-aggregation: data perorangan.
+     *
+     * @param  array<int, array{member: string, values: string[]}> $filters  saringan + nilai titik yang diklik
+     * @return array<int, array<string, mixed>>
+     */
+    public function drillDown(
+        string  $measure,
+        bool    $isCount,
+        array   $filters,
+        array   $scopeParams,
+        ?string $search,
+        int     $page,
+        int     $perPage,
+    ): array {
+        $extra = $this->userFilters($filters);
+
+        $extra[] = $isCount
+            ? ['member' => $measure, 'operator' => 'gt', 'values' => ['0']]
+            : ['member' => $measure, 'operator' => 'set'];
+
+        if ($search !== null && $search !== '') {
+            $extra[] = ['or' => [
+                ['member' => 'DimAlumni.nama', 'operator' => 'contains', 'values' => [$search]],
+                ['member' => 'DimAlumni.nim',  'operator' => 'contains', 'values' => [$search]],
+            ]];
+        }
+
+        return $this->cube->load([
+            'measures'   => [$measure],
+            'dimensions' => [
+                'DimAlumni.id_alumni',
+                'DimAlumni.nama',
+                'DimAlumni.nim',
+                'DimProdi.nama_prodi',
+                'DimProdi.jenjang',
+                'DimAlumni.tahun_lulus',
+                'DimStatusAlumni.label',
+            ],
+            'filters' => $this->buildGlobalFiltersFromArray($scopeParams, $extra),
+            'order'   => [['DimAlumni.nama', 'asc'], ['DimAlumni.id_alumni', 'asc']],
+            'limit'   => $perPage,
+            'offset'  => ($page - 1) * $perPage,
+        ])->map(fn (array $r) => [
+            'nama'        => $r['DimAlumni.nama']        ?? '',
+            'nim'         => $r['DimAlumni.nim']         ?? '',
+            'nama_prodi'  => $r['DimProdi.nama_prodi']   ?? '',
+            'jenjang'     => $r['DimProdi.jenjang']      ?? '',
+            'tahun_lulus' => $r['DimAlumni.tahun_lulus'] ?? '',
+            'status'      => $r['DimStatusAlumni.label'] ?? '',
+            'nilai'       => $r[$measure]                ?? null,
+        ])->values()->all();
+    }
+
     /** @return array<int, array{member: string, operator: string, values: string[]}> */
     private function userFilters(array $filters): array
     {

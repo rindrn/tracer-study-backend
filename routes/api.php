@@ -498,6 +498,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('catalog',          [ExplorerController::class, 'catalog']);
             Route::get('dimension-values', [ExplorerController::class, 'dimensionValues']);
             Route::post('query',           [ExplorerController::class, 'query']);
+            Route::post('drill-down',      [ExplorerController::class, 'drillDown']);
         });
 
         // ── Insight: pertanyaan tersimpan ─────────────────────────────
