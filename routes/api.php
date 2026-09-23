@@ -57,6 +57,7 @@ use App\Http\Controllers\Api\Analytical\ResponseRateController;
 use App\Http\Controllers\Api\Analytical\SummaryController;
 use App\Http\Controllers\Api\Analytical\EducationSummaryController;
 use App\Http\Controllers\Api\Analytical\EmploymentSummaryController;
+use App\Http\Controllers\Api\Analytical\ExplorerController;
 
 
 // Controllers — DataPipeline (ETL)
@@ -489,6 +490,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('meta/filter-options',        [FilterMetaController::class, 'filterOptions']);
         Route::get('thresholds', [ThresholdController::class, 'forChart']);
+
+        // ── Insight: OLAP Explorer (susun sendiri measure × dimensi) ─────
+        Route::prefix('explorer')->group(function () {
+            Route::get('catalog',          [ExplorerController::class, 'catalog']);
+            Route::get('dimension-values', [ExplorerController::class, 'dimensionValues']);
+            Route::post('query',           [ExplorerController::class, 'query']);
+        });
  
         // ── Segmen: Tingkat Keterserapan Lulusan ─────────────────────────
         Route::prefix('keterserapan')->group(function () {
