@@ -57,6 +57,7 @@ use App\Http\Controllers\Api\Analytical\ResponseRateController;
 use App\Http\Controllers\Api\Analytical\SummaryController;
 use App\Http\Controllers\Api\Analytical\EducationSummaryController;
 use App\Http\Controllers\Api\Analytical\EmploymentSummaryController;
+use App\Http\Controllers\Api\Analytical\ExplorerController;
 
 
 // Controllers — DataPipeline (ETL)
@@ -559,6 +560,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('bandingkan', [SebaranInstansiController::class, 'bandingkan']);
         Route::get('lokasi',     [SebaranInstansiController::class, 'lokasi']);
         Route::get('drill-down', [SebaranInstansiController::class, 'drillDown']);
+    });
+
+    // ── OLAP Explorer (halaman Insight) ──────────────────────────────
+    // Satu-satunya grup analitik yang measure & dimensinya ditentukan
+    // pengguna saat runtime, bukan oleh kode. Penjaganya OlapCatalog
+    // (config/olap_catalog.php) dan EnforcesProdiScope, keduanya di server.
+    Route::prefix('dashboard/explorer')->group(function () {
+        Route::get('catalog',          [ExplorerController::class, 'catalog']);
+        Route::get('dimension-values', [ExplorerController::class, 'dimensionValues']);
+        Route::post('query',           [ExplorerController::class, 'query']);
     });
 
     Route::prefix('dashboard/kompetensi')->group(function () {
