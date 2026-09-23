@@ -28,6 +28,10 @@ trait UsesInsightTestSchema
             $this->markTestSkipped('Koneksi oltp (PostgreSQL) tidak tersedia: ' . $e->getMessage());
         }
 
+        // Katalog Insight membaca meta Cube lewat cache 'redis' (WithCache);
+        // di tes diarahkan ke array supaya tidak butuh Redis menyala.
+        config(['cache.stores.redis' => ['driver' => 'array']]);
+
         DB::connection('oltp')->beginTransaction();
 
         $schema = 'insight_test_' . bin2hex(random_bytes(4));

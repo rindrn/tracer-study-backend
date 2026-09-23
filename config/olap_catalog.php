@@ -18,6 +18,17 @@
 |         decimal  → rata-rata/median, subtotalnya dikosongkan
 |         currency → rupiah, subtotalnya dikosongkan
 |
+| Yang ditulis di sini hanya ukuran "siap pakai" dan dimensi. Ukuran dari
+| kolom angka ("Rata-rata gaji", "Nilai tengah masa tunggu", ...) dan
+| dimensi rentang ("Gaji per Rp 2 jt") TIDAK ditulis di sini: keduanya
+| dibangkitkan di model Cube.js dan dibaca otomatis dari /meta (lihat
+| ExplorerService::cubes()). Menambah kolom angka cukup di model Cube.
+|
+| count_measure    → cacah dasar: dipakai "sembunyikan kelompok dengan
+|                    responden < n" dan penanda jumlah di drill-down.
+| drill_dimensions → kolom daftar alumni saat sebuah angka diklik. Harus
+|                    bisa di-join dari cube ini.
+|
 */
 
 return [
@@ -26,6 +37,7 @@ return [
         // Dimensi ketiga digambar sebagai panel (small multiples) di FE.
         'max_dimensions' => 3,
         'max_measures'   => 4,
+        'max_formulas'   => 3,
         'max_rows'       => 5000,
     ],
 
@@ -37,7 +49,12 @@ return [
 
             // Measure cacah yang dipakai untuk mencari snapshot terbaru dan
             // mengisi dropdown filter — tidak ditampilkan terpisah.
-            'base_measure' => 'FactTracerStudy.count_alumni',
+            'base_measure'  => 'FactTracerStudy.count_alumni',
+            'count_measure' => 'FactTracerStudy.count_alumni',
+            'drill_dimensions' => [
+                'DimAlumni.id_alumni', 'DimAlumni.nama', 'DimAlumni.nim', 'DimProdi.nama_prodi',
+                'DimProdi.jenjang', 'DimAlumni.tahun_lulus', 'DimStatusAlumni.label',
+            ],
 
             'measures' => [
                 'FactTracerStudy.count_alumni' => [
@@ -122,6 +139,86 @@ return [
                 'Wirausaha' => [
                     'DimWirausaha.label_tingkat_instansi' => 'Tingkat usaha',
                     'DimWirausaha.nama_provinsi'          => 'Provinsi usaha',
+                    'DimWirausaha.nama_kota'              => 'Kota usaha',
+                    'DimWirausaha.jabatan'                => 'Jabatan di usaha',
+                ],
+                'Studi Lanjut' => [
+                    'DimStudiLanjut.status_studi'     => 'Status studi lanjut',
+                    'DimStudiLanjut.sumber_biaya'     => 'Sumber biaya studi lanjut',
+                    'DimStudiLanjut.perguruan_tinggi' => 'Perguruan tinggi studi lanjut',
+                    'DimStudiLanjut.program_studi'    => 'Program studi lanjut',
+                ],
+            ],
+        ],
+
+        'FactRangeEvaluasi' => [
+            'label'       => 'Kompetensi & Metode Pembelajaran',
+            'description' => 'Skor 1–5 dari alumni: kompetensi yang dikuasai saat lulus, yang dibutuhkan di pekerjaan, dan metode pembelajaran.',
+
+            'base_measure'  => 'FactRangeEvaluasi.count',
+            'count_measure' => 'FactRangeEvaluasi.count',
+            'drill_dimensions' => [
+                'DimAlumni.id_alumni', 'DimAlumni.nama', 'DimAlumni.nim', 'DimProdi.nama_prodi',
+                'DimProdi.jenjang', 'DimAlumni.tahun_lulus',
+            ],
+
+            'measures' => [
+                'FactRangeEvaluasi.count' => [
+                    'label' => 'Jumlah jawaban', 'format' => 'integer',
+                    'description' => 'Banyaknya penilaian yang diberikan alumni.',
+                ],
+            ],
+
+            'dimension_groups' => [
+                'Pertanyaan' => [
+                    'DimIndikatorEvaluasi.kategori_label'   => 'Kategori penilaian',
+                    'DimIndikatorEvaluasi.grup_gap'         => 'Aspek kompetensi',
+                    'DimIndikatorEvaluasi.label_pertanyaan' => 'Pertanyaan',
+                ],
+                'Program Studi' => [
+                    'DimProdi.jurusan'    => 'Jurusan',
+                    'DimProdi.jenjang'    => 'Jenjang',
+                    'DimProdi.nama_prodi' => 'Program studi',
+                ],
+                'Alumni' => [
+                    'DimAlumni.tahun_lulus' => 'Tahun lulus',
+                ],
+            ],
+        ],
+
+        'FactMultiSelect' => [
+            'label'       => 'Alasan Kerja Tidak Sesuai Bidang',
+            'description' => 'Alasan yang dipilih alumni ketika pekerjaannya tidak sesuai bidang studi (boleh lebih dari satu).',
+
+            'base_measure'  => 'FactMultiSelect.count_alumni_unik',
+            'count_measure' => 'FactMultiSelect.count_alumni_unik',
+            'drill_dimensions' => [
+                'DimAlumni.id_alumni', 'DimAlumni.nama', 'DimAlumni.nim', 'DimProdi.nama_prodi',
+                'DimProdi.jenjang', 'DimAlumni.tahun_lulus',
+            ],
+
+            'measures' => [
+                'FactMultiSelect.count_alumni_unik' => [
+                    'label' => 'Jumlah alumni', 'format' => 'integer',
+                    'description' => 'Banyaknya alumni yang memilih alasan tersebut.',
+                ],
+                'FactMultiSelect.count_pilihan' => [
+                    'label' => 'Jumlah pilihan', 'format' => 'integer',
+                    'description' => 'Banyaknya centang; satu alumni bisa memilih beberapa alasan.',
+                ],
+            ],
+
+            'dimension_groups' => [
+                'Alasan' => [
+                    'DimIndikatorEvaluasi.label_pertanyaan' => 'Alasan',
+                ],
+                'Program Studi' => [
+                    'DimProdi.jurusan'    => 'Jurusan',
+                    'DimProdi.jenjang'    => 'Jenjang',
+                    'DimProdi.nama_prodi' => 'Program studi',
+                ],
+                'Alumni' => [
+                    'DimAlumni.tahun_lulus' => 'Tahun lulus',
                 ],
             ],
         ],

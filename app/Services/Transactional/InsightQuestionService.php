@@ -122,18 +122,48 @@ class InsightQuestionService
         return $question;
     }
 
-    /** Simpan dalam bentuk yang dipakai FE apa adanya, tanpa kunci lain. */
+    /**
+     * Simpan dalam bentuk yang dipakai FE apa adanya, tanpa kunci lain.
+     * `percent` dan `diff` hanya tampilan (diolah di FE), jadi cukup
+     * diperiksa bentuknya; sisanya sudah divalidasi assertValidInput().
+     */
     private function normalizeQuery(array $query): array
     {
+        $sort = $query['sort'] ?? null;
+        $diff = $query['diff'] ?? null;
+
         return [
             'cube'     => (string) $query['cube'],
             'measures' => array_values($query['measures'] ?? []),
             'rowDims'  => array_values($query['rowDims'] ?? []),
             'colDim'   => $query['colDim'] ?? null,
             'filters'  => array_values(array_map(fn (array $f) => [
-                'member' => (string) $f['member'],
-                'values' => array_values(array_map('strval', $f['values'] ?? [])),
+                'member'   => (string) $f['member'],
+                'operator' => in_array($f['operator'] ?? 'equals', ['equals', 'notEquals', 'set', 'notSet'], true)
+                    ? ($f['operator'] ?? 'equals')
+                    : 'equals',
+                'values'   => array_values(array_map('strval', $f['values'] ?? [])),
             ], $query['filters'] ?? [])),
+            'formulas' => array_values(array_map(fn (array $f) => [
+                'key'    => (string) $f['key'],
+                'label'  => (string) $f['label'],
+                'left'   => (string) $f['left'],
+                'op'     => (string) $f['op'],
+                'right'  => (string) $f['right'],
+                'format' => (string) ($f['format'] ?? 'decimal'),
+            ], $query['formulas'] ?? [])),
+            'minN'     => isset($query['minN']) ? (int) $query['minN'] : null,
+            'sort'     => is_array($sort) ? [
+                'by'        => (string) $sort['by'],
+                'direction' => $sort['direction'] === 'asc' ? 'asc' : 'desc',
+                'limit'     => isset($sort['limit']) ? (int) $sort['limit'] : null,
+            ] : null,
+            'percent'  => in_array($query['percent'] ?? 'none', ['none', 'row', 'column', 'all'], true)
+                ? ($query['percent'] ?? 'none')
+                : 'none',
+            'diff'     => is_array($diff) && isset($diff['a'], $diff['b'])
+                ? ['a' => (string) $diff['a'], 'b' => (string) $diff['b']]
+                : null,
         ];
     }
 }

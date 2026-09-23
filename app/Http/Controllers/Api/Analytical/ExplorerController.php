@@ -50,12 +50,14 @@ class ExplorerController extends Controller
     {
         $request->validate([
             'dimension' => 'required|string|max:100',
+            'cube'      => 'nullable|string|max:100',
         ]);
 
         try {
             $data = $this->service->dimensionValues(
                 $request->query('dimension'),
                 $this->scopedParams($request),
+                $request->query('cube'),
             );
             return response()->json(['success' => true, 'data' => $data]);
         } catch (\RuntimeException $e) {
@@ -67,14 +69,25 @@ class ExplorerController extends Controller
     {
         $body = $request->validate([
             'cube'               => 'required|string|max:100',
-            'measures'           => 'required|array|min:1',
+            // Boleh kosong bila ada rumus; syarat "minimal satu" dicek di service.
+            'measures'           => 'present|array',
             'measures.*'         => 'string|max:100',
             'dimensions'         => 'present|array',
             'dimensions.*'       => 'string|max:100',
-            'filters'            => 'present|array',
-            'filters.*.member'   => 'required|string|max:100',
-            'filters.*.values'   => 'required|array',
-            'filters.*.values.*' => 'nullable|string|max:255',
+            ...self::filterRules(),
+            'formulas'           => 'sometimes|array|max:9',
+            'formulas.*.key'     => 'required|string|max:20',
+            'formulas.*.label'   => 'required|string|max:150',
+            'formulas.*.left'    => 'required|string|max:100',
+            'formulas.*.op'      => 'required|string|in:div,sub,add,mul',
+            'formulas.*.right'   => 'required|string|max:100',
+            'formulas.*.format'  => 'required|string|max:20',
+            'min_n'              => 'nullable|integer|min:1|max:100000',
+            'sort'               => 'nullable|array',
+            'sort.by'            => 'required_with:sort|string|max:100',
+            'sort.direction'     => 'required_with:sort|in:asc,desc',
+            'sort.limit'         => 'nullable|integer|min:1|max:500',
+            'column_dimension'   => 'nullable|string|max:100',
         ]);
 
         try {
@@ -94,10 +107,7 @@ class ExplorerController extends Controller
         $body = $request->validate([
             'cube'               => 'required|string|max:100',
             'measure'            => 'required|string|max:100',
-            'filters'            => 'present|array',
-            'filters.*.member'   => 'required|string|max:100',
-            'filters.*.values'   => 'required|array',
-            'filters.*.values.*' => 'nullable|string|max:255',
+            ...self::filterRules(),
             'search'             => 'nullable|string|max:100',
             'page'               => 'sometimes|integer|min:1',
             'per_page'           => 'sometimes|integer|min:5|max:100',
@@ -109,6 +119,18 @@ class ExplorerController extends Controller
         } catch (\RuntimeException $e) {
             return $this->serviceError($e);
         }
+    }
+
+    /** Saringan: "sama dengan"/"bukan" berisi nilai, "ada nilainya"/"kosong" tanpa nilai. */
+    private static function filterRules(): array
+    {
+        return [
+            'filters'            => 'present|array',
+            'filters.*.member'   => 'required|string|max:100',
+            'filters.*.operator' => 'sometimes|string|in:equals,notEquals,set,notSet',
+            'filters.*.values'   => 'present|array',
+            'filters.*.values.*' => 'nullable|string|max:255',
+        ];
     }
 
     // ──────────────────────────────────────────────────────────────

@@ -92,6 +92,36 @@ class CubeJsClient
         return collect($body['data'] ?? []);
     }
 
+    /**
+     * Metadata model Cube.js (GET /cubejs-api/v1/meta): daftar cube beserta
+     * measure & dimensinya, termasuk properti `meta` tiap member. Dipakai
+     * katalog Insight untuk membaca ukuran & rentang yang dibangkitkan
+     * otomatis di model.
+     *
+     * @return array<int, array> isi field "cubes"
+     */
+    public function meta(): array
+    {
+        try {
+            $response = Http::withToken($this->getToken())
+                ->timeout($this->timeout)
+                ->get("{$this->baseUrl}/cubejs-api/v1/meta");
+        } catch (ConnectionException|RequestException $e) {
+            Log::error('CubeJsClient: meta connection failed', ['error' => $e->getMessage()]);
+            throw new BusinessException('Layanan analitik sedang tidak tersedia, coba lagi nanti.', 503);
+        }
+
+        if ($response->failed()) {
+            Log::error('CubeJsClient: meta request failed', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+            throw new \RuntimeException("Cube.js meta request failed [{$response->status()}]");
+        }
+
+        return $response->json('cubes') ?? [];
+    }
+
     // ──────────────────────────────────────────────────────────────
     //  JWT generation — HS256, tanpa library eksternal
     // ──────────────────────────────────────────────────────────────

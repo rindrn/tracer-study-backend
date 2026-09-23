@@ -20,6 +20,12 @@ use Illuminate\Support\Collection;
  */
 class ExplorerRepository extends BaseAnalyticalRepository
 {
+    /** Metadata model Cube (untuk ukuran & rentang yang dibangkitkan otomatis). */
+    public function cubeMeta(): array
+    {
+        return $this->cube->meta();
+    }
+
     /**
      * id_waktu snapshot terbaru yang benar-benar punya baris fakta. Diambil
      * lewat measure (bukan daftar DimWaktu saja) supaya run ETL yang gagal
@@ -104,7 +110,11 @@ class ExplorerRepository extends BaseAnalyticalRepository
      *
      * Tidak di-cache dan tidak lewat pre-aggregation: data perorangan.
      *
-     * @param  array<int, array{member: string, values: string[]}> $filters  saringan + nilai titik yang diklik
+     * Kolom daftar mengikuti `drill_dimensions` di katalog tiap sumber data:
+     * status alumni hanya ada di fakta tracer study, tidak di fakta kompetensi.
+     *
+     * @param  array<int, array{member: string, operator: string, values: string[]}> $filters  saringan + nilai titik yang diklik
+     * @param  string[] $drillDimensions
      * @return array<int, array<string, mixed>>
      */
     public function drillDown(
@@ -115,6 +125,7 @@ class ExplorerRepository extends BaseAnalyticalRepository
         ?string $search,
         int     $page,
         int     $perPage,
+        array   $drillDimensions,
     ): array {
         $extra = $this->userFilters($filters);
 
@@ -131,15 +142,7 @@ class ExplorerRepository extends BaseAnalyticalRepository
 
         return $this->cube->load([
             'measures'   => [$measure],
-            'dimensions' => [
-                'DimAlumni.id_alumni',
-                'DimAlumni.nama',
-                'DimAlumni.nim',
-                'DimProdi.nama_prodi',
-                'DimProdi.jenjang',
-                'DimAlumni.tahun_lulus',
-                'DimStatusAlumni.label',
-            ],
+            'dimensions' => $drillDimensions,
             'filters' => $this->buildGlobalFiltersFromArray($scopeParams, $extra),
             'order'   => [['DimAlumni.nama', 'asc'], ['DimAlumni.id_alumni', 'asc']],
             'limit'   => $perPage,
@@ -155,13 +158,20 @@ class ExplorerRepository extends BaseAnalyticalRepository
         ])->values()->all();
     }
 
-    /** @return array<int, array{member: string, operator: string, values: string[]}> */
+    /**
+     * Saringan pengguna ke bentuk Cube: "sama dengan"/"bukan" membawa nilai,
+     * "ada nilainya"/"kosong" tidak (Cube menolak values pada set/notSet).
+     *
+     * @return array<int, array<string, mixed>>
+     */
     private function userFilters(array $filters): array
     {
-        return array_map(fn (array $f) => [
-            'member'   => $f['member'],
-            'operator' => 'equals',
-            'values'   => array_map('strval', $f['values']),
-        ], $filters);
+        return array_map(function (array $f) {
+            $operator = $f['operator'] ?? 'equals';
+
+            return in_array($operator, ['set', 'notSet'], true)
+                ? ['member' => $f['member'], 'operator' => $operator]
+                : ['member' => $f['member'], 'operator' => $operator, 'values' => array_map('strval', $f['values'])];
+        }, $filters);
     }
 }

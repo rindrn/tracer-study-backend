@@ -31,7 +31,12 @@ class ExplorerServiceTest extends TestCase
         $this->sent = [];
     }
 
-    private function service(Collection $queryRows = new Collection()): ExplorerService
+    /**
+     * @param Collection|\Closure $queryRows  baris untuk setiap query, atau
+     *                                        fn (array $query): Collection
+     * @param array|null           $meta       isi /meta; null = Cube gagal
+     */
+    private function service(Collection|\Closure $queryRows = new Collection(), ?array $meta = []): ExplorerService
     {
         $cube = Mockery::mock(CubeJsClient::class);
         $cube->shouldReceive('load')->andReturnUsing(function (array $q) use ($queryRows) {
@@ -42,10 +47,42 @@ class ExplorerServiceTest extends TestCase
                 return collect([['DimWaktu.id_waktu' => 42, 'FactTracerStudy.count_alumni' => '10']]);
             }
 
-            return $queryRows;
+            return $queryRows instanceof \Closure ? $queryRows($q) : $queryRows;
         });
 
+        $meta === null
+            ? $cube->shouldReceive('meta')->andThrow(new \RuntimeException('Cube mati'))
+            : $cube->shouldReceive('meta')->andReturn($meta === [] ? self::meta() : $meta);
+
         return new ExplorerService(new ExplorerRepository($cube));
+    }
+
+    /** Potongan /meta: ukuran & rentang otomatis, plus member yang harus diabaikan. */
+    private static function meta(): array
+    {
+        $agg = fn (string $name, string $fn, string $fnLabel, string $col, string $colLabel, string $format) => [
+            'name' => $name,
+            'meta' => ['kind' => 'agg', 'fn' => $fn, 'fn_label' => $fnLabel, 'column' => $col, 'column_label' => $colLabel, 'format' => $format],
+        ];
+
+        return [[
+            'name'     => 'FactTracerStudy',
+            'measures' => [
+                ['name' => 'FactTracerStudy.count_alumni'],
+                $agg('FactTracerStudy.agg_avg_take_home_pay', 'avg', 'Rata-rata', 'take_home_pay', 'Gaji', 'currency'),
+                $agg('FactTracerStudy.agg_max_take_home_pay', 'max', 'Terbesar', 'take_home_pay', 'Gaji', 'currency'),
+                $agg('FactTracerStudy.agg_avg_nilai_ump', 'avg', 'Rata-rata', 'nilai_ump', 'UMP provinsi tempat kerja', 'currency'),
+                // Menyamar sebagai ukuran otomatis tapi bukan milik cube ini → diabaikan.
+                $agg('DimAlumni.nim', 'avg', 'Rata-rata', 'nim', 'NIM', 'decimal'),
+            ],
+            'dimensions' => [
+                ['name' => 'DimAlumni.nama'],
+                [
+                    'name' => 'FactTracerStudy.rentang_masa_tunggu_bekerja_3',
+                    'meta' => ['kind' => 'bin', 'column' => 'masa_tunggu_bekerja', 'column_label' => 'Masa tunggu kerja (bulan)', 'width' => 3, 'width_label' => 'per 3 bulan'],
+                ],
+            ],
+        ]];
     }
 
     private function body(array $override = []): array
@@ -88,7 +125,7 @@ class ExplorerServiceTest extends TestCase
     {
         $catalog = $this->service()->catalog();
 
-        $this->assertSame(['max_dimensions', 'max_measures', 'max_rows'], array_keys($catalog['limits']));
+        $this->assertSame(['max_dimensions', 'max_measures', 'max_formulas', 'max_rows'], array_keys($catalog['limits']));
         $cube = $catalog['cubes'][0];
         $this->assertSame('FactTracerStudy', $cube['key']);
         $this->assertArrayHasKey('format', $cube['measures'][0]);
@@ -213,6 +250,228 @@ class ExplorerServiceTest extends TestCase
         $this->assertSame(3, $this->lastQuery()['limit']);
     }
 
+    // ── Katalog otomatis dari /meta ─────────────────────────────────────
+
+    private function tracerCube(array $catalog): array
+    {
+        return collect($catalog['cubes'])->firstWhere('key', 'FactTracerStudy');
+    }
+
+    public function test_kolom_angka_dan_rentang_dibaca_dari_meta_cube(): void
+    {
+        $cube = $this->tracerCube($this->service()->catalog());
+
+        $gaji = collect($cube['numeric_columns'])->firstWhere('column', 'take_home_pay');
+        $this->assertSame('Gaji', $gaji['label']);
+        $this->assertSame(['avg', 'max'], array_column($gaji['functions'], 'fn'));
+
+        $rentang = collect($cube['dimension_groups'])->firstWhere('group', 'Rentang angka');
+        $this->assertSame(
+            [['key' => 'FactTracerStudy.rentang_masa_tunggu_bekerja_3', 'label' => 'Masa tunggu kerja per 3 bulan']],
+            $rentang['members'],
+        );
+
+        // Ukuran otomatis tidak dicampur ke daftar "siap pakai".
+        $this->assertNotContains('FactTracerStudy.agg_avg_take_home_pay', array_column($cube['measures'], 'key'));
+    }
+
+    public function test_member_meta_milik_cube_lain_diabaikan(): void
+    {
+        $json = json_encode($this->service()->catalog());
+        $this->assertStringNotContainsString('DimAlumni.nim', $json);
+
+        $this->expectException(BusinessException::class);
+        $this->service()->query($this->body(['measures' => ['DimAlumni.nim']]), []);
+    }
+
+    public function test_katalog_tetap_jalan_saat_cube_tidak_bisa_dihubungi(): void
+    {
+        $cube = $this->tracerCube($this->service(meta: null)->catalog());
+
+        $this->assertSame([], $cube['numeric_columns']);
+        $this->assertContains('FactTracerStudy.count_alumni', array_column($cube['measures'], 'key'));
+    }
+
+    public function test_ukuran_otomatis_dan_rentang_bisa_diminta_dengan_label_yang_ramah(): void
+    {
+        $result = $this->service()->query($this->body([
+            'measures'   => ['FactTracerStudy.agg_avg_nilai_ump', 'FactTracerStudy.agg_avg_take_home_pay'],
+            'dimensions' => ['FactTracerStudy.rentang_masa_tunggu_bekerja_3'],
+        ]), []);
+
+        $this->assertSame(['Rata-rata UMP provinsi tempat kerja', 'Rata-rata gaji'], array_column($result['measures'], 'label'));
+        $this->assertSame('currency', $result['measures'][0]['format']);
+        $this->assertSame('Masa tunggu kerja per 3 bulan', $result['dimensions'][0]['label']);
+    }
+
+    // ── Rumus ───────────────────────────────────────────────────────────
+
+    private function multiplier(array $override = []): array
+    {
+        return array_merge([
+            'key' => 'rumus_1', 'label' => 'Kelipatan gaji terhadap UMP',
+            'left' => 'FactTracerStudy.agg_avg_take_home_pay', 'op' => 'div',
+            'right' => 'FactTracerStudy.agg_avg_nilai_ump', 'format' => 'ratio',
+        ], $override);
+    }
+
+    public function test_rumus_dihitung_dari_hasil_agregasi_dan_ukuran_bantu_disembunyikan(): void
+    {
+        $rows = collect([
+            ['DimProdi.jurusan' => 'A', 'FactTracerStudy.agg_avg_take_home_pay' => '9000000', 'FactTracerStudy.agg_avg_nilai_ump' => '3000000'],
+            ['DimProdi.jurusan' => 'B', 'FactTracerStudy.agg_avg_take_home_pay' => '5000000', 'FactTracerStudy.agg_avg_nilai_ump' => '0'],
+            ['DimProdi.jurusan' => 'C', 'FactTracerStudy.agg_avg_take_home_pay' => null, 'FactTracerStudy.agg_avg_nilai_ump' => '2000000'],
+        ]);
+
+        $result = $this->service($rows)->query($this->body([
+            'measures' => [],
+            'formulas' => [$this->multiplier()],
+        ]), []);
+
+        // Pembilang & penyebut ikut diminta ke Cube...
+        $this->assertEqualsCanonicalizing(
+            ['FactTracerStudy.agg_avg_take_home_pay', 'FactTracerStudy.agg_avg_nilai_ump'],
+            $this->lastQuery()['measures'],
+        );
+        // ...tapi yang ditampilkan hanya rumusnya.
+        $this->assertSame(['rumus_1'], array_column($result['measures'], 'key'));
+        $this->assertSame('ratio', $result['measures'][0]['format']);
+        $this->assertSame('Rata-rata gaji ÷ rata-rata UMP provinsi tempat kerja', $result['measures'][0]['description']);
+        $this->assertSame('currency', $result['measures'][0]['formula']['left_format']);
+
+        // Bagi nol dan nilai kosong → null, bukan 0.
+        $this->assertSame([3.0, null, null], array_column($result['rows'], 'rumus_1'));
+    }
+
+    public function test_rumus_persen_dikali_seratus(): void
+    {
+        $rows = collect([['FactTracerStudy.count_terserap' => '75', 'FactTracerStudy.count_alumni' => '100']]);
+
+        $result = $this->service($rows)->query($this->body([
+            'measures'   => ['FactTracerStudy.count_alumni'],
+            'dimensions' => [],
+            'formulas'   => [$this->multiplier([
+                'label' => 'Tingkat keterserapan', 'left' => 'FactTracerStudy.count_terserap',
+                'right' => 'FactTracerStudy.count_alumni', 'format' => 'percent',
+            ])],
+        ]), []);
+
+        $this->assertSame(75.0, $result['rows'][0]['rumus_1']);
+        $this->assertSame(['FactTracerStudy.count_alumni', 'rumus_1'], array_column($result['measures'], 'key'));
+    }
+
+    #[DataProvider('rumusTerlarang')]
+    public function test_rumus_tidak_sah_ditolak(array $override): void
+    {
+        try {
+            $this->service()->query($this->body(['formulas' => [$this->multiplier($override)]]), []);
+            $this->fail('Seharusnya ditolak');
+        } catch (BusinessException $e) {
+            $this->assertSame(422, $e->getCode());
+        }
+
+        $this->assertSame([], array_filter($this->sent, fn ($q) => ($q['dimensions'] ?? []) !== ['DimWaktu.id_waktu']));
+    }
+
+    public static function rumusTerlarang(): array
+    {
+        return [
+            'operator asing'           => [['op' => 'pow']],
+            'ukuran PII'               => [['left' => 'DimAlumni.nim']],
+            'persen pada pengurangan'  => [['op' => 'sub', 'format' => 'percent']],
+            'tanpa nama'               => [['label' => '  ']],
+            'kunci bebas'              => [['key' => 'DimAlumni.nama']],
+        ];
+    }
+
+    // ── Olah hasil ──────────────────────────────────────────────────────
+
+    public function test_kelompok_dengan_responden_kurang_dari_n_disembunyikan(): void
+    {
+        $rows = collect([
+            ['DimProdi.jurusan' => 'A', 'FactTracerStudy.agg_avg_take_home_pay' => '9000000', 'FactTracerStudy.count_alumni' => '120'],
+            ['DimProdi.jurusan' => 'B', 'FactTracerStudy.agg_avg_take_home_pay' => '12000000', 'FactTracerStudy.count_alumni' => '8'],
+        ]);
+
+        $result = $this->service($rows)->query($this->body([
+            'measures' => ['FactTracerStudy.agg_avg_take_home_pay'],
+            'min_n'    => 30,
+        ]), []);
+
+        $this->assertContains('FactTracerStudy.count_alumni', $this->lastQuery()['measures']);
+        $this->assertSame(['A'], array_column($result['rows'], 'DimProdi.jurusan'));
+        // Cacah bantu tidak ikut ditampilkan.
+        $this->assertSame(['FactTracerStudy.agg_avg_take_home_pay'], array_column($result['measures'], 'key'));
+    }
+
+    public function test_urutkan_dan_ambil_teratas_tanpa_dimensi_kolom(): void
+    {
+        $rows = collect([
+            ['DimProdi.jurusan' => 'A', 'FactTracerStudy.count_alumni' => '10'],
+            ['DimProdi.jurusan' => 'B', 'FactTracerStudy.count_alumni' => null],
+            ['DimProdi.jurusan' => 'C', 'FactTracerStudy.count_alumni' => '30'],
+            ['DimProdi.jurusan' => 'D', 'FactTracerStudy.count_alumni' => '20'],
+        ]);
+
+        $sorted = fn (array $sort) => array_column($this->service($rows)->query($this->body(['sort' => $sort]), [])['rows'], 'DimProdi.jurusan');
+
+        $this->assertSame(['C', 'D', 'A', 'B'], $sorted(['by' => 'FactTracerStudy.count_alumni', 'direction' => 'desc']));
+        $this->assertSame(['A', 'D', 'C', 'B'], $sorted(['by' => 'FactTracerStudy.count_alumni', 'direction' => 'asc']));
+        $this->assertSame(['C', 'D'], $sorted(['by' => 'FactTracerStudy.count_alumni', 'direction' => 'desc', 'limit' => 2]));
+    }
+
+    public function test_urutan_dengan_dimensi_kolom_memakai_peringkat_per_kelompok_baris(): void
+    {
+        $router = function (array $q) {
+            // Query peringkat: dikelompokkan menurut dimensi baris saja.
+            if ($q['dimensions'] === ['DimProdi.jurusan']) {
+                return collect([
+                    ['DimProdi.jurusan' => 'A', 'FactTracerStudy.agg_avg_take_home_pay' => '7000000'],
+                    ['DimProdi.jurusan' => 'B', 'FactTracerStudy.agg_avg_take_home_pay' => '9000000'],
+                    ['DimProdi.jurusan' => 'C', 'FactTracerStudy.agg_avg_take_home_pay' => '8000000'],
+                ]);
+            }
+
+            return collect([
+                ['DimProdi.jurusan' => 'A', 'DimAlumni.tahun_lulus' => '2020', 'FactTracerStudy.agg_avg_take_home_pay' => '9900000'],
+                ['DimProdi.jurusan' => 'A', 'DimAlumni.tahun_lulus' => '2021', 'FactTracerStudy.agg_avg_take_home_pay' => '1000000'],
+                ['DimProdi.jurusan' => 'B', 'DimAlumni.tahun_lulus' => '2020', 'FactTracerStudy.agg_avg_take_home_pay' => '9000000'],
+                ['DimProdi.jurusan' => 'C', 'DimAlumni.tahun_lulus' => '2021', 'FactTracerStudy.agg_avg_take_home_pay' => '8000000'],
+            ]);
+        };
+
+        $result = $this->service($router)->query($this->body([
+            'measures'         => ['FactTracerStudy.agg_avg_take_home_pay'],
+            'dimensions'       => ['DimProdi.jurusan', 'DimAlumni.tahun_lulus'],
+            'column_dimension' => 'DimAlumni.tahun_lulus',
+            'sort'             => ['by' => 'FactTracerStudy.agg_avg_take_home_pay', 'direction' => 'desc', 'limit' => 2],
+        ]), []);
+
+        // B (9 jt) lalu C (8 jt) — A tersingkir walau salah satu selnya 9,9 jt.
+        $this->assertSame(['B', 'C'], array_column($result['rows'], 'DimProdi.jurusan'));
+    }
+
+    public function test_urutan_hanya_boleh_memakai_ukuran_yang_ditampilkan(): void
+    {
+        $this->expectException(BusinessException::class);
+
+        $this->service()->query($this->body(['sort' => ['by' => 'FactTracerStudy.count_terserap', 'direction' => 'desc']]), []);
+    }
+
+    public function test_saringan_ada_nilainya_dan_bukan(): void
+    {
+        $this->service()->query($this->body(['filters' => [
+            ['member' => 'FactTracerStudy.rentang_masa_tunggu_bekerja_3', 'operator' => 'set', 'values' => []],
+            ['member' => 'DimProdi.jenjang', 'operator' => 'notEquals', 'values' => ['D3']],
+            ['member' => 'DimAlumni.tahun_lulus', 'operator' => 'equals', 'values' => []],
+        ]]), []);
+
+        $q = $this->lastQuery();
+        $this->assertSame(['member' => 'FactTracerStudy.rentang_masa_tunggu_bekerja_3', 'operator' => 'set'], $this->filterOn($q, 'FactTracerStudy.rentang_masa_tunggu_bekerja_3'));
+        $this->assertSame(['member' => 'DimProdi.jenjang', 'operator' => 'notEquals', 'values' => ['D3']], $this->filterOn($q, 'DimProdi.jenjang'));
+        $this->assertNull($this->filterOn($q, 'DimAlumni.tahun_lulus'));
+    }
+
     // ── Drill-down ──────────────────────────────────────────────────────
 
     private function drill(array $override = [], array $scope = [], ?Collection $rows = null): array
@@ -283,6 +542,19 @@ class ExplorerServiceTest extends TestCase
         ]], $result['data']);
         $this->assertSame(1, $result['pagination']['total_on_page']);
         $this->assertSame('integer', $result['measure']['format']);
+    }
+
+    public function test_drill_down_kompetensi_tanpa_kolom_status(): void
+    {
+        $this->drill([
+            'cube'    => 'FactRangeEvaluasi',
+            'measure' => 'FactRangeEvaluasi.count',
+            'filters' => [['member' => 'DimIndikatorEvaluasi.grup_gap', 'values' => ['Etika']]],
+        ]);
+
+        $dims = $this->lastQuery()['dimensions'];
+        $this->assertContains('DimAlumni.nama', $dims);
+        $this->assertNotContains('DimStatusAlumni.label', $dims);
     }
 
     public function test_drill_down_tetap_menolak_saringan_pii(): void

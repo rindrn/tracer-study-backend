@@ -69,10 +69,46 @@ class InsightQuestionServiceTest extends TestCase
 
         $this->assertSame('Alumni per jurusan', $saved['title']);
         $this->assertSame('DimAlumni.tahun_lulus', $saved['query']['colDim']);
-        $this->assertSame([['member' => 'DimProdi.jenjang', 'values' => ['D3']]], $saved['query']['filters']);
+        $this->assertSame([['member' => 'DimProdi.jenjang', 'operator' => 'equals', 'values' => ['D3']]], $saved['query']['filters']);
         $this->assertTrue($saved['is_shared']);
         $this->assertTrue($saved['is_mine']);
         $this->assertSame('Ani', $saved['owner_name']);
+    }
+
+    public function test_rumus_dan_olah_hasil_ikut_tersimpan(): void
+    {
+        $data = $this->data();
+        $data['query'] = [
+            'cube'     => 'FactTracerStudy',
+            'measures' => [],
+            'rowDims'  => ['DimProdi.jurusan'],
+            'colDim'   => null,
+            'filters'  => [['member' => 'DimProdi.jenjang', 'operator' => 'set', 'values' => []]],
+            'formulas' => [[
+                'key' => 'rumus_1', 'label' => 'Tingkat keterserapan', 'left' => 'FactTracerStudy.count_terserap',
+                'op' => 'div', 'right' => 'FactTracerStudy.count_alumni', 'format' => 'percent',
+            ]],
+            'minN'     => 30,
+            'sort'     => ['by' => 'rumus_1', 'direction' => 'desc', 'limit' => 10],
+            'percent'  => 'row',
+            'diff'     => null,
+        ];
+
+        $saved = $this->service()->create($this->ani, $data);
+
+        // assertEquals, bukan assertSame: jsonb menyusun ulang urutan kunci
+        // saat menyimpan — isinya yang harus sama, bukan urutannya.
+        $this->assertEquals($data['query'], $saved['query']);
+        $this->assertEquals($data['query'], $this->service()->show($this->ani, $saved['id'])['query']);
+    }
+
+    public function test_urutan_pada_ukuran_yang_tidak_ditampilkan_tidak_bisa_disimpan(): void
+    {
+        $data = $this->data();
+        $data['query']['sort'] = ['by' => 'FactTracerStudy.count_terserap', 'direction' => 'desc'];
+
+        $this->expectException(BusinessException::class);
+        $this->service()->create($this->ani, $data);
     }
 
     public function test_susunan_di_luar_katalog_tidak_bisa_disimpan(): void
