@@ -133,6 +133,31 @@ class ExplorerService
         ];
     }
 
+    /**
+     * Validasi susunan pertanyaan berbentuk FE ({ cube, measures, rowDims,
+     * colDim, filters }) — dipakai saat menyimpan pertanyaan, supaya yang
+     * tersimpan pasti bisa dijalankan kembali.
+     */
+    public function assertValidInput(array $input): void
+    {
+        $dimensions = array_values(array_filter([
+            ...($input['rowDims'] ?? []),
+            $input['colDim'] ?? null,
+        ]));
+
+        $filters = array_values(array_filter(
+            $input['filters'] ?? [],
+            fn ($f) => is_array($f) && !empty($f['values']),
+        ));
+
+        $this->validate(
+            (string) ($input['cube'] ?? ''),
+            array_values($input['measures'] ?? []),
+            $dimensions,
+            $filters,
+        );
+    }
+
     // ──────────────────────────────────────────────────────────────
     //  PRIVATE
     // ──────────────────────────────────────────────────────────────

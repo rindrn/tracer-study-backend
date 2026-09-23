@@ -58,6 +58,7 @@ use App\Http\Controllers\Api\Analytical\SummaryController;
 use App\Http\Controllers\Api\Analytical\EducationSummaryController;
 use App\Http\Controllers\Api\Analytical\EmploymentSummaryController;
 use App\Http\Controllers\Api\Analytical\ExplorerController;
+use App\Http\Controllers\Api\Transactional\InsightQuestionController;
 
 
 // Controllers — DataPipeline (ETL)
@@ -496,6 +497,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('catalog',          [ExplorerController::class, 'catalog']);
             Route::get('dimension-values', [ExplorerController::class, 'dimensionValues']);
             Route::post('query',           [ExplorerController::class, 'query']);
+        });
+
+        // ── Insight: pertanyaan tersimpan ─────────────────────────────
+        Route::prefix('insight/questions')->group(function () {
+            Route::get('',        [InsightQuestionController::class, 'index']);
+            Route::post('',       [InsightQuestionController::class, 'store']);
+            Route::get('{id}',    [InsightQuestionController::class, 'show'])->whereNumber('id');
+            Route::put('{id}',    [InsightQuestionController::class, 'update'])->whereNumber('id');
+            Route::delete('{id}', [InsightQuestionController::class, 'destroy'])->whereNumber('id');
         });
  
         // ── Segmen: Tingkat Keterserapan Lulusan ─────────────────────────
