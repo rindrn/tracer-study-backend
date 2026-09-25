@@ -21,6 +21,9 @@ use App\Services\Analytical\ExplorerService;
  */
 class InsightQuestionService
 {
+    /** Bentuk visualisasi yang boleh disimpan; harus sama dengan `Viz` di FE. */
+    private const VIZ = ['auto', 'table', 'bar', 'row', 'line', 'area', 'stacked', 'pie'];
+
     public function __construct(
         private readonly ExplorerService $explorer,
     ) {}
@@ -124,7 +127,7 @@ class InsightQuestionService
 
     /**
      * Simpan dalam bentuk yang dipakai FE apa adanya, tanpa kunci lain.
-     * `percent` dan `diff` hanya tampilan (diolah di FE), jadi cukup
+     * `percent`, `diff`, dan `viz` hanya tampilan (diolah di FE), jadi cukup
      * diperiksa bentuknya; sisanya sudah divalidasi assertValidInput().
      */
     private function normalizeQuery(array $query): array
@@ -164,6 +167,9 @@ class InsightQuestionService
             'diff'     => is_array($diff) && isset($diff['a'], $diff['b'])
                 ? ['a' => (string) $diff['a'], 'b' => (string) $diff['b']]
                 : null,
+            'viz'      => in_array($query['viz'] ?? 'auto', self::VIZ, true)
+                ? ($query['viz'] ?? 'auto')
+                : 'auto',
         ];
     }
 }

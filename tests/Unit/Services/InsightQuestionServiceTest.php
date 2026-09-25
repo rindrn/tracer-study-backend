@@ -92,6 +92,7 @@ class InsightQuestionServiceTest extends TestCase
             'sort'     => ['by' => 'rumus_1', 'direction' => 'desc', 'limit' => 10],
             'percent'  => 'row',
             'diff'     => null,
+            'viz'      => 'row',
         ];
 
         $saved = $this->service()->create($this->ani, $data);
@@ -100,6 +101,21 @@ class InsightQuestionServiceTest extends TestCase
         // saat menyimpan — isinya yang harus sama, bukan urutannya.
         $this->assertEquals($data['query'], $saved['query']);
         $this->assertEquals($data['query'], $this->service()->show($this->ani, $saved['id'])['query']);
+    }
+
+    public function test_bentuk_visualisasi_tersimpan_dan_nilai_asing_jatuh_ke_otomatis(): void
+    {
+        $data = $this->data();
+        $data['query']['viz'] = 'pie';
+        $this->assertSame('pie', $this->service()->create($this->ani, $data)['query']['viz']);
+
+        // Validasi bentuk ada di controller; service tetap tidak mempercayai
+        // nilai di luar daftar, supaya baris lama/hasil impor tidak merusak FE.
+        $data['query']['viz'] = 'sunburst';
+        $this->assertSame('auto', $this->service()->create($this->ani, $data)['query']['viz']);
+
+        unset($data['query']['viz']);
+        $this->assertSame('auto', $this->service()->create($this->ani, $data)['query']['viz']);
     }
 
     public function test_urutan_pada_ukuran_yang_tidak_ditampilkan_tidak_bisa_disimpan(): void

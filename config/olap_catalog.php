@@ -131,7 +131,7 @@ return [
                     'DimKesesuaianBidang.label' => 'Kesesuaian bidang kerja',
                     'DimKesesuaianLevel.label'  => 'Kesesuaian tingkat pendidikan',
                 ],
-                'Tempat Kerja' => [
+                'Perusahaan' => [
                     'DimPerusahaan.label_jenis_perusahaan' => 'Jenis instansi',
                     'DimPerusahaan.label_tingkat_instansi' => 'Tingkat instansi',
                     'DimPerusahaan.nama_provinsi'          => 'Provinsi tempat kerja',

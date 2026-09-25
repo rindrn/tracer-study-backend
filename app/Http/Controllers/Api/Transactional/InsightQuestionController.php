@@ -94,6 +94,7 @@ class InsightQuestionController extends Controller
             'query.sort.direction'     => 'required_with:query.sort|in:asc,desc',
             'query.sort.limit'         => 'nullable|integer|min:1|max:500',
             'query.percent'            => 'nullable|in:none,row,column,all',
+            'query.viz'                => 'nullable|in:auto,table,bar,row,line,area,stacked,pie',
             'query.diff'               => 'nullable|array',
             'query.diff.a'             => 'required_with:query.diff|string|max:255',
             'query.diff.b'             => 'required_with:query.diff|string|max:255',
