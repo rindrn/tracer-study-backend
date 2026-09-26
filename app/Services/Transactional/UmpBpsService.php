@@ -49,6 +49,10 @@ class UmpBpsService
         32 => 10,  // Maluku Utara
         33 => 4,   // Papua Barat
         35 => 13,  // Papua
+        34 => 36,  // Papua Barat Daya
+        36 => 37,  // Papua Selatan
+        37 => 38,  // Papua Tengah
+        38 => 39,  // Papua Pegunungan
     ];
 
     public function __construct(
@@ -77,7 +81,10 @@ class UmpBpsService
             $json = $response->json();
 
             if (($json['status'] ?? '') !== 'OK') {
-                throw new \RuntimeException("BPS status bukan OK: " . ($json['status'] ?? 'unknown'));
+                throw new \RuntimeException(
+                    ($json['message'] ?? null)
+                        ?: "BPS status bukan OK: " . ($json['status'] ?? 'unknown')
+                );
             }
 
             $datacontent = $json['datacontent'] ?? [];

@@ -11,16 +11,30 @@
 # ---------------------------------------------------------------------------
 
 # --- Tahap 1: resolve dependency Composer ---------------------------------
-FROM composer:2 AS vendor
+FROM php:8.3-cli-alpine AS vendor
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+COPY --from=mlocati/php-extension-installer:2 \
+    /usr/bin/install-php-extensions \
+    /usr/local/bin/
+
+RUN install-php-extensions \
+        gd \
+        pdo_pgsql \
+        pgsql \
+        zip \
+        intl \
+        bcmath \
+        pcntl
 
 WORKDIR /app
 
-# composer.json + lock disalin duluan supaya layer install ter-cache selama
-# dependency tidak berubah.
+# Copy dependency manifest dulu agar layer Composer bisa di-cache
 COPY composer.json composer.lock ./
 
-# --no-scripts karena artisan belum ada di tahap ini (package:discover butuh
-# seluruh source). Script-nya dijalankan lagi setelah source lengkap disalin.
+# Install dependency tanpa menjalankan script Artisan,
+# karena source Laravel belum dicopy
 RUN composer install \
         --no-dev \
         --no-interaction \
@@ -29,9 +43,14 @@ RUN composer install \
         --prefer-dist \
         --optimize-autoloader
 
+# Baru copy seluruh source Laravel
 COPY . .
 
-RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
+# Optimasi autoloader setelah source tersedia
+RUN composer dump-autoload \
+        --no-dev \
+        --optimize \
+        --classmap-authoritative
 
 # --- Tahap 2: runtime -----------------------------------------------------
 FROM php:8.3-fpm-alpine AS runtime

@@ -1,0 +1,1361 @@
+{
+  "info": {
+    "name": "SmartTracer — Pembuktian ISO/IEC 25010",
+    "description": "",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Persiapan",
+      "item": [
+        {
+          "name": "Masuk sebagai kepala tracer study",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Peran tertinggi. Tokennya dipakai folder-folder berikutnya.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{staffEmail}}\",\n  \"password\": \"{{staffPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('masuk berhasil', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('token', b.data.token);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Masuk sebagai ketua jurusan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Peran dengan cakupan data terbatas pada satu jurusan. Dipakai untuk menguji penegakan cakupan di folder Security.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{kajurEmail}}\",\n  \"password\": \"{{kajurPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('masuk berhasil', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('kajurToken', b.data.token);",
+                  "pm.collectionVariables.set('kajurJurusan', b.data.user.jurusan);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Ambil satu alumni dan satu kuesioner sebagai rujukan",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni?per_page=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Identitas diambil dari tanggapan, bukan ditulis tetap di koleksi, supaya pengujian tetap sahih pada basis data mana pun."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "const baris = pm.response.json().data.data;",
+                  "pm.collectionVariables.set('alumniId', baris[0].id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Ambil satu kuesioner sebagai rujukan",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/questionnaires",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "questionnaires"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "const baris = Array.isArray(d) ? d : d.data;",
+                  "pm.collectionVariables.set('questionnaireId', baris[0].id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Functional Suitability",
+      "item": [
+        {
+          "name": "Kelengkapan: daftar alumni terbaca",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni?per_page=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Membuktikan bentuk tanggapan sukses seragam: success dan data selalu ada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('amplop tanggapan seragam', () => {",
+                  "  pm.expect(b).to.have.property('success', true);",
+                  "  pm.expect(b).to.have.property('data');",
+                  "});",
+                  "pm.test('data berisi baris', () => pm.expect(b.data.data.length).to.be.above(0));",
+                  "// Field message bersifat opsional pada tanggapan sukses: dari 102 tanggapan",
+                  "// 2xx berformat JSON pada koleksi utama, seluruhnya membawa success, tetapi",
+                  "// hanya 13 yang membawa message. Dicatat sebagai ketidakseragaman kecil,",
+                  "// bukan dijadikan syarat lulus.",
+                  "console.log('membawa message: ' + Object.prototype.hasOwnProperty.call(b, 'message'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kesesuaian: masukan tak lengkap ditolak 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/programs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "programs"
+              ]
+            },
+            "description": "Body sengaja dikosongkan. Yang dibuktikan adalah lapisan validasi menolak dan menjelaskan alasannya per field, bukan gagal diam-diam.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ditolak dengan 422', () => pm.response.to.have.status(422));",
+                  "const b = pm.response.json();",
+                  "pm.test('memuat rincian kesalahan per field', () => {",
+                  "  pm.expect(b).to.have.property('errors');",
+                  "  pm.expect(Object.keys(b.errors).length).to.be.above(0);",
+                  "});",
+                  "pm.test('pesan berbahasa Indonesia', () =>",
+                  "  pm.expect(b.message.toLowerCase()).to.match(/validasi|gagal|wajib/));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Ketepatan: ringkasan tahun terbaca",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/meta/ringkasan-tahun",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "meta",
+                "ringkasan-tahun"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "pm.test('berformat JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Performance Efficiency",
+      "item": [
+        {
+          "name": "Perilaku waktu: ringkasan dasbor di bawah 3 detik",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/employment/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "employment",
+                "summary"
+              ]
+            },
+            "description": "Endpoint terberat secara komputasi karena melewati lapisan agregasi. Panggilan pertama sesudah layanan analitik dinyalakan ulang dapat melampaui tiga detik karena pra-agregasinya belum termuat; angka yang dipakai adalah kondisi singgahan panas, sebagaimana dasbor dipakai sehari-hari."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "pm.test('di bawah ambang 3000 ms yang dijanjikan proposal', () =>",
+                  "  pm.expect(pm.response.responseTime).to.be.below(3000));",
+                  "console.log('waktu tanggap: ' + pm.response.responseTime + ' ms');"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kapasitas: batas atas per_page ditegakkan [CACAT TERBUKA]",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni?per_page=100000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "100000"
+                }
+              ]
+            },
+            "description": "Pemeriksaan ini DIHARAPKAN GAGAL. Parameter jumlah baris per halaman belum memiliki batas atas, sehingga seluruh isi tabel dapat diminta dalam satu permintaan. Dibiarkan gagal supaya cacat yang masih terbuka terlihat di laporan, bukan tersembunyi."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "const jml = pm.response.json().data.data.length;",
+                  "console.log('baris yang dikirim dalam satu tanggapan: ' + jml);",
+                  "console.log('ukuran tanggapan: ' + pm.response.responseSize + ' byte');",
+                  "pm.test('per_page dibatasi di sisi server (maksimal 200 baris)', () =>",
+                  "  pm.expect(jml).to.be.at.most(200));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Compatibility",
+      "item": [
+        {
+          "name": "Kesalingoperasian: unduhan XLSX memakai jenis konten yang tepat",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni/template",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni",
+                "template"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "const ct = pm.response.headers.get('Content-Type') || '';",
+                  "pm.test('jenis konten spreadsheet', () => pm.expect(ct).to.include('spreadsheetml'));",
+                  "pm.test('ditandai sebagai unduhan', () =>",
+                  "  pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kesalingoperasian: unduhan CSV memakai jenis konten yang tepat",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stakeholder-contacts/export?format=csv",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stakeholder-contacts",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "csv"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "pm.test('jenis konten CSV', () =>",
+                  "  pm.expect(pm.response.headers.get('Content-Type') || '').to.include('csv'));",
+                  "pm.test('panjang isi dinyatakan', () =>",
+                  "  pm.expect(pm.response.headers.get('Content-Length')).to.not.be.null);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kesalingoperasian: endpoint publik berformat JSON",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/public/statistics/years",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "public",
+                "statistics",
+                "years"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil tanpa autentikasi', () => pm.response.to.have.status(200));",
+                  "pm.test('berformat JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Reliability",
+      "item": [
+        {
+          "name": "Ketiadaan kesalahan: id non-numerik dijawab 404, bukan 500",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni",
+                "abc"
+              ]
+            },
+            "description": "Bentuk masukan yang tidak mungkin dihasilkan antarmuka. Sebelum pembatasan pola parameter, masukan seperti ini memicu kesalahan tipe yang diteruskan sebagai galat server."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak jatuh ke galat server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "pm.test('dijawab 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Toleransi: pelanggaran relasi dijawab 409, bukan 500",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/provinces/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "provinces",
+                "1"
+              ]
+            },
+            "description": "Baris ini masih dirujuk tabel upah minimum provinsi. Yang dibuktikan adalah pengecualian basis data ditangkap dan diterjemahkan, bukan diteruskan mentah."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak jatuh ke galat server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "pm.test('dijawab 409 Conflict', () => pm.response.to.have.status(409));",
+                  "const b = pm.response.json();",
+                  "pm.test('pesannya menjelaskan, bukan jejak tumpukan', () => {",
+                  "  pm.expect(b.message).to.be.a('string');",
+                  "  pm.expect(b.message).to.not.include('SQLSTATE');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Toleransi: rujukan tidak ditemukan dijawab 4xx, bukan 500",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stakeholder-contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stakeholder-contacts"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alumni_id\": 999999999,\n  \"questionnaire_id\": 999999999,\n  \"contact_type\": \"atasan\",\n  \"contact_name\": \"Uji Rujukan\",\n  \"contact_email\": \"uji@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak jatuh ke galat server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "pm.test('dijawab 4xx', () => pm.expect(pm.response.code).to.be.within(400, 499));",
+                  "pm.test('pesannya tidak membocorkan SQL', () =>",
+                  "  pm.expect(pm.response.text()).to.not.include('SQLSTATE'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 - Security",
+      "item": [
+        {
+          "name": "Kerahasiaan: tanpa token ditolak 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ditolak 401', () => pm.response.to.have.status(401));",
+                  "pm.test('tidak ada data yang ikut terkirim', () =>",
+                  "  pm.expect(pm.response.text()).to.not.include('nim'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kerahasiaan: peran terbatas ditolak 403 di endpoint khusus",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{kajurToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit-logs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "audit-logs"
+              ]
+            },
+            "description": "Jejak audit hanya boleh dibaca kepala tracer study."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ditolak 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Keutuhan: cakupan data tidak dapat diperluas dari sisi klien",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{kajurToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni?jurusan=Teknik%20Mesin&per_page=25",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni"
+              ],
+              "query": [
+                {
+                  "key": "jurusan",
+                  "value": "Teknik%20Mesin"
+                },
+                {
+                  "key": "per_page",
+                  "value": "25"
+                }
+              ]
+            },
+            "description": "Ketua jurusan Akuntansi meminta data jurusan lain secara eksplisit. Server tidak boleh mempercayai parameter cakupan yang dikirim klien."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "const milik = pm.collectionVariables.get('kajurJurusan');",
+                  "const baris = pm.response.json().data.data;",
+                  "const jurusan = [...new Set(baris.map(r => r.jurusan || r.jurusan_name))];",
+                  "console.log('jurusan yang terkirim: ' + JSON.stringify(jurusan));",
+                  "pm.test('parameter jurusan milik unit lain diabaikan', () => {",
+                  "  jurusan.forEach(j => pm.expect(j).to.eql(milik));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Keutuhan: sisipkan muatan formula lewat isian bebas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stakeholder-contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stakeholder-contacts"
+              ]
+            },
+            "description": "Nama kontak diisi muatan formula persis seperti yang dapat dikirim alumni lewat borang. Berkas ekspornya diperiksa di request berikutnya.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alumni_id\": {{alumniId}},\n  \"questionnaire_id\": {{questionnaireId}},\n  \"alumni_status\": \"bekerja\",\n  \"contacts\": [\n    {\n      \"contact_type\": \"atasan\",\n      \"contact_name\": \"=cmd|' /C calc'!A1\",\n      \"contact_email\": \"uji.formula@example.com\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('kontak tersimpan', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Keutuhan: ekspor CSV menetralkan awalan formula",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stakeholder-contacts/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stakeholder-contacts",
+                "export"
+              ]
+            },
+            "description": "Nama kontak berasal dari isian bebas alumni. Bila ditulis apa adanya, nilai berawalan = + @ akan dieksekusi aplikasi lembar sebar saat berkasnya dibuka petugas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('berhasil', () => pm.response.to.have.status(200));",
+                  "const teks = pm.response.text();",
+                  "const sel = teks.split(/\\r?\\n/).slice(1).flatMap(b => b.split(','));",
+                  "const berbahaya = sel.filter(s => /^\"?[=+@]/.test(s.trim()));",
+                  "console.log('sel berawalan formula tanpa penetralan: ' + berbahaya.length);",
+                  "pm.test('muatan yang barusan disisipkan ikut terekspor', () =>",
+                  "  pm.expect(teks).to.include('/C calc'));",
+                  "pm.test('tidak ada sel yang dimulai formula mentah', () =>",
+                  "  pm.expect(berbahaya.length).to.eql(0));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kerahasiaan: penebakan kata sandi ke-1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Batasnya lima percobaan per menit per kombinasi rute, surel, dan alamat IP. Percobaan keenam dan seterusnya harus ditahan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"penebak.sandi@contoh.invalid\",\n  \"password\": \"salah-sekali\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('percobaan ke-1 masih dilayani (belum 429)', () =>",
+                  "  pm.expect(pm.response.code).to.not.eql(429));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kerahasiaan: penebakan kata sandi ke-2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Batasnya lima percobaan per menit per kombinasi rute, surel, dan alamat IP. Percobaan keenam dan seterusnya harus ditahan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"penebak.sandi@contoh.invalid\",\n  \"password\": \"salah-sekali\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('percobaan ke-2 masih dilayani (belum 429)', () =>",
+                  "  pm.expect(pm.response.code).to.not.eql(429));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kerahasiaan: penebakan kata sandi ke-3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Batasnya lima percobaan per menit per kombinasi rute, surel, dan alamat IP. Percobaan keenam dan seterusnya harus ditahan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"penebak.sandi@contoh.invalid\",\n  \"password\": \"salah-sekali\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('percobaan ke-3 masih dilayani (belum 429)', () =>",
+                  "  pm.expect(pm.response.code).to.not.eql(429));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kerahasiaan: penebakan kata sandi ke-4",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Batasnya lima percobaan per menit per kombinasi rute, surel, dan alamat IP. Percobaan keenam dan seterusnya harus ditahan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"penebak.sandi@contoh.invalid\",\n  \"password\": \"salah-sekali\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('percobaan ke-4 masih dilayani (belum 429)', () =>",
+                  "  pm.expect(pm.response.code).to.not.eql(429));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kerahasiaan: penebakan kata sandi ke-5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Batasnya lima percobaan per menit per kombinasi rute, surel, dan alamat IP. Percobaan keenam dan seterusnya harus ditahan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"penebak.sandi@contoh.invalid\",\n  \"password\": \"salah-sekali\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('percobaan ke-5 masih dilayani (belum 429)', () =>",
+                  "  pm.expect(pm.response.code).to.not.eql(429));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kerahasiaan: penebakan kata sandi ke-6",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Batasnya lima percobaan per menit per kombinasi rute, surel, dan alamat IP. Percobaan keenam dan seterusnya harus ditahan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"penebak.sandi@contoh.invalid\",\n  \"password\": \"salah-sekali\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('percobaan ke-6 sudah ditahan 429', () => pm.response.to.have.status(429));",
+                  "const b = pm.response.json();",
+                  "pm.test('pesannya berbahasa Indonesia dan menyebut sisa waktu', () => {",
+                  "  pm.expect(b.message).to.match(/[Tt]erlalu banyak/);",
+                  "  pm.expect(b).to.have.property('retry_after');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Kerahasiaan: penebakan kata sandi ke-7",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Batasnya lima percobaan per menit per kombinasi rute, surel, dan alamat IP. Percobaan keenam dan seterusnya harus ditahan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"penebak.sandi@contoh.invalid\",\n  \"password\": \"salah-sekali\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('percobaan ke-7 sudah ditahan 429', () => pm.response.to.have.status(429));",
+                  "const b = pm.response.json();",
+                  "pm.test('pesannya berbahasa Indonesia dan menyebut sisa waktu', () => {",
+                  "  pm.expect(b.message).to.match(/[Tt]erlalu banyak/);",
+                  "  pm.expect(b).to.have.property('retry_after');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000/api"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "kajurToken",
+      "value": ""
+    },
+    {
+      "key": "kajurJurusan",
+      "value": ""
+    },
+    {
+      "key": "staffEmail",
+      "value": ""
+    },
+    {
+      "key": "staffPassword",
+      "value": ""
+    },
+    {
+      "key": "kajurEmail",
+      "value": ""
+    },
+    {
+      "key": "kajurPassword",
+      "value": ""
+    },
+    {
+      "key": "alumniId",
+      "value": ""
+    },
+    {
+      "key": "questionnaireId",
+      "value": ""
+    }
+  ]
+}

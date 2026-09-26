@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "9f3b1c20-5d47-4f0a-9a1e-7c2e6f0b1a10",
     "name": "SmartTracer API (lokal)",
-    "description": "Dibuat otomatis dari `php artisan route:list`. Jalankan folder \"00 - Auth\" lebih dulu supaya token terisi.",
+    "description": "",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1834,6 +1834,338 @@
               ]
             },
             "description": "Guard: staff\nController: App\\Http\\Controllers\\Api\\Admin\\AlumniController@downloadTemplate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "",
+                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
+                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
+                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
+                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
+                  "if (tipeKonten.toLowerCase().includes('json')) {",
+                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
+                  "} else {",
+                  "  pm.test('respons berkas unduhan', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /alumni/stats-by-program",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni/stats-by-program",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni",
+                "stats-by-program"
+              ]
+            },
+            "description": "Guard: staff\nController: App\\Http\\Controllers\\Api\\Admin\\AlumniController@statsByProgram"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "",
+                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
+                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
+                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
+                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
+                  "if (tipeKonten.toLowerCase().includes('json')) {",
+                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
+                  "} else {",
+                  "  pm.test('respons berkas unduhan', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /alumni/credentials/issue-email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni/credentials/issue-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni",
+                "credentials",
+                "issue-email"
+              ]
+            },
+            "description": "Guard: staff (head_tracer)\nController: App\\Http\\Controllers\\Api\\Admin\\AlumniCredentialEmailController@issue\nSumber aturan: validate() di controller\n\nField body:\n- batch_id (wajib): required, uuid\n- nims (wajib bila filter kosong): array of string\n- graduation_year, jurusan, program_id: filter alternatif\n- only_without_credentials, limit, after_nim: opsional",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"batch_id\": \"{{batchId}}\",\n  \"nims\": [\"{{alumniNim}}\"],\n  \"only_without_credentials\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "",
+                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
+                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
+                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
+                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
+                  "if (tipeKonten.toLowerCase().includes('json')) {",
+                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
+                  "} else {",
+                  "  pm.test('respons berkas unduhan', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /alumni/reminders/issue-email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni/reminders/issue-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni",
+                "reminders",
+                "issue-email"
+              ]
+            },
+            "description": "Guard: staff (head_tracer)\nController: App\\Http\\Controllers\\Api\\Admin\\AlumniReminderController@issue\nSumber aturan: validate() di controller\n\nField body:\n- batch_id (wajib): required, uuid\n- nims (wajib bila filter kosong): array of string\n- graduation_year, jurusan, program_id: filter alternatif\n- limit, after_nim: opsional",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"batch_id\": \"{{batchId}}\",\n  \"nims\": [\"{{alumniNim}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "",
+                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
+                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
+                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
+                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
+                  "if (tipeKonten.toLowerCase().includes('json')) {",
+                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
+                  "} else {",
+                  "  pm.test('respons berkas unduhan', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /alumni/email-batches/active",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni/email-batches/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni",
+                "email-batches",
+                "active"
+              ]
+            },
+            "description": "Guard: staff (head_tracer)\nController: App\\Http\\Controllers\\Api\\Admin\\AlumniEmailBatchController@active"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "",
+                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
+                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
+                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
+                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
+                  "if (tipeKonten.toLowerCase().includes('json')) {",
+                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
+                  "} else {",
+                  "  pm.test('respons berkas unduhan', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /alumni/email-batches/{batchId}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni/email-batches/{{batchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni",
+                "email-batches",
+                "{{batchId}}"
+              ]
+            },
+            "description": "Guard: staff (head_tracer)\nController: App\\Http\\Controllers\\Api\\Admin\\AlumniEmailBatchController@status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "",
+                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
+                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
+                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
+                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
+                  "if (tipeKonten.toLowerCase().includes('json')) {",
+                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
+                  "} else {",
+                  "  pm.test('respons berkas unduhan', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /alumni/email-batches/{batchId}/cancel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alumni/email-batches/{{batchId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alumni",
+                "email-batches",
+                "{{batchId}}",
+                "cancel"
+              ]
+            },
+            "description": "Guard: staff (head_tracer)\nController: App\\Http\\Controllers\\Api\\Admin\\AlumniEmailBatchController@cancel"
           },
           "event": [
             {
@@ -7514,6 +7846,61 @@
       ]
     },
     {
+      "name": "notifications",
+      "item": [
+        {
+          "name": "GET /notifications/summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "summary"
+              ]
+            },
+            "description": "Guard: staff\nController: App\\Http\\Controllers\\Api\\Transactional\\NotificationController@summary"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "",
+                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
+                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
+                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
+                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
+                  "if (tipeKonten.toLowerCase().includes('json')) {",
+                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
+                  "} else {",
+                  "  pm.test('respons berkas unduhan', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "programs",
       "item": [
         {
@@ -8376,6 +8763,52 @@
               ]
             },
             "description": "Guard: public\nController: App\\Http\\Controllers\\Api\\PublicAccess\\PublicStatisticsController@years"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
+                  "",
+                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
+                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
+                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
+                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
+                  "if (tipeKonten.toLowerCase().includes('json')) {",
+                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
+                  "} else {",
+                  "  pm.test('respons berkas unduhan', () =>",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /public/privacy-notice",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/public/privacy-notice",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "public",
+                "privacy-notice"
+              ]
+            },
+            "description": "Guard: public\nController: App\\Http\\Controllers\\Api\\PublicAccess\\PrivacyNoticeController@show"
           },
           "event": [
             {
@@ -9729,433 +10162,6 @@
       ]
     },
     {
-      "name": "thresholds",
-      "item": [
-        {
-          "name": "POST /thresholds",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/thresholds",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "thresholds"
-              ]
-            },
-            "description": "Guard: staff\nPeran yang diizinkan: head_tracer,tracer_team\nController: App\\Http\\Controllers\\Api\\Transactional\\ThresholdController@store\nSumber aturan: kelas validator terpisah\n\nField body:\n- lam_version_id (wajib): required, integer, exists:oltp.lam_versions,id\n- indicator_id (wajib): required, integer, exists:oltp.threshold_indicators,id\n- level (wajib): required, string, in:baik,unggul\n- value (wajib): required, numeric, min:0, max:100",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"indicator_id\": 1,\n  \"lam_version_id\": 1,\n  \"level\": \"baik\",\n  \"value\": 0\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
-                  "",
-                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
-                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
-                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
-                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
-                  "if (tipeKonten.toLowerCase().includes('json')) {",
-                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
-                  "} else {",
-                  "  pm.test('respons berkas unduhan', () =>",
-                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "GET /thresholds",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/thresholds",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "thresholds"
-              ]
-            },
-            "description": "Guard: staff\nPeran yang diizinkan: head_tracer,tracer_team\nController: App\\Http\\Controllers\\Api\\Transactional\\ThresholdController@index"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
-                  "",
-                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
-                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
-                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
-                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
-                  "if (tipeKonten.toLowerCase().includes('json')) {",
-                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
-                  "} else {",
-                  "  pm.test('respons berkas unduhan', () =>",
-                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "PUT /thresholds/{id}",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/thresholds/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "thresholds",
-                ":id"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "1",
-                  "description": "isi dengan id yang ada di basis data"
-                }
-              ]
-            },
-            "description": "Guard: staff\nPeran yang diizinkan: head_tracer\nController: App\\Http\\Controllers\\Api\\Transactional\\ThresholdController@update\nSumber aturan: kelas validator terpisah\n\nField body:\n- value (wajib): required, numeric, min:0, max:100",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"value\": 0\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
-                  "",
-                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
-                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
-                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
-                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
-                  "if (tipeKonten.toLowerCase().includes('json')) {",
-                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
-                  "} else {",
-                  "  pm.test('respons berkas unduhan', () =>",
-                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "DELETE /thresholds/{id}",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/thresholds/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "thresholds",
-                ":id"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "1",
-                  "description": "isi dengan id yang ada di basis data"
-                }
-              ]
-            },
-            "description": "Guard: staff\nPeran yang diizinkan: head_tracer\nController: App\\Http\\Controllers\\Api\\Transactional\\ThresholdController@destroy"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
-                  "",
-                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
-                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
-                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
-                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
-                  "if (tipeKonten.toLowerCase().includes('json')) {",
-                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
-                  "} else {",
-                  "  pm.test('respons berkas unduhan', () =>",
-                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "GET /thresholds/{threshold}",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/thresholds/:threshold",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "thresholds",
-                ":threshold"
-              ],
-              "variable": [
-                {
-                  "key": "threshold",
-                  "value": "1",
-                  "description": "isi dengan id yang ada di basis data"
-                }
-              ]
-            },
-            "description": "Guard: staff\nPeran yang diizinkan: head_tracer,tracer_team\nController: App\\Http\\Controllers\\Api\\Transactional\\ThresholdController@show"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
-                  "",
-                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
-                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
-                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
-                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
-                  "if (tipeKonten.toLowerCase().includes('json')) {",
-                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
-                  "} else {",
-                  "  pm.test('respons berkas unduhan', () =>",
-                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "PUT /thresholds/{threshold}",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/thresholds/:threshold",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "thresholds",
-                ":threshold"
-              ],
-              "variable": [
-                {
-                  "key": "threshold",
-                  "value": "1",
-                  "description": "isi dengan id yang ada di basis data"
-                }
-              ]
-            },
-            "description": "Guard: staff\nPeran yang diizinkan: head_tracer,tracer_team\nController: App\\Http\\Controllers\\Api\\Transactional\\ThresholdController@update\nSumber aturan: kelas validator terpisah\n\nField body:\n- value (wajib): required, numeric, min:0, max:100",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"value\": 0\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
-                  "",
-                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
-                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
-                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
-                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
-                  "if (tipeKonten.toLowerCase().includes('json')) {",
-                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
-                  "} else {",
-                  "  pm.test('respons berkas unduhan', () =>",
-                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "DELETE /thresholds/{threshold}",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/thresholds/:threshold",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "thresholds",
-                ":threshold"
-              ],
-              "variable": [
-                {
-                  "key": "threshold",
-                  "value": "1",
-                  "description": "isi dengan id yang ada di basis data"
-                }
-              ]
-            },
-            "description": "Guard: staff\nPeran yang diizinkan: head_tracer,tracer_team\nController: App\\Http\\Controllers\\Api\\Transactional\\ThresholdController@destroy"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('tidak error server', () => pm.expect(pm.response.code).to.be.below(500));",
-                  "",
-                  "// Sebagian endpoint memang mengembalikan berkas (template XLSX, ekspor CSV),",
-                  "// bukan JSON. Assertion JSON hanya berlaku kalau Content-Type-nya JSON;",
-                  "// untuk unduhan yang dicek adalah header Content-Disposition-nya.",
-                  "const tipeKonten = pm.response.headers.get('Content-Type') || '';",
-                  "if (tipeKonten.toLowerCase().includes('json')) {",
-                  "  pm.test('respons JSON', () => pm.response.to.be.json);",
-                  "} else {",
-                  "  pm.test('respons berkas unduhan', () =>",
-                  "    pm.expect(pm.response.headers.get('Content-Disposition') || '').to.include('attachment'));",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "response": []
-        }
-      ]
-    },
-    {
       "name": "tracer-study",
       "item": [
         {
@@ -11394,6 +11400,10 @@
     {
       "key": "alumniPassword",
       "value": ""
+    },
+    {
+      "key": "batchId",
+      "value": "3f1a6c4e-9d20-4b7a-8f55-0c2e91b7d840"
     }
   ]
 }

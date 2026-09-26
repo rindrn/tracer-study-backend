@@ -1,0 +1,242 @@
+{
+  "collection_name": "Template Analisis Tracer Study",
+  "collection_description": "Starter questions & dashboard untuk eksplorasi data OLAP tracer study. Dibuat oleh provision.py, aman dijalankan ulang (idempoten).",
+  "dashboard_name": "Template Analisis Tracer Study",
+  "database_name": "SmartTracer",
+  "variables": {
+    "tahun_lulus": {
+      "display_name": "Tahun Lulus",
+      "type": "text"
+    },
+    "prodi": {
+      "display_name": "Program Studi",
+      "type": "text"
+    }
+  },
+  "questions": [
+    {
+      "file": "01_masa_tunggu_prodi_tahun.sql",
+      "name": "Masa Tunggu Kerja per Prodi & Tahun Lulus",
+      "description": "Rata-rata masa tunggu kerja (bulan) alumni, dikelompokkan per program studi dan tahun lulus.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "02_gaji_vs_lokasi.sql",
+      "name": "Pola Gaji vs Lokasi Bekerja",
+      "description": "Rata-rata take-home pay alumni per provinsi tempat bekerja, dibandingkan dengan UMP provinsi tersebut.",
+      "display": "table",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "03_keterserapan_per_prodi.sql",
+      "name": "Keterserapan Kerja per Prodi",
+      "description": "Distribusi status alumni (bekerja, wirausaha, studi lanjut, dst) per program studi beserta persentasenya.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "04_kesesuaian_bidang_level.sql",
+      "name": "Kesesuaian Bidang & Level Kerja vs Prodi",
+      "description": "Jumlah alumni per kombinasi kesesuaian bidang kerja dan level kerja, dikelompokkan per program studi.",
+      "display": "table",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "05_sebaran_instansi.sql",
+      "name": "Sebaran Instansi (Geografis & Jenis)",
+      "description": "Jumlah alumni bekerja per provinsi dan jenis perusahaan/instansi tempat bekerja.",
+      "display": "table",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "06_wirausaha_sebaran_masa_tunggu.sql",
+      "name": "Wirausaha: Sebaran & Masa Tunggu",
+      "description": "Sebaran geografis alumni wirausaha per program studi beserta rata-rata masa tunggu memulai usaha.",
+      "display": "table",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "07_kompetensi_gap_metode.sql",
+      "name": "Kompetensi Gap & Metode Pembelajaran per Prodi",
+      "description": "Rata-rata skor evaluasi per kelompok gap kompetensi (grup_gap), dikelompokkan per program studi.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "08_pembiayaan_studi_lanjut.sql",
+      "name": "Pembiayaan Studi Lanjut",
+      "description": "Jumlah alumni yang melanjutkan studi, dikelompokkan per perguruan tinggi tujuan dan sumber biaya.",
+      "display": "table",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "09_tren_keterserapan_tahun.sql",
+      "name": "Tren Status Alumni per Tahun Lulus",
+      "description": "Tren jumlah alumni per kategori status (bekerja, wirausaha, studi lanjut, dst) dari tahun ke tahun.",
+      "display": "line",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "10_top_perusahaan_penyerap.sql",
+      "name": "Top 10 Perusahaan Penyerap Alumni",
+      "description": "10 perusahaan/instansi dengan jumlah alumni bekerja terbanyak.",
+      "display": "row",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "11_proporsi_gaji_vs_ump.sql",
+      "name": "Proporsi Gaji di Atas vs di Bawah UMP",
+      "description": "Persentase alumni dengan take-home pay di atas/sama dengan UMP dibanding di bawah UMP provinsi tempat bekerja.",
+      "display": "pie",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "12_level_instansi_kerja.sql",
+      "name": "Level Instansi Tempat Bekerja",
+      "description": "Komposisi alumni bekerja berdasarkan level instansi: lokal, nasional, atau multinasional.",
+      "display": "pie",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "13_sumber_biaya_kuliah.sql",
+      "name": "Sumber Biaya Kuliah",
+      "description": "Komposisi alumni berdasarkan sumber biaya kuliah (mandiri vs berbagai jenis beasiswa) saat menempuh studi.",
+      "display": "pie",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "14_metode_kompetensi_terpilih.sql",
+      "name": "Metode Pembelajaran & Kompetensi Terpilih per Prodi",
+      "description": "Frekuensi metode pembelajaran dan kompetensi (dari pertanyaan multi-pilihan) yang paling banyak dipilih alumni per program studi.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "15_gaji_per_jenjang.sql",
+      "name": "Rata-rata Gaji per Jenjang Studi",
+      "description": "Perbandingan rata-rata take-home pay alumni antara jenjang D3 dan D4.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "16_skor_evaluasi_per_kategori.sql",
+      "name": "Skor Evaluasi per Kategori Pertanyaan",
+      "description": "Rata-rata skor evaluasi alumni per kategori pertanyaan (bukan grup gap), dikelompokkan per program studi.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "17_kelayakan_lulusan_per_prodi.sql",
+      "name": "Kelayakan Lulusan per Prodi (Proxy IKU 2)",
+      "description": "Persentase alumni dengan outcome layak (bekerja bergaji >= UMP, wirausaha, atau melanjutkan pendidikan) per prodi, diurutkan dari yang paling butuh perhatian. Proxy IKU 2, bukan angka resmi Kemendikbud.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "18_ranking_kecepatan_penyerapan.sql",
+      "name": "Ranking Kecepatan Penyerapan Kerja Antar Prodi",
+      "description": "Rata-rata masa tunggu kerja seluruh angkatan per prodi, diurutkan dari yang paling lama -- untuk mengidentifikasi prodi yang butuh intervensi career center.",
+      "display": "row",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "19_dampak_kesesuaian_bidang_gaji.sql",
+      "name": "Dampak Kesesuaian Bidang terhadap Gaji",
+      "description": "Perbandingan rata-rata take-home pay antar tingkat kesesuaian bidang kerja dengan bidang studi -- menunjukkan apakah bekerja sesuai bidang berkorelasi dengan gaji lebih tinggi.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "20_proaktivitas_cari_kerja.sql",
+      "name": "Proaktivitas Mencari Kerja per Prodi",
+      "description": "Jumlah alumni yang sudah mendapat kerja sebelum vs sesudah lulus per prodi -- indikator efektivitas career readiness dan program magang/link-and-match.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "21_prodi_berisiko.sql",
+      "name": "Prodi Berisiko: Masa Tunggu Tinggi & Serapan Rendah",
+      "description": "Scorecard early-warning yang menggabungkan rata-rata masa tunggu kerja dan persentase alumni belum terserap per prodi, diurutkan dari yang paling berisiko -- dasar prioritas intervensi.",
+      "display": "table",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "22_gap_kompetensi_terbesar.sql",
+      "name": "10 Gap Kompetensi Terbesar (Fokus Perbaikan Kurikulum)",
+      "description": "10 kombinasi prodi x kelompok kompetensi dengan skor evaluasi terendah -- daftar prioritas untuk tim kurikulum.",
+      "display": "row",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "23_iku2_resmi_keterserapan.sql",
+      "name": "IKU 2 Resmi: Tingkat Keterserapan Lulusan per Prodi",
+      "description": "Persentase alumni terserap (definisi resmi dari kpi_category_mapping milik pipeline ETL institusi, bukan proxy) per prodi, diurutkan dari yang terendah.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "24_tren_gaji_nasional.sql",
+      "name": "Tren Rata-rata Gaji Alumni per Tahun Lulus",
+      "description": "Tren rata-rata take-home pay alumni secara nasional dari tahun ke tahun -- indikator daya beli lulusan dari waktu ke waktu.",
+      "display": "line",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "25_tren_masa_tunggu_nasional.sql",
+      "name": "Tren Rata-rata Masa Tunggu Kerja per Tahun Lulus",
+      "description": "Tren rata-rata masa tunggu kerja alumni secara nasional dari tahun ke tahun -- indikator daya serap pasar kerja dari waktu ke waktu.",
+      "display": "line",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "26_rollup_jurusan.sql",
+      "name": "Ringkasan Keterserapan & Gaji per Jurusan",
+      "description": "Rollup ke level jurusan (di atas prodi) untuk persentase keterserapan resmi dan rata-rata gaji -- cocok untuk laporan tingkat pimpinan jurusan.",
+      "display": "table",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "27_ekuitas_beasiswa.sql",
+      "name": "Ekuitas Beasiswa: Keterserapan per Sumber Biaya Kuliah",
+      "description": "Persentase keterserapan resmi dibandingkan antar kelompok sumber biaya kuliah (mandiri vs berbagai beasiswa) -- mengecek apakah penerima beasiswa afirmasi/ADIK punya outcome kerja setara.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "28_peran_wirausaha.sql",
+      "name": "Peran Wirausaha Alumni",
+      "description": "Komposisi alumni wirausaha berdasarkan peran (Founder, Co-Founder, Freelance, Staff).",
+      "display": "pie",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "29_kesesuaian_level_vs_gaji.sql",
+      "name": "Kesesuaian Level Kerja vs Gaji",
+      "description": "Perbandingan rata-rata gaji berdasarkan kesesuaian level pekerjaan dengan jenjang pendidikan (overqualified/sesuai/underqualified).",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "30_kecepatan_respons_kerja.sql",
+      "name": "Rata-rata Lama Mendapat Kerja: Sebelum vs Sesudah Lulus",
+      "description": "Rata-rata jumlah bulan mendapat kerja sebelum vs sesudah lulus per prodi -- pelengkap kuantitas (bukan hanya jumlah) untuk mengukur efektivitas career readiness.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "31_distribusi_kecepatan_kerja.sql",
+      "name": "Distribusi Kecepatan Mendapat Kerja",
+      "description": "Sebaran alumni berdasarkan kelompok lama masa tunggu kerja (0-3, 4-6, 7-9, 10-12 bulan) -- menunjukkan bentuk distribusi, bukan hanya rata-rata.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    },
+    {
+      "file": "32_gaji_karyawan_vs_wirausaha.sql",
+      "name": "Perbandingan Gaji: Karyawan vs Wirausaha",
+      "description": "Perbandingan rata-rata take-home pay antara alumni yang bekerja sebagai karyawan dan yang berwirausaha.",
+      "display": "bar",
+      "template_tags": ["tahun_lulus", "prodi"]
+    }
+  ]
+}

@@ -40,25 +40,34 @@ class AnswerValueResolver
     /**
      * @param Collection<string,Collection> $optionsByCode question_code => Collection of {option_code, option_label}
      * @param array<string,object>          $questionMetaByCode question_code => object{question_type, metadata}
-     * @param array<int,string>             $provinceNamesById
-     * @param array<int,string>             $cityNamesById
+     * @param array<int,string>             $provinceOutputById nilai f5a1 yang ditulis, berkunci provinces.id
+     * @param array<int,string>             $cityOutputById     nilai f5a2 yang ditulis, berkunci cities.id
      */
     public function __construct(
         private readonly Collection $optionsByCode,
         private readonly array $questionMetaByCode,
-        private readonly array $provinceNamesById = [],
-        private readonly array $cityNamesById = [],
+        private readonly array $provinceOutputById = [],
+        private readonly array $cityOutputById = [],
     ) {}
 
     /**
-     * Resolver yang tidak melakukan apa-apa -- semua nilai dikembalikan
-     * mentah. Dipakai untuk mode export "kode mentah" (format=code) yang
-     * file-nya ditujukan untuk diunggah ke portal Kementerian, bukan
-     * untuk dibaca manusia.
+     * Resolver untuk mode export "kode mentah" (format=code), yang berkasnya
+     * ditujukan untuk diunggah ke portal Kementerian.
+     *
+     * Sebagian besar kolom memang sudah menyimpan kode kementerian apa adanya
+     * -- f8, f1101, f1201 dan kawan-kawan berisi option_code yang sama persis
+     * dengan lembar instrumen -- sehingga dikembalikan tanpa diterjemahkan.
+     *
+     * f5a1 dan f5a2 pengecualiannya. Keduanya menyimpan KUNCI BARIS tabel
+     * master (provinces.id, cities.id), bukan kode kementerian, sehingga
+     * membiarkannya mentah akan menuliskan id basis data ke berkas pelaporan
+     * -- angka yang kebetulan sah tetapi menunjuk wilayah yang salah. Karena
+     * itu pemanggil meneruskan pemetaan id -> kode wilayah untuk kedua kolom
+     * tersebut.
      */
-    public static function raw(): self
+    public static function raw(array $provinceCodesById = [], array $cityCodesById = []): self
     {
-        return new self(collect(), []);
+        return new self(collect(), [], $provinceCodesById, $cityCodesById);
     }
 
     public function resolve(string $code, mixed $rawValue): string
@@ -70,11 +79,11 @@ class AnswerValueResolver
         $raw = (string) $rawValue;
 
         if ($code === self::PROVINCE_CODE) {
-            return $this->provinceNamesById[(int) $raw] ?? $raw;
+            return $this->provinceOutputById[(int) $raw] ?? $raw;
         }
 
         if ($code === self::CITY_CODE) {
-            return $this->cityNamesById[(int) $raw] ?? $raw;
+            return $this->cityOutputById[(int) $raw] ?? $raw;
         }
 
         $match = $this->optionsByCode->get($code)?->firstWhere('option_code', $raw);

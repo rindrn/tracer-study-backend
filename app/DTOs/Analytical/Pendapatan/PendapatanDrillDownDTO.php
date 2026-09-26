@@ -15,6 +15,7 @@ class PendapatanDrillDownDTO
      *   nama: string,
      *   nim: string,
      *   nama_prodi: string,
+     *   jenjang: string,
      *   tahun_lulus: string,
      *   perusahaan: string,
      *   take_home_pay: int|null,

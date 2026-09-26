@@ -250,9 +250,18 @@ class ReportService
         return $global !== null ? [$global->id] : [];
     }
 
+    /** Kolom yang menyimpan kunci baris tabel wilayah, bukan kode kementerian. */
+    private const KODE_WILAYAH = ['f5a1', 'f5a2'];
+
     /**
      * Untuk mode kode mentah, resolver "kosong" dipakai supaya query
-     * options/provinces/cities tidak dijalankan sama sekali.
+     * options/questions tidak dijalankan sama sekali.
+     *
+     * Kecualinya f5a1 dan f5a2. Keduanya menyimpan provinces.id dan cities.id,
+     * sehingga tanpa penerjemahan berkas pelaporan akan memuat id basis data
+     * alih-alih kode wilayah kementerian. Kedua query wilayahnya karena itu
+     * tetap dijalankan pada mode kode — tetapi hanya bila kolomnya memang
+     * diminta, sehingga ekspor yang tidak memuat wilayah tetap bebas query.
      *
      * @param string[] $questionCodes
      * @param int[]    $questionnaireIds pembatas asal pertanyaan
@@ -260,15 +269,31 @@ class ReportService
     private function buildValueResolver(array $questionCodes, array $questionnaireIds, bool $rawCode): AnswerValueResolver
     {
         if ($rawCode || $questionCodes === []) {
-            return AnswerValueResolver::raw();
+            return array_intersect(self::KODE_WILAYAH, $questionCodes) === []
+                ? AnswerValueResolver::raw()
+                : AnswerValueResolver::raw(...$this->petaWilayah('code'));
         }
 
         return new AnswerValueResolver(
             $this->questionnaireRepo->getOptionsGroupedByCode($questionCodes, $questionnaireIds),
             $this->questionnaireRepo->getQuestionMetaByCode($questionCodes, $questionnaireIds),
-            DB::connection('oltp')->table('provinces')->pluck('name', 'id')->toArray(),
-            DB::connection('oltp')->table('cities')->pluck('name', 'id')->toArray(),
+            ...$this->petaWilayah('name'),
         );
+    }
+
+    /**
+     * Pemetaan id wilayah ke kolom yang diminta, untuk provinsi dan kabupaten.
+     *
+     * @return array{0: array<int,string>, 1: array<int,string>}
+     */
+    private function petaWilayah(string $kolom): array
+    {
+        $conn = DB::connection('oltp');
+
+        return [
+            $conn->table('provinces')->pluck($kolom, 'id')->toArray(),
+            $conn->table('cities')->pluck($kolom, 'id')->toArray(),
+        ];
     }
 
     private function buildHeaderList(array $codes, array $labels): array

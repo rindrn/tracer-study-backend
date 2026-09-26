@@ -6,10 +6,20 @@ use Illuminate\Support\Collection;
 
 class SebaranInstansiRepository extends BaseAnalyticalRepository
 {
+    // status_alumni_sk BUKAN literal stabil -- dim_status_alumni Type1
+    // membuat surrogate key baru per questionnaire_id (mis. sk 1,2,3,4,5,6
+    // sama-sama label "Bekerja (full time/part time)" tapi dari 6 versi
+    // questionnaire berbeda), jadi equals ke satu angka literal ('1') diam-
+    // diam membuang alumni yang jawab lewat questionnaire lain -- persis
+    // kasus yang sama seperti dijelaskan di WirausahaRepository::getBarData().
+    // id_status_alumni polanya "{questionnaire_id}:f8:{option_code}" di
+    // SEMUA versi questionnaire (dikonfirmasi lewat data), option_code=1
+    // konsisten berarti "Bekerja (full time/part time)" -- contains ':f8:1'
+    // cocok ke SEMUA versi sekaligus, bukan cuma questionnaire pertama.
     private const FILTER_BEKERJA = [
-        'member'   => 'FactTracerStudy.status_alumni_sk',
-        'operator' => 'equals',
-        'values'   => ['1'],
+        'member'   => 'DimStatusAlumni.id_status_alumni',
+        'operator' => 'contains',
+        'values'   => [':f8:1'],
     ];
 
     // ──────────────────────────────────────────────────────────────
