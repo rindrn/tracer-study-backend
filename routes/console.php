@@ -44,6 +44,11 @@ Schedule::command('etl:run --reason=scheduled_weekly')
 
 Schedule::command('tracer:recalc-response-threshold')->dailyAt('01:00');
 
+// Reaper untuk ETL run yang macet di status "running" karena worker mati
+// paksa (TC-SAF-11, lihat docblock ReapStuckEtlRuns). Tiap 15 menit cukup --
+// ambang macetnya sendiri 60 menit, jadi tidak perlu lebih sering dari ini.
+Schedule::command('etl:reap-stuck-runs')->everyFifteenMinutes();
+
 /*
 |--------------------------------------------------------------------------
 | MODE TESTING (uncomment untuk debug cepat, comment yang production di atas)

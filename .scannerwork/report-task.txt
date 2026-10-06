@@ -1,0 +1,7 @@
+organization=arumannn
+projectKey=arumannn_tracer-study-backend
+serverUrl=https://sonarcloud.io
+serverVersion=8.0.0.106333
+dashboardUrl=https://sonarcloud.io/dashboard?id=arumannn_tracer-study-backend
+ceTaskId=AaCoxZG7GFHdUyzrubas
+ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AaCoxZG7GFHdUyzrubas

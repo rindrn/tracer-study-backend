@@ -162,5 +162,23 @@ class AppServiceProvider extends ServiceProvider
                     ->response($tooMany),
             ];
         });
+
+        // Endpoint destruktif/massal (hapus entitas, terbitkan kredensial
+        // bulk, kirim email bulk) sebelumnya tidak punya pembatasan laju sama
+        // sekali (ditemukan QA Safety: 50 permintaan beruntun semuanya
+        // diproses server tanpa satu pun 429). Per-user (bukan per-IP saja)
+        // supaya satu staf yang klik berulang/loop bug frontend tidak bisa
+        // membanjiri endpoint ini, tapi staf lain tetap tidak terpengaruh.
+        RateLimiter::for('admin-bulk', function (Request $request) {
+            $userId = $request->user()?->id ?? $request->ip();
+
+            return Limit::perMinute(20)->by("admin-bulk|{$userId}")->response(
+                fn (Request $request, array $headers) => response()->json([
+                    'success'     => false,
+                    'message'     => 'Terlalu banyak permintaan beruntun. Tunggu sebentar lalu coba lagi.',
+                    'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+                ], 429, $headers)
+            );
+        });
     }
 }

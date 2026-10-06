@@ -105,7 +105,11 @@ class AlumniImport implements ToCollection, WithHeadingRow, WithMultipleSheets
             // pekerjaan yang sah.
             $validator = Validator::make($data, [
                 'nim'        => 'required|string|min:5',
-                'name'       => 'required|string',
+                // max:150 mengikuti lebar kolom alumni_profiles.name -- tanpa
+                // ini nama yang kepanjangan lolos validasi lalu menjatuhkan
+                // seluruh chunk insert dengan galat SQL mentah (lihat
+                // AlumniProfileRepository::bulkInsert).
+                'name'       => 'required|string|max:150',
                 'kode_prodi' => 'required|string',
                 'email'      => 'nullable|email',
                 'kode_pt'    => 'nullable|string|max:10',

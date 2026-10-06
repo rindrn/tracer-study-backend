@@ -258,7 +258,11 @@ class TracerStudySubmitService
             'phone'           => $phone,
             'program_id'      => $programId,
             'graduation_year' => $validated['tahun_lulus'],
-            'nik'             => $validated['nik'],
+            // Aturannya 'nullable' di SubmitTracerStudyRequest -- kalau field
+            // tidak dikirim sama sekali, key-nya tidak ada di $validated dan
+            // akses langsung melempar ErrorException (ditemukan saat QA
+            // Safety mengirim payload tanpa NIK).
+            'nik'             => $validated['nik'] ?? null,
             'npwp'            => $validated['npwp'] ?? null,
         ];
 

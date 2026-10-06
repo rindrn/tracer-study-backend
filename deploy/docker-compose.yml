@@ -253,7 +253,6 @@ services:
         # lewat nginx edge, sehingga tidak ada CORS dan tidak perlu build
         # ulang saat domain berubah.
         VITE_API_URL: /api
-        VITE_METABASE_DASHBOARD_URL: https://analyst.smart-tracer.id
         VITE_INSTITUTION_CODE: ${VITE_INSTITUTION_CODE}
         VITE_INSTITUTION_NAME: ${VITE_INSTITUTION_NAME}
         VITE_INSTITUTION_SHORT_NAME: ${VITE_INSTITUTION_SHORT_NAME}
