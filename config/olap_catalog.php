@@ -34,7 +34,11 @@
 return [
 
     'limits' => [
-        // Dimensi ketiga digambar sebagai panel (small multiples) di FE.
+        // Batas dimensi sebenarnya PER CUBE, dihitung dari jumlah tabel
+        // dimensi di dimension_groups (ExplorerService::maxDimensionsOf) dan
+        // bisa ditimpa dengan kunci 'max_dimensions' di config cube. Angka
+        // ini hanya cadangan bila cube tidak punya dimensi sama sekali, dan
+        // untuk klien lama yang belum membaca batas per cube.
         'max_dimensions' => 3,
         'max_measures'   => 4,
         'max_formulas'   => 3,

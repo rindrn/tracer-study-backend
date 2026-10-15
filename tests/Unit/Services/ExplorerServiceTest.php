@@ -132,6 +132,53 @@ class ExplorerServiceTest extends TestCase
         $this->assertArrayHasKey('members', $cube['dimension_groups'][0]);
     }
 
+    public function test_batas_dimensi_per_cube_sama_dengan_jumlah_tabel_dimensinya(): void
+    {
+        $batas = collect($this->service()->catalog()['cubes'])->pluck('max_dimensions', 'key')->all();
+
+        // Dimensi rentang (FactTracerStudy.rentang_*) ada di fact itu sendiri,
+        // bukan tabel dimensi, jadi tidak menambah batas.
+        $this->assertSame(
+            ['FactTracerStudy' => 8, 'FactRangeEvaluasi' => 3, 'FactMultiSelect' => 3],
+            $batas,
+        );
+    }
+
+    public function test_batas_dimensi_bisa_ditimpa_per_cube_di_config(): void
+    {
+        config(['olap_catalog.cubes.FactMultiSelect.max_dimensions' => 2]);
+
+        $batas = collect($this->service()->catalog()['cubes'])->pluck('max_dimensions', 'key');
+
+        $this->assertSame(2, $batas['FactMultiSelect']);
+    }
+
+    public function test_lebih_dari_tiga_dimensi_diterima_sampai_batas_cube(): void
+    {
+        $this->service()->query($this->body(['dimensions' => [
+            'DimProdi.jurusan', 'DimProdi.nama_prodi', 'DimAlumni.tahun_lulus', 'DimStatusAlumni.label',
+            'DimKesesuaianBidang.label', 'DimKesesuaianLevel.label', 'DimPerusahaan.nama_provinsi', 'DimWirausaha.jabatan',
+        ]]), []);
+
+        $this->assertCount(8, array_filter(
+            $this->lastQuery()['dimensions'],
+            fn (string $d) => $d !== 'DimWaktu.id_waktu',
+        ));
+    }
+
+    public function test_pesan_batas_menyebut_sumber_data_dan_batasnya(): void
+    {
+        $this->expectException(BusinessException::class);
+        $this->expectExceptionMessage('Alasan Kerja Tidak Sesuai Bidang: maksimal 3 dimensi');
+
+        $this->service()->query([
+            'cube'       => 'FactMultiSelect',
+            'measures'   => ['FactMultiSelect.count_alumni_unik'],
+            'dimensions' => ['DimIndikatorEvaluasi.label_pertanyaan', 'DimProdi.jurusan', 'DimProdi.nama_prodi', 'DimAlumni.tahun_lulus'],
+            'filters'    => [],
+        ], []);
+    }
+
     // ── Penyaring wajib ─────────────────────────────────────────────────
 
     public function test_query_selalu_dipatok_ke_snapshot_terbaru(): void
@@ -214,8 +261,14 @@ class ExplorerServiceTest extends TestCase
             'dimensi PII'        => [['dimensions' => ['DimAlumni.nim']]],
             'filter PII'         => [['filters' => [['member' => 'DimAlumni.nama', 'values' => ['x']]]]],
             'dimensi dobel'      => [['dimensions' => ['DimProdi.jurusan', 'DimProdi.jurusan']]],
+            // Batas FactTracerStudy = 8 tabel dimensi (lihat test batas per cube).
             'terlalu banyak dim' => [['dimensions' => [
                 'DimProdi.jurusan', 'DimProdi.jenjang', 'DimAlumni.tahun_lulus', 'DimStatusAlumni.label',
+                'DimKesesuaianBidang.label', 'DimKesesuaianLevel.label', 'DimPerusahaan.nama_provinsi',
+                'DimWirausaha.jabatan', 'DimStudiLanjut.status_studi',
+            ]]],
+            'melebihi batas cube kecil' => [['cube' => 'FactMultiSelect', 'measures' => ['FactMultiSelect.count_alumni_unik'], 'dimensions' => [
+                'DimIndikatorEvaluasi.label_pertanyaan', 'DimProdi.jurusan', 'DimProdi.nama_prodi', 'DimAlumni.tahun_lulus',
             ]]],
             'tanpa measure'      => [['measures' => []]],
         ];

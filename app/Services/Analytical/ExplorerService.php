@@ -78,6 +78,7 @@ class ExplorerService
                 ),
                 'numeric_columns'  => $cube['numeric_columns'],
                 'count_measure'    => $cube['count_measure'] ?? null,
+                'max_dimensions'   => $this->maxDimensionsOf($key, $cube),
                 'dimension_groups' => array_map(
                     fn (string $group, array $members) => [
                         'group'   => $group,
@@ -478,8 +479,9 @@ class ExplorerService
         if (count($formulas) > ($limits['max_formulas'] ?? 3)) {
             throw new BusinessException('Maksimal ' . ($limits['max_formulas'] ?? 3) . ' rumus sekaligus.', 422);
         }
-        if (count($dimensions) > $limits['max_dimensions']) {
-            throw new BusinessException("Maksimal {$limits['max_dimensions']} dimensi sekaligus.", 422);
+        $maxDimensions = $this->maxDimensionsOf($q['cube'], $cube);
+        if (count($dimensions) > $maxDimensions) {
+            throw new BusinessException("{$cube['label']}: maksimal {$maxDimensions} dimensi sekaligus.", 422);
         }
         if (count($dimensions) !== count(array_unique($dimensions))) {
             throw new BusinessException('Dimensi yang sama tidak boleh dipilih dua kali.', 422);
@@ -760,6 +762,35 @@ class ExplorerService
     private function limits(): array
     {
         return config('olap_catalog.limits');
+    }
+
+    /**
+     * Batas dimensi sekaligus untuk satu cube: sebanyak TABEL dimensi yang
+     * ditawarkan katalognya (DimProdi, DimAlumni, ...), kecuali ditimpa
+     * `max_dimensions` di config cube itu. Dihitung dari prefiks member,
+     * bukan dari jumlah member -- jurusan dan prodi sama-sama DimProdi.
+     *
+     * Dimensi rentang (FactTracerStudy.rentang_*) tinggal di fact itu
+     * sendiri, bukan tabel dimensi, jadi prefiks cube sendiri tidak dihitung.
+     * Rentang tetap boleh dipilih; ia hanya memakai jatah yang sama.
+     */
+    private function maxDimensionsOf(string $key, array $cube): int
+    {
+        if (isset($cube['max_dimensions'])) {
+            return (int) $cube['max_dimensions'];
+        }
+
+        $tables = [];
+        foreach ($cube['dimension_groups'] as $members) {
+            foreach (array_keys($members) as $member) {
+                $table = strstr($member, '.', true);
+                if ($table !== false && $table !== $key) {
+                    $tables[$table] = true;
+                }
+            }
+        }
+
+        return count($tables) ?: $this->limits()['max_dimensions'];
     }
 
     private function key(string $prefix, array $params): string
