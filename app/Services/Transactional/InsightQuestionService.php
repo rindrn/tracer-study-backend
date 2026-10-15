@@ -22,7 +22,7 @@ use App\Services\Analytical\ExplorerService;
 class InsightQuestionService
 {
     /** Bentuk visualisasi yang boleh disimpan; harus sama dengan `Viz` di FE. */
-    private const VIZ = ['auto', 'combo', 'table', 'bar', 'row', 'line', 'area', 'stacked', 'pie', 'panels'];
+    private const VIZ = ['auto', 'combo', 'table', 'bar', 'row', 'line', 'area', 'stacked', 'pie', 'panels', 'heatmap', 'scatter'];
 
     public function __construct(
         private readonly ExplorerService $explorer,

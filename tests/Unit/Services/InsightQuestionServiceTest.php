@@ -109,7 +109,7 @@ class InsightQuestionServiceTest extends TestCase
         $data['query']['viz'] = 'pie';
         $this->assertSame('pie', $this->service()->create($this->ani, $data)['query']['viz']);
 
-        foreach (['combo', 'panels'] as $viz) {
+        foreach (['combo', 'panels', 'heatmap', 'scatter'] as $viz) {
             $data['query']['viz'] = $viz;
             $this->assertSame($viz, $this->service()->create($this->ani, $data)['query']['viz']);
         }
