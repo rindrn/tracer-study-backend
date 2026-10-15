@@ -109,6 +109,11 @@ class InsightQuestionServiceTest extends TestCase
         $data['query']['viz'] = 'pie';
         $this->assertSame('pie', $this->service()->create($this->ani, $data)['query']['viz']);
 
+        foreach (['combo', 'panels'] as $viz) {
+            $data['query']['viz'] = $viz;
+            $this->assertSame($viz, $this->service()->create($this->ani, $data)['query']['viz']);
+        }
+
         // Validasi bentuk ada di controller; service tetap tidak mempercayai
         // nilai di luar daftar, supaya baris lama/hasil impor tidak merusak FE.
         $data['query']['viz'] = 'sunburst';
