@@ -130,6 +130,10 @@ class ExplorerServiceTest extends TestCase
         $this->assertSame('FactTracerStudy', $cube['key']);
         $this->assertArrayHasKey('format', $cube['measures'][0]);
         $this->assertArrayHasKey('members', $cube['dimension_groups'][0]);
+        $this->assertContains(
+            ['name' => 'Program Studi', 'levels' => ['DimProdi.jurusan', 'DimProdi.prodi_jenjang']],
+            $cube['hierarchies'],
+        );
     }
 
     public function test_batas_dimensi_per_cube_sama_dengan_jumlah_tabel_dimensinya(): void
@@ -156,7 +160,7 @@ class ExplorerServiceTest extends TestCase
     public function test_lebih_dari_tiga_dimensi_diterima_sampai_batas_cube(): void
     {
         $this->service()->query($this->body(['dimensions' => [
-            'DimProdi.jurusan', 'DimProdi.nama_prodi', 'DimAlumni.tahun_lulus', 'DimStatusAlumni.label',
+            'DimProdi.jurusan', 'DimProdi.prodi_jenjang', 'DimAlumni.tahun_lulus', 'DimStatusAlumni.label',
             'DimKesesuaianBidang.label', 'DimKesesuaianLevel.label', 'DimPerusahaan.nama_provinsi', 'DimWirausaha.jabatan',
         ]]), []);
 
@@ -174,7 +178,7 @@ class ExplorerServiceTest extends TestCase
         $this->service()->query([
             'cube'       => 'FactMultiSelect',
             'measures'   => ['FactMultiSelect.count_alumni_unik'],
-            'dimensions' => ['DimIndikatorEvaluasi.label_pertanyaan', 'DimProdi.jurusan', 'DimProdi.nama_prodi', 'DimAlumni.tahun_lulus'],
+            'dimensions' => ['DimIndikatorEvaluasi.label_pertanyaan', 'DimProdi.jurusan', 'DimProdi.prodi_jenjang', 'DimAlumni.tahun_lulus'],
             'filters'    => [],
         ], []);
     }
@@ -268,7 +272,7 @@ class ExplorerServiceTest extends TestCase
                 'DimWirausaha.jabatan', 'DimStudiLanjut.status_studi',
             ]]],
             'melebihi batas cube kecil' => [['cube' => 'FactMultiSelect', 'measures' => ['FactMultiSelect.count_alumni_unik'], 'dimensions' => [
-                'DimIndikatorEvaluasi.label_pertanyaan', 'DimProdi.jurusan', 'DimProdi.nama_prodi', 'DimAlumni.tahun_lulus',
+                'DimIndikatorEvaluasi.label_pertanyaan', 'DimProdi.jurusan', 'DimProdi.prodi_jenjang', 'DimAlumni.tahun_lulus',
             ]]],
             'tanpa measure'      => [['measures' => []]],
         ];
@@ -627,14 +631,14 @@ class ExplorerServiceTest extends TestCase
     public function test_nilai_dimensi_tersaring_scope_dan_tanpa_nilai_kosong(): void
     {
         $rows = collect([
-            ['DimProdi.nama_prodi' => 'Akuntansi'],
-            ['DimProdi.nama_prodi' => null],
-            ['DimProdi.nama_prodi' => 'Teknik Sipil'],
+            ['DimProdi.prodi_jenjang' => 'D3 Akuntansi'],
+            ['DimProdi.prodi_jenjang' => null],
+            ['DimProdi.prodi_jenjang' => 'D4 Teknik Sipil'],
         ]);
 
-        $result = $this->service($rows)->dimensionValues('DimProdi.nama_prodi', ['id_prodi_in' => [1]]);
+        $result = $this->service($rows)->dimensionValues('DimProdi.prodi_jenjang', ['id_prodi_in' => [1]]);
 
-        $this->assertSame(['Akuntansi', 'Teknik Sipil'], $result['values']);
+        $this->assertSame(['D3 Akuntansi', 'D4 Teknik Sipil'], $result['values']);
         $this->assertNotNull($this->filterOn($this->lastQuery(), 'DimProdi.id_prodi'));
         $this->assertNotNull($this->filterOn($this->lastQuery(), 'DimWaktu.id_waktu'));
     }

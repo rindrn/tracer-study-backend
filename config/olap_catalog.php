@@ -26,8 +26,26 @@
 |
 | count_measure    → cacah dasar: dipakai "sembunyikan kelompok dengan
 |                    responden < n" dan penanda jumlah di drill-down.
-| drill_dimensions → kolom daftar alumni saat sebuah angka diklik. Harus
-|                    bisa di-join dari cube ini.
+| drill_dimensions → kolom daftar alumni saat sebuah angka diklik
+|                    (drill-through). Harus bisa di-join dari cube ini.
+| hierarchies      → jenjang dimensi untuk roll-up / drill-down, ditulis
+|                    dari level RINGKAS ke RINCI. Tiap level wajib ada di
+|                    dimension_groups cube yang sama, dan tiap nilai level
+|                    bawah punya tepat satu induk di level atasnya. Dimensi
+|                    satu level (status alumni, kesesuaian, tahun lulus, ...)
+|                    sengaja tidak ditulis: cukup di-slice/dice, dan roll-up
+|                    di atasnya berarti melepas dimensi sampai total.
+|
+| Yang SENGAJA tidak punya hierarki:
+|   - DimWaktu  : waktu ETL dijalankan, bukan waktu alumni mengisi; cacahnya
+|                 semi-additive (tidak boleh dijumlah lintas snapshot).
+|   - DimUmp    : tabel acuan flag_above_ump; provinsi & tahunnya sudah ada
+|                 di DimPerusahaan dan DimAlumni.
+|   - nama_pt   : satu pemasangan = satu PT, nilainya selalu sama.
+|   - grup_gap  : memasangkan butir Kompetensi A dan B, bukan induk kategori.
+|
+| "Program studi" memakai DimProdi.prodi_jenjang, bukan nama_prodi: nama
+| prodi tidak unik antar-jenjang (D3 & D4 Akuntansi), lihat DimProdi.js.
 |
 */
 
@@ -123,7 +141,7 @@ return [
                 'Program Studi' => [
                     'DimProdi.jurusan'          => 'Jurusan',
                     'DimProdi.jenjang'          => 'Jenjang',
-                    'DimProdi.nama_prodi'       => 'Program studi',
+                    'DimProdi.prodi_jenjang'    => 'Program studi',
                     'DimProdi.akreditasi_prodi' => 'Akreditasi prodi',
                 ],
                 'Alumni' => [
@@ -139,6 +157,7 @@ return [
                     'DimPerusahaan.label_jenis_perusahaan' => 'Jenis instansi',
                     'DimPerusahaan.label_tingkat_instansi' => 'Tingkat instansi',
                     'DimPerusahaan.nama_provinsi'          => 'Provinsi tempat kerja',
+                    'DimPerusahaan.nama_kota'              => 'Kota tempat kerja',
                 ],
                 'Wirausaha' => [
                     'DimWirausaha.label_tingkat_instansi' => 'Tingkat usaha',
@@ -152,6 +171,12 @@ return [
                     'DimStudiLanjut.perguruan_tinggi' => 'Perguruan tinggi studi lanjut',
                     'DimStudiLanjut.program_studi'    => 'Program studi lanjut',
                 ],
+            ],
+
+            'hierarchies' => [
+                'Program Studi' => ['DimProdi.jurusan', 'DimProdi.prodi_jenjang'],
+                'Lokasi kerja'  => ['DimPerusahaan.nama_provinsi', 'DimPerusahaan.nama_kota'],
+                'Lokasi usaha'  => ['DimWirausaha.nama_provinsi', 'DimWirausaha.nama_kota'],
             ],
         ],
 
@@ -182,11 +207,16 @@ return [
                 'Program Studi' => [
                     'DimProdi.jurusan'    => 'Jurusan',
                     'DimProdi.jenjang'    => 'Jenjang',
-                    'DimProdi.nama_prodi' => 'Program studi',
+                    'DimProdi.prodi_jenjang' => 'Program studi',
                 ],
                 'Alumni' => [
                     'DimAlumni.tahun_lulus' => 'Tahun lulus',
                 ],
+            ],
+
+            'hierarchies' => [
+                'Pertanyaan'    => ['DimIndikatorEvaluasi.kategori_label', 'DimIndikatorEvaluasi.label_pertanyaan'],
+                'Program Studi' => ['DimProdi.jurusan', 'DimProdi.prodi_jenjang'],
             ],
         ],
 
@@ -219,11 +249,15 @@ return [
                 'Program Studi' => [
                     'DimProdi.jurusan'    => 'Jurusan',
                     'DimProdi.jenjang'    => 'Jenjang',
-                    'DimProdi.nama_prodi' => 'Program studi',
+                    'DimProdi.prodi_jenjang' => 'Program studi',
                 ],
                 'Alumni' => [
                     'DimAlumni.tahun_lulus' => 'Tahun lulus',
                 ],
+            ],
+
+            'hierarchies' => [
+                'Program Studi' => ['DimProdi.jurusan', 'DimProdi.prodi_jenjang'],
             ],
         ],
 

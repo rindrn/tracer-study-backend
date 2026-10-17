@@ -91,6 +91,12 @@ class ExplorerService
                     array_keys($cube['dimension_groups']),
                     $cube['dimension_groups'],
                 ),
+                // Ringkas → rinci; dasar roll-up / drill-down di frontend.
+                'hierarchies' => array_map(
+                    fn (string $name, array $levels) => ['name' => $name, 'levels' => array_values($levels)],
+                    array_keys($cube['hierarchies'] ?? []),
+                    $cube['hierarchies'] ?? [],
+                ),
             ];
         }
 

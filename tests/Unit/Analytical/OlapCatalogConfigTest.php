@@ -119,4 +119,43 @@ class OlapCatalogConfigTest extends TestCase
             }
         }
     }
+
+    /**
+     * Hierarki yang salah ketik atau menunjuk dimensi di luar katalog tidak
+     * memunculkan galat — tombol drill-down/roll-up hanya diam-diam tidak
+     * muncul, atau menyusun query yang ditolak 422.
+     */
+    public function test_setiap_level_hierarki_terdaftar_dan_tidak_dobel(): void
+    {
+        $dimensions = $this->dimensionsByCube();
+
+        foreach (config('olap_catalog.cubes') as $cubeName => $cube) {
+            $seen = [];
+
+            foreach ($cube['hierarchies'] ?? [] as $name => $levels) {
+                $this->assertGreaterThanOrEqual(2, count($levels), "Hierarki {$name} di {$cubeName} kurang dari dua level.");
+
+                foreach ($levels as $level) {
+                    $this->assertContains($level, $dimensions[$cubeName], "Level {$level} hierarki {$name} tidak ada di dimension_groups {$cubeName}.");
+                    $this->assertNotContains($level, $seen, "Level {$level} dipakai dua kali di hierarki {$cubeName}.");
+                    $seen[] = $level;
+                }
+            }
+        }
+    }
+
+    /** Lihat docblock config: dimensi ini tidak boleh jadi jenjang roll-up. */
+    public function test_waktu_ump_dan_nama_pt_tidak_dijadikan_hierarki(): void
+    {
+        foreach (config('olap_catalog.cubes') as $cubeName => $cube) {
+            foreach ($cube['hierarchies'] ?? [] as $name => $levels) {
+                foreach ($levels as $level) {
+                    $this->assertFalse(
+                        str_starts_with($level, 'DimWaktu.') || str_starts_with($level, 'DimUmp.') || $level === 'DimProdi.nama_pt',
+                        "Hierarki {$name} di {$cubeName} memuat {$level}.",
+                    );
+                }
+            }
+        }
+    }
 }
