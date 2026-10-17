@@ -399,6 +399,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
                 'DimAlumni.tahun_lulus',
                 'DimPerusahaan.nama_kota',
                 'DimPerusahaan.label_jenis_perusahaan',
+                'DimPerusahaan.jenis_perusahaan_lainnya',
                 'DimPerusahaan.label_tingkat_instansi',
                 'DimStatusAlumni.label',
             ],
@@ -415,7 +416,10 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             'jenjang'          => $r['DimProdi.jenjang']                            ?? '',
             'tahun_lulus'      => $r['DimAlumni.tahun_lulus']                       ?? '',
             'nama_kota'        => $r['DimPerusahaan.nama_kota']                     ?? '',
-            'jenis_instansi'   => $r['DimPerusahaan.label_jenis_perusahaan']        ?? '',
+            // Kelompok "Lainnya": tampilkan isian ketikannya bila ada.
+            'jenis_instansi'   => $r['DimPerusahaan.jenis_perusahaan_lainnya']
+                ?? $r['DimPerusahaan.label_jenis_perusahaan']
+                ?? '',
             'tingkat_instansi' => $r['DimPerusahaan.label_tingkat_instansi']        ?? '',
             'status'           => $r['DimStatusAlumni.label']                       ?? '',
         ])->toArray();

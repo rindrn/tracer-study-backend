@@ -56,6 +56,9 @@ class AnswerResolverService
      */
     private const COMPANION_TEXT_MAX_LENGTH = 100;
 
+    /** Label seragam untuk opsi "Lainnya, tuliskan" di dimensi, lihat applyCompanionSubstitutions(). */
+    public const LAINNYA_LABEL = 'Lainnya';
+
     /** @var array<int, Collection> cache: questionnaire_id => questionnaire_options */
     private array $optionsCache = [];
 
@@ -146,29 +149,30 @@ class AnswerResolverService
     }
 
     /**
-     * Timpa $resolved[parent_code] dengan jawaban teks bebas dari
-     * pertanyaan companion-nya, KHUSUS untuk alumni yang benar-benar
-     * memilih opsi "Lainnya, tuliskan" pada pertanyaan induk (bukan opsi
-     * lain) DAN companion-nya benar-benar terisi. Kalau companion
-     * kosong/tidak dijawab, $resolved[parent_code] dibiarkan seperti
-     * hasil resolve semula (label opsi tetap, mis. "Lainnya, tuliskan")
-     * -- fail-visible, bukan fail-silent, sama filosofinya dengan
-     * resolveProvinceName() di atas: respondennya memang tidak menuliskan
-     * apa-apa, itu bukan bug ETL yang perlu disamarkan.
+     * Pasangan "Lainnya, tuliskan" untuk role narrow (mis. f1101->f1102 jenis
+     * instansi, f1201->f1202 sumber biaya): alumni yang memilih opsi Lainnya
+     * di pertanyaan induk.
      *
-     * $answersForResponse adalah collection jawaban MENTAH satu response
-     * yang SAMA (sudah dipunyai caller sebelum pivot $resolved dibangun --
-     * lihat AlumniFactBuilderService), sehingga tidak perlu query OLTP
-     * baru per-alumni; hanya getShowIfCompanionDefinitions() yang
-     * melakukan I/O baru, dan itu di-cache sekali per proses ETL.
+     * Kategori dan teks ketikan dipisah. $resolved[parent_code] diseragamkan
+     * jadi LAINNYA_LABEL (terisi atau tidak isiannya), sehingga dimensi tetap
+     * berisi kategori baku dan semua isian bebas berkumpul di satu kelompok
+     * "Lainnya". Dulu label ditimpa teks ketikan, dan tiap ketikan berbeda
+     * ("Freelance", "freelance", "FMCG", ...) menjadi kelompok sendiri.
+     * Teksnya dikembalikan terpisah per parent_code. Caller menyimpannya ke
+     * kolom *_lainnya, yang hanya ditampilkan saat drill-through.
      *
-     * Definisi companion PASANGAN INI TIDAK PERNAH mengubah nilai
-     * $resolved untuk parent yang jawabannya BUKAN opsi Lainnya -- resolve
-     * biasa (resolveChoiceLabel()) tetap satu-satunya sumber nilai untuk
-     * kasus itu.
+     * $answersForResponse adalah jawaban MENTAH satu response yang sama,
+     * jadi tidak ada query OLTP per alumni. Hanya
+     * getShowIfCompanionDefinitions() yang melakukan I/O, dan itu di-cache
+     * sekali per proses ETL. Parent yang jawabannya BUKAN opsi Lainnya
+     * tidak pernah diubah.
+     *
+     * @return array{0: array, 1: array<string, string>} [$resolved, teks isian per parent_code]
      */
     public function applyCompanionSubstitutions(int $questionnaireId, array $resolved, Collection $answersForResponse): array
     {
+        $texts = [];
+
         foreach ($this->getCompanionDefinitions($questionnaireId) as $def) {
             $parentAnswer = $answersForResponse->firstWhere('question_code', $def->parent_code);
 
@@ -182,17 +186,60 @@ class AnswerResolverService
                 continue; // opsi lain yang dipilih -- nilai resolve semula sudah benar
             }
 
+            $resolved[$def->parent_code] = self::LAINNYA_LABEL;
+
             $companionAnswer = $answersForResponse->firstWhere('question_code', $def->companion_code);
             $companionText = $companionAnswer->answer_text ?? null;
 
-            if ($companionText === null || trim($companionText) === '') {
-                continue; // companion kosong -- biarkan label "Lainnya, tuliskan" apa adanya
+            if ($companionText !== null && trim($companionText) !== '') {
+                $texts[$def->parent_code] = $this->truncateFreeText(trim($companionText), self::COMPANION_TEXT_MAX_LENGTH);
             }
-
-            $resolved[$def->parent_code] = $this->truncateFreeText($companionText, self::COMPANION_TEXT_MAX_LENGTH);
         }
 
-        return $resolved;
+        // Data lama tidak selalu lewat pasangan di atas: isian bebasnya
+        // tersimpan langsung sebagai jawaban induk ("Freelance" alih-alih
+        // kode opsi), atau kode Lainnya-nya tidak cocok dengan pemicu
+        // show_if. Keduanya tetap masuk kelompok "Lainnya". Jawaban angka
+        // yang bukan kode opsi (mis. "0") sengaja dibiarkan apa adanya.
+        foreach ($this->lainnyaOptionCodes($questionnaireId) as $parentCode => $lainnyaCodes) {
+            $raw = trim((string) ($answersForResponse->firstWhere('question_code', $parentCode)?->answer_text ?? ''));
+
+            if ($raw === '' || isset($texts[$parentCode])) {
+                continue;
+            }
+
+            if (in_array($raw, $lainnyaCodes, true)) {
+                $resolved[$parentCode] = self::LAINNYA_LABEL;
+            } elseif (!is_numeric($raw) && !$this->isOptionLabel($questionnaireId, $parentCode, $raw)) {
+                $resolved[$parentCode] = self::LAINNYA_LABEL;
+                $texts[$parentCode] = $this->truncateFreeText($raw, self::COMPANION_TEXT_MAX_LENGTH);
+            }
+        }
+
+        return [$resolved, $texts];
+    }
+
+    /**
+     * Pertanyaan pilihan yang punya opsi "Lainnya" → kode opsi Lainnya-nya.
+     *
+     * @return array<string, string[]>
+     */
+    private function lainnyaOptionCodes(int $questionnaireId): array
+    {
+        return $this->getOptionsForQuestionnaire($questionnaireId)
+            ->filter(fn ($opt) => stripos((string) $opt->option_label, 'lainnya') !== false)
+            ->groupBy('question_code')
+            ->map(fn ($opts) => $opts->pluck('option_code')->map(fn ($c) => (string) $c)->all())
+            ->all();
+    }
+
+    private function isOptionLabel(int $questionnaireId, string $questionCode, string $value): bool
+    {
+        $key = mb_strtolower(trim($value));
+
+        return $this->getOptionsForQuestionnaire($questionnaireId)->contains(
+            fn ($opt) => $opt->question_code === $questionCode && mb_strtolower(trim((string) $opt->option_label)) === $key
+        );
     }
 
     private function getCompanionDefinitions(int $questionnaireId): Collection
@@ -392,12 +439,21 @@ class AnswerResolverService
             return null;
         }
 
-        $options = $this->getOptionsForQuestionnaire($questionnaireId);
-        $match = $options->first(
-            fn ($opt) => $opt->question_code === $questionCode && $opt->option_code === $rawOptionCode
-        );
+        $options = $this->getOptionsForQuestionnaire($questionnaireId)
+            ->filter(fn ($opt) => $opt->question_code === $questionCode);
+        $match = $options->first(fn ($opt) => $opt->option_code === $rawOptionCode);
 
-        return $match?->option_label ?? $rawOptionCode;
+        if ($match !== null) {
+            return $match->option_label;
+        }
+
+        // Data lama kadang menyimpan labelnya, bukan kodenya, dengan huruf
+        // besar-kecil berbeda ("Perusahaan Swasta" vs opsi "Perusahaan
+        // swasta"). Tanpa ini keduanya jadi dua kelompok di dimensi.
+        $key = mb_strtolower(trim($rawOptionCode));
+        $byLabel = $options->first(fn ($opt) => mb_strtolower(trim((string) $opt->option_label)) === $key);
+
+        return $byLabel?->option_label ?? $rawOptionCode;
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Services\Analytical;
 
 use App\Exceptions\BusinessException;
 use App\Repositories\Analytical\ExplorerRepository;
+use App\Services\ETL\AnswerResolverService;
 use App\Traits\WithCache;
 use Illuminate\Support\Facades\Log;
 
@@ -193,6 +194,8 @@ class ExplorerService
         $meta    = $this->measureMeta($cube, $measure);
         $search  = isset($body['search']) ? trim((string) $body['search']) : null;
 
+        $lainnya = $this->lainnyaTextMember($cube, $q['filters']);
+
         $rows = $this->repo->drillDown(
             $measure,
             $meta['format'] === 'integer',
@@ -202,10 +205,14 @@ class ExplorerService
             $page,
             $perPage,
             $cube['drill_dimensions'],
+            $lainnya,
         );
 
         return [
             'measure'    => $meta,
+            // Kolom tambahan daftar alumni: teks ketikan bila yang diklik
+            // kelompok "Lainnya" (lihat lainnya_texts di katalog).
+            'context'    => $lainnya !== null ? ['key' => 'lainnya', 'label' => 'Isian "Lainnya"'] : null,
             'data'       => $rows,
             'pagination' => [
                 'page'          => $page,
@@ -213,6 +220,24 @@ class ExplorerService
                 'total_on_page' => count($rows),
             ],
         ];
+    }
+
+    /**
+     * Kolom teks ketikan bila saringan drill-through mengunci kelompok
+     * "Lainnya" pada dimensi berisian bebas; null bila tidak.
+     */
+    private function lainnyaTextMember(array $cube, array $filters): ?string
+    {
+        foreach ($cube['lainnya_texts'] as $member => $textMember) {
+            foreach ($filters as $f) {
+                if ($f['member'] === $member && $f['operator'] === 'equals'
+                    && in_array(AnswerResolverService::LAINNYA_LABEL, $f['values'], true)) {
+                    return $textMember;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -642,6 +667,7 @@ class ExplorerService
             $cube['generated_measures']   = $generated;
             $cube['numeric_columns']      = array_values($columns);
             $cube['drill_dimensions']   ??= [];
+            $cube['lainnya_texts']      ??= [];
             if ($bins !== []) {
                 $cube['dimension_groups']['Rentang angka'] = $bins;
             }

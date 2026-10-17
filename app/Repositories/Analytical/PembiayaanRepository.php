@@ -226,6 +226,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
                 'DimProdi.jenjang',
                 'DimAlumni.tahun_lulus',
                 'DimAlumni.label_sumber_biaya_dipolban',
+                'DimAlumni.sumber_biaya_lainnya',
             ],
             'filters' => $filters,
             'order'   => [['DimAlumni.nama', 'asc']],
@@ -239,7 +240,10 @@ class PembiayaanRepository extends BaseAnalyticalRepository
             'nama_prodi'   => $r['DimProdi.nama_prodi']                       ?? '',
             'jenjang'      => $r['DimProdi.jenjang']                          ?? '',
             'tahun_lulus'  => $r['DimAlumni.tahun_lulus']                     ?? '',
-            'sumber_biaya' => $r['DimAlumni.label_sumber_biaya_dipolban']     ?? '',
+            // Kelompok "Lainnya": tampilkan isian ketikannya bila ada.
+            'sumber_biaya' => $r['DimAlumni.sumber_biaya_lainnya']
+                ?? $r['DimAlumni.label_sumber_biaya_dipolban']
+                ?? '',
         ])->toArray();
 
         return [

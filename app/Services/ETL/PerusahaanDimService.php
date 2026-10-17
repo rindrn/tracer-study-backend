@@ -31,13 +31,22 @@ class PerusahaanDimService
         'nasional/wiraswasta berbadan hukum'             => 'Nasional/Wiraswasta berbadan hukum',
     ];
 
+    /**
+     * Isian "Lainnya" yang sebenarnya opsi resmi dengan nama lama. Dashboard
+     * KPI 12 sudah lama menghitung "Lembaga Pemerintah" sebagai Instansi
+     * pemerintah; tanpa ini 83 alumni data asli pindah ke "Lainnya".
+     */
+    private const JENIS_ALIAS = [
+        'lembaga pemerintah' => 'Instansi pemerintah',
+    ];
+
     public function __construct(
         private readonly OlapLoadRepository $olapRepo,
     ) {}
 
     /**
      * @param array $resolvedAnswers keys: 'nama_perusahaan', 'jenis_perusahaan',
-     *              'kota', 'provinsi', 'tingkat_instansi'
+     *              'jenis_perusahaan_lainnya', 'kota', 'provinsi', 'tingkat_instansi'
      * @return int|null perusahaan_sk, null jika alumni tidak bekerja
      */
     public function syncAndResolveSk(array $resolvedAnswers, \DateTimeInterface $snapshotDate): ?int
@@ -50,10 +59,16 @@ class PerusahaanDimService
 
         $idPerusahaan = $this->deriveBusinessKey($namaPerusahaan, $resolvedAnswers['kota'] ?? '');
 
+        [$jenis, $jenisLainnya] = $this->resolveJenisAlias(
+            $resolvedAnswers['jenis_perusahaan'] ?? null,
+            $resolvedAnswers['jenis_perusahaan_lainnya'] ?? null,
+        );
+
         $newAttributes = [
             'id_perusahaan'           => $idPerusahaan,
             'company_name'            => $namaPerusahaan,
-            'label_jenis_perusahaan'  => $resolvedAnswers['jenis_perusahaan'] ?? null,
+            'label_jenis_perusahaan'  => $jenis,
+            'jenis_perusahaan_lainnya' => $jenisLainnya,
             'label_tingkat_instansi'  => $this->normalizeTingkatInstansi($resolvedAnswers['tingkat_instansi'] ?? null),
             'nama_kota'               => $resolvedAnswers['kota'] ?? null,
             'nama_provinsi'           => $resolvedAnswers['provinsi'] ?? null,
@@ -66,6 +81,7 @@ class PerusahaanDimService
         }
 
         $hasChanged = $active->label_jenis_perusahaan !== $newAttributes['label_jenis_perusahaan']
+            || ($active->jenis_perusahaan_lainnya ?? null) !== $newAttributes['jenis_perusahaan_lainnya']
             || $active->label_tingkat_instansi !== $newAttributes['label_tingkat_instansi']
             || $active->nama_kota !== $newAttributes['nama_kota']
             || $active->nama_provinsi !== $newAttributes['nama_provinsi'];
@@ -83,6 +99,14 @@ class PerusahaanDimService
         return mb_strtolower(trim($companyName))
             . '|'
             . mb_strtolower(trim($city));
+    }
+
+    /** @return array{0: ?string, 1: ?string} [label jenis, isian Lainnya] */
+    private function resolveJenisAlias(?string $jenis, ?string $lainnya): array
+    {
+        $alias = $lainnya !== null ? (self::JENIS_ALIAS[mb_strtolower(trim($lainnya))] ?? null) : null;
+
+        return $alias !== null ? [$alias, null] : [$jenis, $lainnya];
     }
 
     /** Nilai yang tidak dikenali dibiarkan apa adanya (fail-visible, bukan fail-silent). */

@@ -59,6 +59,7 @@ class OlapLoadRepository
                 'nama'                         => $attributes['nama'],
                 'tahun_lulus'                  => $attributes['tahun_lulus'],
                 'label_sumber_biaya_dipolban'  => $attributes['label_sumber_biaya_dipolban'] ?? null,
+                'sumber_biaya_lainnya'         => $attributes['sumber_biaya_lainnya'] ?? null,
             ]
         );
     }
@@ -100,6 +101,7 @@ class OlapLoadRepository
             'id_perusahaan'          => $attributes['id_perusahaan'],
             'company_name'           => $attributes['company_name'],
             'label_jenis_perusahaan' => $attributes['label_jenis_perusahaan'],
+            'jenis_perusahaan_lainnya' => $attributes['jenis_perusahaan_lainnya'] ?? null,
             'label_tingkat_instansi' => $attributes['label_tingkat_instansi'],
             'nama_kota'              => $attributes['nama_kota'],
             'nama_provinsi'          => $attributes['nama_provinsi'],

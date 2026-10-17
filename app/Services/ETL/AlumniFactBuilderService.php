@@ -116,16 +116,15 @@ class AlumniFactBuilderService
                 );
             }
 
-            // ── Substitusi teks bebas companion untuk pasangan "Lainnya,
-            // tuliskan" (mis. f1201->f1202 sumber biaya, f1101->f1102
-            // jenis instansi) -- terdeteksi otomatis dari metadata
-            // show_if, lihat AnswerResolverService::applyCompanionSubstitutions().
-            // HARUS di sini: SETELAH pivot $resolved selesai (butuh nilai
-            // resolve semula sebagai fallback), tapi SEBELUM
-            // $resolvedByRole dibaca dari $resolved di bawah, supaya role
-            // narrow (sumber_biaya_studi, jenis_perusahaan, dst) ikut
-            // membawa teks penggantinya. ──
-            $resolved = $this->resolver->applyCompanionSubstitutions(
+            // ── Pasangan "Lainnya, tuliskan" (mis. f1201->f1202 sumber
+            // biaya, f1101->f1102 jenis instansi) -- terdeteksi otomatis
+            // dari metadata show_if, lihat
+            // AnswerResolverService::applyCompanionSubstitutions(). Label
+            // induk diseragamkan jadi "Lainnya"; teks ketikannya terpisah
+            // di $companionTexts untuk kolom *_lainnya. HARUS di sini:
+            // SETELAH pivot $resolved selesai, tapi SEBELUM
+            // $resolvedByRole dibaca dari $resolved di bawah. ──
+            [$resolved, $companionTexts] = $this->resolver->applyCompanionSubstitutions(
                 $response->questionnaire_id,
                 $resolved,
                 $answersForThisAlumni
@@ -148,6 +147,7 @@ class AlumniFactBuilderService
             // dan dicatat ke etl_anomaly_log lewat AnomalyLoggerService --
             // TIDAK PERNAH melempar exception / menghentikan run. ──
             $resolvedByRole = [];
+            $lainnyaByRole = []; // teks isian "Lainnya, tuliskan" per role, lihat applyCompanionSubstitutions()
             foreach ($answersForThisAlumni as $answer) {
                 $mappingRow = $mappingIndex['by_code']->get($response->questionnaire_id . ':' . $answer->question_code);
 
@@ -182,6 +182,9 @@ class AlumniFactBuilderService
                 }
 
                 $resolvedByRole[$roleKey] = $value;
+                if (isset($companionTexts[$answer->question_code])) {
+                    $lainnyaByRole[$roleKey] = $companionTexts[$answer->question_code];
+                }
             }
 
             // ── label_sumber_biaya_dipolban dari role sumber_biaya_studi
@@ -200,6 +203,7 @@ class AlumniFactBuilderService
                     'angkatan'                     => (string) $alumniRow->entry_year,
                     'tahun_lulus'                  => (string) $alumniRow->graduation_year,
                     'label_sumber_biaya_dipolban'  => $resolvedByRole['sumber_biaya_studi'],
+                    'sumber_biaya_lainnya'         => $lainnyaByRole['sumber_biaya_studi'] ?? null,
                 ]);
             }
 
@@ -244,6 +248,7 @@ class AlumniFactBuilderService
             $perusahaanSk = $this->perusahaanDim->syncAndResolveSk([
                 'nama_perusahaan'  => $resolvedByRole['nama_perusahaan'] ?? null,
                 'jenis_perusahaan' => $resolvedByRole['jenis_perusahaan'] ?? null,
+                'jenis_perusahaan_lainnya' => $lainnyaByRole['jenis_perusahaan'] ?? null,
                 'kota'             => $resolvedByRole['kota_kerja'] ?? null,
                 'provinsi'         => $resolvedByRole['provinsi_kerja'] ?? null,
                 'tingkat_instansi' => $resolvedByRole['tingkat_instansi'] ?? null,

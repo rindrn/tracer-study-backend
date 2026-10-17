@@ -115,6 +115,7 @@ class ExplorerRepository extends BaseAnalyticalRepository
      *
      * @param  array<int, array{member: string, operator: string, values: string[]}> $filters  saringan + nilai titik yang diklik
      * @param  string[] $drillDimensions
+     * @param  string|null $lainnyaMember kolom teks isian "Lainnya" yang ikut diambil
      * @return array<int, array<string, mixed>>
      */
     public function drillDown(
@@ -126,6 +127,7 @@ class ExplorerRepository extends BaseAnalyticalRepository
         int     $page,
         int     $perPage,
         array   $drillDimensions,
+        ?string $lainnyaMember = null,
     ): array {
         $extra = $this->userFilters($filters);
 
@@ -142,7 +144,7 @@ class ExplorerRepository extends BaseAnalyticalRepository
 
         return $this->cube->load([
             'measures'   => [$measure],
-            'dimensions' => $drillDimensions,
+            'dimensions' => $lainnyaMember !== null ? [...$drillDimensions, $lainnyaMember] : $drillDimensions,
             'filters' => $this->buildGlobalFiltersFromArray($scopeParams, $extra),
             'order'   => [['DimAlumni.nama', 'asc'], ['DimAlumni.id_alumni', 'asc']],
             'limit'   => $perPage,
@@ -155,6 +157,7 @@ class ExplorerRepository extends BaseAnalyticalRepository
             'tahun_lulus' => $r['DimAlumni.tahun_lulus'] ?? '',
             'status'      => $r['DimStatusAlumni.label'] ?? '',
             'nilai'       => $r[$measure]                ?? null,
+            'lainnya'     => $lainnyaMember !== null ? ($r[$lainnyaMember] ?? null) : null,
         ])->values()->all();
     }
 

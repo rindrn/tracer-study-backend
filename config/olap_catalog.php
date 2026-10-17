@@ -28,6 +28,10 @@
 |                    responden < n" dan penanda jumlah di drill-down.
 | drill_dimensions → kolom daftar alumni saat sebuah angka diklik
 |                    (drill-through). Harus bisa di-join dari cube ini.
+| lainnya_texts    → dimensi berisian "Lainnya, tuliskan" → kolom teks
+|                    ketikannya. Di dimensi semua isian bebas berkumpul di
+|                    satu kelompok "Lainnya"; teksnya baru tampil saat
+|                    kelompok itu di-drill-through.
 | hierarchies      → jenjang dimensi untuk roll-up / drill-down, ditulis
 |                    dari level RINGKAS ke RINCI. Tiap level wajib ada di
 |                    dimension_groups cube yang sama, dan tiap nilai level
@@ -83,6 +87,10 @@ return [
             'drill_dimensions' => [
                 'DimAlumni.id_alumni', 'DimAlumni.nama', 'DimAlumni.nim', 'DimProdi.nama_prodi',
                 'DimProdi.jenjang', 'DimAlumni.tahun_lulus', 'DimStatusAlumni.label',
+            ],
+            'lainnya_texts' => [
+                'DimPerusahaan.label_jenis_perusahaan' => 'DimPerusahaan.jenis_perusahaan_lainnya',
+                'DimAlumni.label_sumber_biaya_dipolban' => 'DimAlumni.sumber_biaya_lainnya',
             ],
 
             'measures' => [

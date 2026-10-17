@@ -584,6 +584,32 @@ class ExplorerServiceTest extends TestCase
         $this->assertSame(['budi'], $or[0]['values']);
     }
 
+    public function test_drill_down_kelompok_lainnya_menampilkan_isian_ketikan(): void
+    {
+        $result = $this->drill([
+            'measure' => 'FactTracerStudy.count_alumni',
+            'filters' => [['member' => 'DimPerusahaan.label_jenis_perusahaan', 'values' => ['Lainnya']]],
+        ], rows: collect([[
+            'DimAlumni.nama' => 'Budi', 'DimPerusahaan.jenis_perusahaan_lainnya' => 'Freelance',
+            'FactTracerStudy.count_alumni' => '1',
+        ]]));
+
+        $this->assertContains('DimPerusahaan.jenis_perusahaan_lainnya', $this->lastQuery()['dimensions']);
+        $this->assertSame('Freelance', $result['data'][0]['lainnya']);
+        $this->assertSame(['key' => 'lainnya', 'label' => 'Isian "Lainnya"'], $result['context']);
+    }
+
+    public function test_drill_down_kelompok_selain_lainnya_tanpa_kolom_isian(): void
+    {
+        $result = $this->drill([
+            'measure' => 'FactTracerStudy.count_alumni',
+            'filters' => [['member' => 'DimPerusahaan.label_jenis_perusahaan', 'values' => ['BUMN/BUMD']]],
+        ]);
+
+        $this->assertNotContains('DimPerusahaan.jenis_perusahaan_lainnya', $this->lastQuery()['dimensions']);
+        $this->assertNull($result['context']);
+    }
+
     public function test_drill_down_membentuk_baris_untuk_modal(): void
     {
         $result = $this->drill(rows: collect([[
@@ -595,9 +621,10 @@ class ExplorerServiceTest extends TestCase
 
         $this->assertSame([[
             'nama' => 'Budi', 'nim' => '201', 'nama_prodi' => 'Akuntansi', 'jenjang' => 'D3',
-            'tahun_lulus' => '2022', 'status' => 'Bekerja', 'nilai' => '1',
+            'tahun_lulus' => '2022', 'status' => 'Bekerja', 'nilai' => '1', 'lainnya' => null,
         ]], $result['data']);
         $this->assertSame(1, $result['pagination']['total_on_page']);
+        $this->assertNull($result['context']);
         $this->assertSame('integer', $result['measure']['format']);
     }
 

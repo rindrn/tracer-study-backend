@@ -28,7 +28,8 @@ CREATE TABLE public.dim_alumni (
     nim character varying(20) NOT NULL,
     nama character varying(100),
     tahun_lulus character varying(5),
-    label_sumber_biaya_dipolban character varying(100)
+    label_sumber_biaya_dipolban character varying(100),
+    sumber_biaya_lainnya character varying(100)
 );
 
 
@@ -194,7 +195,8 @@ CREATE TABLE public.dim_perusahaan (
     nama_provinsi character varying(100),
     valid_from date,
     valid_to date,
-    flag_perusahaan boolean DEFAULT true NOT NULL
+    flag_perusahaan boolean DEFAULT true NOT NULL,
+    jenis_perusahaan_lainnya character varying(100)
 );
 
 
