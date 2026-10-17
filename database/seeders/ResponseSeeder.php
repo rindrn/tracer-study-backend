@@ -72,8 +72,19 @@ class ResponseSeeder extends Seeder
             'Bahasa Inggris' => ['q_bidang_bahasa' => ['Penerjemah', 'Pengajar', 'Content Writer', 'Tour Guide', 'Customer Service']],
         ];
 
-        $provinces = ['Jawa Barat', 'DKI Jakarta', 'Jawa Tengah', 'Jawa Timur', 'Banten', 'Sumatera Utara', 'Bali'];
-        $cities    = ['Bandung', 'Jakarta Selatan', 'Bekasi', 'Semarang', 'Surabaya', 'Tangerang', 'Denpasar'];
+        // Kota dipilih DARI provinsinya: hierarki kota → provinsi dipakai
+        // drill-down Insight, dan pasangan acak (Bandung di Bali) membuatnya
+        // tampak rusak.
+        $citiesByProvince = [
+            'Jawa Barat'     => ['Bandung', 'Bekasi'],
+            'DKI Jakarta'    => ['Jakarta Selatan'],
+            'Jawa Tengah'    => ['Semarang'],
+            'Jawa Timur'     => ['Surabaya'],
+            'Banten'         => ['Tangerang'],
+            'Sumatera Utara' => ['Medan'],
+            'Bali'           => ['Denpasar'],
+        ];
+        $provinces = array_keys($citiesByProvince);
         $companies = ['PT Telkom Indonesia', 'PT Pertamina', 'PT Astra International', 'Tokopedia', 'GoTo', 'PT PLN', 'Bank BCA', 'Shopee Indonesia', 'Traveloka', 'PT Krakatau Steel'];
         $universities = ['Universitas Indonesia', 'Institut Teknologi Bandung', 'Universitas Gadjah Mada', 'Universitas Padjadjaran', 'Universitas Brawijaya'];
 
@@ -164,8 +175,10 @@ class ResponseSeeder extends Seeder
 
                 $answers[] = $this->answer($responseId, 'f502', (string)$waitingMonths, $now);
                 $answers[] = $this->answer($responseId, 'f505', (string)$salary, $now);
-                $answers[] = $this->answer($responseId, 'f5a1', $faker->randomElement($provinces), $now);
-                $answers[] = $this->answer($responseId, 'f5a2', $faker->randomElement($cities), $now);
+                $province = $faker->randomElement($provinces);
+                $city     = $faker->randomElement($citiesByProvince[$province]);
+                $answers[] = $this->answer($responseId, 'f5a1', $province, $now);
+                $answers[] = $this->answer($responseId, 'f5a2', $city, $now);
                 $answers[] = $this->answer($responseId, 'f5d', (string)$faker->numberBetween(1, 3), $now);
 
                 if ($statusKerja == 1) {
@@ -196,7 +209,7 @@ class ResponseSeeder extends Seeder
                     'job_title'         => $faker->jobTitle,
                     'salary_current'    => $salary,
                     'waiting_months'    => $waitingMonths,
-                    'work_city'         => $faker->randomElement($cities),
+                    'work_city'         => $city,
                     'first_job_started_at' => $faker->dateTimeBetween('-2 years', 'now')->format('Y-m-d'),
                     'created_at'        => $now,
                     'updated_at'        => $now,

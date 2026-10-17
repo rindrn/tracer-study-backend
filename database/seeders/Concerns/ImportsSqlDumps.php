@@ -55,7 +55,19 @@ trait ImportsSqlDumps
         }
 
         $this->command?->info("Mengimpor {$relative} ({$label})...");
-        passthru('psql ' . $this->psqlDsn($conn) . ' -v ON_ERROR_STOP=1 -q -f ' . escapeshellarg($path), $status);
+
+        // Dump lahir di mesin dengan role `smarttracer`/`postgres`; role itu
+        // belum tentu ada di mesin lain dan `ALTER ... OWNER TO` membuat
+        // import gagal. Baris owner dibuang -- objek otomatis dimiliki user
+        // yang menjalankan import, sama saja untuk demo/dev.
+        $tmp = tempnam(sys_get_temp_dir(), 'dump_');
+        file_put_contents($tmp, preg_replace('/^ALTER .+ OWNER TO .+;\R/m', '', file_get_contents($path)));
+
+        try {
+            passthru('psql ' . $this->psqlDsn($conn) . ' -v ON_ERROR_STOP=1 -q -f ' . escapeshellarg($tmp), $status);
+        } finally {
+            @unlink($tmp);
+        }
 
         if ($status !== 0) {
             throw new RuntimeException("Import {$relative} gagal.");
