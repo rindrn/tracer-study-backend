@@ -447,6 +447,13 @@ class AnswerResolverService
             return $match->option_label;
         }
 
+        // Ekspor portal kementerian menulis 0 untuk pertanyaan yang tidak
+        // diisi. Tidak ada satu opsi pun berkode 0, jadi tanpa ini "0" lolos
+        // sebagai label dan tampil sebagai kategori tersendiri di dashboard.
+        if (trim($rawOptionCode) === '0') {
+            return null;
+        }
+
         // Data lama kadang menyimpan labelnya, bukan kodenya, dengan huruf
         // besar-kecil berbeda ("Perusahaan Swasta" vs opsi "Perusahaan
         // swasta"). Tanpa ini keduanya jadi dua kelompok di dimensi.

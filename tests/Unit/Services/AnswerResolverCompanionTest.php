@@ -106,6 +106,7 @@ class AnswerResolverCompanionTest extends TestCase
 
         $this->assertSame('Perusahaan swasta', $value('Perusahaan Swasta'));
         $this->assertSame('Perusahaan swasta', $value('3'));
-        $this->assertSame('0', $value('0')); // kode tak dikenal dibiarkan apa adanya
+        $this->assertSame('9', $value('9')); // kode tak dikenal dibiarkan apa adanya
+        $this->assertNull($value('0'));      // 0 = tidak diisi di ekspor kementerian
     }
 }
