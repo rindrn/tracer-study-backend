@@ -168,10 +168,16 @@ return [
                     'DimAlumni.tahun_lulus'                 => 'Tahun lulus',
                     'DimAlumni.label_sumber_biaya_dipolban' => 'Sumber biaya kuliah',
                 ],
-                'Status & Kesesuaian' => [
-                    'DimStatusAlumni.label'     => 'Status alumni',
+                // Satu grup = satu tabel dimensi star schema, termasuk tiga
+                // dimensi kecil di bawah ini yang dulu disatukan.
+                'Status Alumni' => [
+                    'DimStatusAlumni.label' => 'Status alumni',
+                ],
+                'Kesesuaian Bidang' => [
                     'DimKesesuaianBidang.label' => 'Kesesuaian bidang kerja',
-                    'DimKesesuaianLevel.label'  => 'Kesesuaian tingkat pendidikan',
+                ],
+                'Kesesuaian Tingkat' => [
+                    'DimKesesuaianLevel.label' => 'Kesesuaian tingkat pendidikan',
                 ],
                 'Perusahaan' => [
                     'DimPerusahaan.label_jenis_perusahaan' => 'Jenis instansi',
