@@ -369,7 +369,10 @@ class AlumniFactBuilderService
                 'id_studi_lanjut'       => $idStudiLanjut,
                 'prodi_sk'              => $prodiSk,
                 'wirausaha_sk'          => $wirausahaSk,
-                'masa_tunggu_bekerja'   => isset($resolvedByRole['masa_tunggu_bekerja']) ? (int) $resolvedByRole['masa_tunggu_bekerja'] : null,
+                'masa_tunggu_bekerja'   => $this->masaTungguBekerja(
+                    $resolvedByRole,
+                    $mappingIndex['by_role']->has($response->questionnaire_id . ':mulai_mencari_kerja'),
+                ),
                 'bulan_sebelum_lulus'   => isset($resolvedByRole['bulan_sebelum_lulus']) ? (int) $resolvedByRole['bulan_sebelum_lulus'] : null,
                 'bulan_sesudah_lulus'   => isset($resolvedByRole['bulan_sesudah_lulus']) ? (int) $resolvedByRole['bulan_sesudah_lulus'] : null,
                 'masa_tunggu_wirausaha' => null,
@@ -414,6 +417,30 @@ class AlumniFactBuilderService
      *                       tidak ada cara struktural memvalidasi "bentuk"
      *                       teks bebas lebih jauh dari sekadar keberadaannya.
      */
+    /**
+     * Ekspor kementerian menulis 0 untuk sel kosong, jadi masa tunggu 0
+     * bisa berarti "sudah dapat kerja saat lulus" atau tidak diisi. 0
+     * dianggap sah hanya bila alumni mulai mencari sebelum lulus atau tidak
+     * mencari sama sekali (f301); bila baru mencari sesudah lulus atau f301
+     * kosong, 0 dibaca tidak diisi. Kuesioner tanpa pemetaan f301 tidak
+     * bisa dinilai, jadi 0-nya dibiarkan.
+     */
+    private function masaTungguBekerja(array $resolvedByRole, bool $adaPemetaanMulaiMencari): ?int
+    {
+        if (! isset($resolvedByRole['masa_tunggu_bekerja'])) {
+            return null;
+        }
+
+        $bulan = (int) $resolvedByRole['masa_tunggu_bekerja'];
+        if ($bulan !== 0 || ! $adaPemetaanMulaiMencari) {
+            return $bulan;
+        }
+
+        $mulai = mb_strtolower((string) ($resolvedByRole['mulai_mencari_kerja'] ?? ''));
+
+        return str_contains($mulai, 'sebelum lulus') || str_contains($mulai, 'tidak mencari') ? 0 : null;
+    }
+
     private function passesRoleValidation(mixed $value, object $roleRow): bool
     {
         return match ($roleRow->expected_kind) {
