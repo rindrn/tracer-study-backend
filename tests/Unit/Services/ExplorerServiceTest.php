@@ -136,8 +136,20 @@ class ExplorerServiceTest extends TestCase
         );
     }
 
+    public function test_cube_hidden_tidak_ditawarkan_di_katalog(): void
+    {
+        config(['olap_catalog.cubes.FactMultiSelect.hidden' => true]);
+
+        $keys = collect($this->service()->catalog()['cubes'])->pluck('key')->all();
+
+        $this->assertNotContains('FactMultiSelect', $keys);
+        $this->assertContains('FactTracerStudy', $keys);
+    }
+
     public function test_batas_dimensi_per_cube_sama_dengan_jumlah_tabel_dimensinya(): void
     {
+        $this->tampilkanSemuaCube();
+
         $batas = collect($this->service()->catalog()['cubes'])->pluck('max_dimensions', 'key')->all();
 
         // Dimensi rentang (FactTracerStudy.rentang_*) ada di fact itu sendiri,
@@ -150,11 +162,20 @@ class ExplorerServiceTest extends TestCase
 
     public function test_batas_dimensi_bisa_ditimpa_per_cube_di_config(): void
     {
+        $this->tampilkanSemuaCube();
         config(['olap_catalog.cubes.FactMultiSelect.max_dimensions' => 2]);
 
         $batas = collect($this->service()->catalog()['cubes'])->pluck('max_dimensions', 'key');
 
         $this->assertSame(2, $batas['FactMultiSelect']);
+    }
+
+    /** Batas dimensi dihitung untuk tiap cube, termasuk yang disembunyikan dari pilihan Data. */
+    private function tampilkanSemuaCube(): void
+    {
+        foreach (array_keys(config('olap_catalog.cubes')) as $key) {
+            config(["olap_catalog.cubes.{$key}.hidden" => false]);
+        }
     }
 
     public function test_lebih_dari_tiga_dimensi_diterima_sampai_batas_cube(): void

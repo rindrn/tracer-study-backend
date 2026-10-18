@@ -67,6 +67,10 @@ class ExplorerService
         $cubes = [];
 
         foreach ($this->cubes() as $key => $cube) {
+            if ($cube['hidden'] ?? false) {
+                continue;
+            }
+
             $cubes[] = [
                 'key'         => $key,
                 'label'       => $cube['label'],

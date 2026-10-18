@@ -28,6 +28,10 @@
 |                    responden < n" dan penanda jumlah di drill-down.
 | drill_dimensions → kolom daftar alumni saat sebuah angka diklik
 |                    (drill-through). Harus bisa di-join dari cube ini.
+| hidden           → true: cube tidak ditawarkan di pilihan "Data" halaman
+|                    Insight (dan contoh pertanyaannya ikut hilang), tetapi
+|                    definisinya tetap berlaku, sehingga item dashboard yang
+|                    sudah tersimpan untuk cube ini masih bisa dijalankan.
 | lainnya_texts    → dimensi berisian "Lainnya, tuliskan" → kolom teks
 |                    ketikannya. Di dimensi semua isian bebas berkumpul di
 |                    satu kelompok "Lainnya"; teksnya baru tampil saat
@@ -198,6 +202,7 @@ return [
 
         'FactRangeEvaluasi' => [
             'label'       => 'Kompetensi & Metode Pembelajaran',
+            'hidden'      => true,
             'description' => 'Skor 1–5 dari alumni: kompetensi yang dikuasai saat lulus, yang dibutuhkan di pekerjaan, dan metode pembelajaran.',
 
             'base_measure'  => 'FactRangeEvaluasi.count',
@@ -245,6 +250,7 @@ return [
 
         'FactMultiSelect' => [
             'label'       => 'Alasan Kerja Tidak Sesuai Bidang',
+            'hidden'      => true,
             'description' => 'Alasan yang dipilih alumni ketika pekerjaannya tidak sesuai bidang studi (boleh lebih dari satu).',
 
             'base_measure'  => 'FactMultiSelect.count_alumni_unik',
