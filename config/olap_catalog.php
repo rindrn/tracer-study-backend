@@ -51,12 +51,13 @@
 | "Program studi" memakai DimProdi.prodi_jenjang, bukan nama_prodi: nama
 | prodi tidak unik antar-jenjang (D3 & D4 Akuntansi), lihat DimProdi.js.
 |
-| Hierarki Program Studi (jenjang → jurusan → prodi) satu-satunya yang
-| tidak tegas di level tengah: satu jurusan bisa membuka prodi D3 dan D4,
-| jadi "Teknik Kimia" punya dua induk. Aman karena drill-down menyimpan
-| jenjang sebagai saringan, sehingga jurusan selalu dibaca di dalam satu
-| jenjang; roll-up pun dihitung ulang dari fakta, bukan dijumlah dari
-| angka jurusan. Prodi_jenjang sendiri tetap punya tepat satu jurusan.
+| Hierarki Program Studi (jurusan → jenjang → prodi) satu-satunya yang
+| tidak tegas di level tengah: jenjang dipakai banyak jurusan, jadi "D3"
+| punya banyak induk. Aman karena drill-down menyimpan jurusan sebagai
+| saringan, sehingga jenjang selalu dibaca di dalam satu jurusan (D3 & D4
+| Akuntansi); roll-up pun dihitung ulang dari fakta, bukan dijumlah dari
+| angka jenjang. Prodi_jenjang sendiri tetap punya tepat satu pasangan
+| jurusan + jenjang.
 |
 */
 
@@ -189,7 +190,7 @@ return [
             ],
 
             'hierarchies' => [
-                'Program Studi' => ['DimProdi.jenjang', 'DimProdi.jurusan', 'DimProdi.prodi_jenjang'],
+                'Program Studi' => ['DimProdi.jurusan', 'DimProdi.jenjang', 'DimProdi.prodi_jenjang'],
                 'Lokasi kerja'  => ['DimPerusahaan.nama_provinsi', 'DimPerusahaan.nama_kota'],
                 'Lokasi usaha'  => ['DimWirausaha.nama_provinsi', 'DimWirausaha.nama_kota'],
             ],
@@ -238,7 +239,7 @@ return [
 
             'hierarchies' => [
                 'Pertanyaan'    => ['DimIndikatorEvaluasi.kategori_label', 'DimIndikatorEvaluasi.label_pertanyaan'],
-                'Program Studi' => ['DimProdi.jenjang', 'DimProdi.jurusan', 'DimProdi.prodi_jenjang'],
+                'Program Studi' => ['DimProdi.jurusan', 'DimProdi.jenjang', 'DimProdi.prodi_jenjang'],
             ],
         ],
 
@@ -279,7 +280,7 @@ return [
             ],
 
             'hierarchies' => [
-                'Program Studi' => ['DimProdi.jenjang', 'DimProdi.jurusan', 'DimProdi.prodi_jenjang'],
+                'Program Studi' => ['DimProdi.jurusan', 'DimProdi.jenjang', 'DimProdi.prodi_jenjang'],
             ],
         ],
 

@@ -131,7 +131,7 @@ class ExplorerServiceTest extends TestCase
         $this->assertArrayHasKey('format', $cube['measures'][0]);
         $this->assertArrayHasKey('members', $cube['dimension_groups'][0]);
         $this->assertContains(
-            ['name' => 'Program Studi', 'levels' => ['DimProdi.jenjang', 'DimProdi.jurusan', 'DimProdi.prodi_jenjang']],
+            ['name' => 'Program Studi', 'levels' => ['DimProdi.jurusan', 'DimProdi.jenjang', 'DimProdi.prodi_jenjang']],
             $cube['hierarchies'],
         );
     }
