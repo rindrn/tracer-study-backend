@@ -34,7 +34,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
             'filters'    => $filters,
             'order'      => [['FactTracerStudy.count_alumni', 'desc']],
         ])->map(fn($r) => [
-            'sumber_biaya' => $r['DimAlumni.label_sumber_biaya_dipolban'] ?? '',
+            'sumber_biaya' => $this->labelOrTidakDiisi($r['DimAlumni.label_sumber_biaya_dipolban'] ?? null),
             'count'        => (int) ($r['FactTracerStudy.count_alumni']   ?? 0),
         ]);
     }
@@ -73,7 +73,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
             ],
         ])->map(fn($r) => [
             'tahun_lulus'  => $r['DimAlumni.tahun_lulus']                    ?? '',
-            'sumber_biaya' => $r['DimAlumni.label_sumber_biaya_dipolban']    ?? '',
+            'sumber_biaya' => $this->labelOrTidakDiisi($r['DimAlumni.label_sumber_biaya_dipolban'] ?? null),
             'count'        => (int) ($r['FactTracerStudy.count_alumni']       ?? 0),
         ]);
     }
@@ -116,7 +116,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
             'nama_prodi'   => $r['DimProdi.nama_prodi']                      ?? '',
             'jenjang'      => $r['DimProdi.jenjang']                         ?? '',
             'jurusan'      => $r['DimProdi.jurusan']                         ?? '',
-            'sumber_biaya' => $r['DimAlumni.label_sumber_biaya_dipolban']    ?? '',
+            'sumber_biaya' => $this->labelOrTidakDiisi($r['DimAlumni.label_sumber_biaya_dipolban'] ?? null),
             'count'        => (int) ($r['FactTracerStudy.count_alumni']       ?? 0),
         ]);
     }
@@ -169,7 +169,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
             'nama_prodi'   => $r['DimProdi.nama_prodi']                      ?? '',
             'jenjang'      => $r['DimProdi.jenjang']                         ?? '',
             'jurusan'      => $r['DimProdi.jurusan']                         ?? '',
-            'sumber_biaya' => $r['DimAlumni.label_sumber_biaya_dipolban']    ?? '',
+            'sumber_biaya' => $this->labelOrTidakDiisi($r['DimAlumni.label_sumber_biaya_dipolban'] ?? null),
             'count'        => (int) ($r['FactTracerStudy.count_alumni']       ?? 0),
         ]);
     }
@@ -200,17 +200,9 @@ class PembiayaanRepository extends BaseAnalyticalRepository
             mingguSnapshot: $mingguSnapshot,
         );
 
-        // Cube.js: 'equals' dengan banyak nilai berperilaku seperti IN.
-        $sumberValues = array_values(array_filter(
-            array_map('strval', (array) ($sumberBiaya ?? [])),
-            fn ($v) => $v !== '',
-        ));
-        if (! empty($sumberValues)) {
-            $filters[] = [
-                'member'   => 'DimAlumni.label_sumber_biaya_dipolban',
-                'operator' => 'equals',
-                'values'   => $sumberValues,
-            ];
+        // Cube.js: 'equals' dengan banyak nilai berperilaku seperti IN; "Tidak Mengisi" -> notSet.
+        if ($f = $this->labelFilter('DimAlumni.label_sumber_biaya_dipolban', (array) ($sumberBiaya ?? []))) {
+            $filters[] = $f;
         }
 
         if ($search) {
@@ -242,8 +234,7 @@ class PembiayaanRepository extends BaseAnalyticalRepository
             'tahun_lulus'  => $r['DimAlumni.tahun_lulus']                     ?? '',
             // Kelompok "Lainnya": tampilkan isian ketikannya bila ada.
             'sumber_biaya' => $r['DimAlumni.sumber_biaya_lainnya']
-                ?? $r['DimAlumni.label_sumber_biaya_dipolban']
-                ?? '',
+                ?? $this->labelOrTidakDiisi($r['DimAlumni.label_sumber_biaya_dipolban'] ?? null),
         ])->toArray();
 
         return [

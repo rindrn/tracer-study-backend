@@ -56,7 +56,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             'filters'    => $filters,
             'order'      => [['FactTracerStudy.count_alumni', 'desc']],
         ])->map(fn($r) => [
-            'jenis' => $r['DimPerusahaan.label_jenis_perusahaan'] ?? '',
+            'jenis' => $this->labelOrTidakDiisi($r['DimPerusahaan.label_jenis_perusahaan'] ?? null),
             'count' => (int) ($r['FactTracerStudy.count_alumni'] ?? 0),
         ]);
     }
@@ -106,7 +106,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             'nama_prodi'    => $r['DimProdi.nama_prodi']                    ?? '',
             'jenjang'       => $r['DimProdi.jenjang']                       ?? '',
             'jurusan'       => $r['DimProdi.jurusan']                       ?? '',
-            'label_tingkat' => $r['DimPerusahaan.label_tingkat_instansi']   ?? '',
+            'label_tingkat' => $this->labelOrTidakDiisi($r['DimPerusahaan.label_tingkat_instansi'] ?? null),
             'count'         => (int) ($r['FactTracerStudy.count_alumni']    ?? 0),
         ]);
     }
@@ -148,7 +148,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             ],
         ])->map(fn($r) => [
             'tahun_lulus'   => $r['DimAlumni.tahun_lulus']                  ?? '',
-            'label_tingkat' => $r['DimPerusahaan.label_tingkat_instansi']   ?? '',
+            'label_tingkat' => $this->labelOrTidakDiisi($r['DimPerusahaan.label_tingkat_instansi'] ?? null),
             'count'         => (int) ($r['FactTracerStudy.count_alumni']    ?? 0),
         ]);
     }
@@ -198,7 +198,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             'nama_prodi' => $r['DimProdi.nama_prodi']                    ?? '',
             'jenjang'    => $r['DimProdi.jenjang']                       ?? '',
             'jurusan'    => $r['DimProdi.jurusan']                       ?? '',
-            'label_jenis'=> $r['DimPerusahaan.label_jenis_perusahaan']   ?? '',
+            'label_jenis'=> $this->labelOrTidakDiisi($r['DimPerusahaan.label_jenis_perusahaan'] ?? null),
             'count'      => (int) ($r['FactTracerStudy.count_alumni']    ?? 0),
         ]);
     }
@@ -247,7 +247,7 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             'nama_prodi'    => $r['DimProdi.nama_prodi']                   ?? '',
             'jenjang'       => $r['DimProdi.jenjang']                      ?? '',
             'jurusan'       => $r['DimProdi.jurusan']                      ?? '',
-            'label_tingkat' => $r['DimPerusahaan.label_tingkat_instansi']  ?? '',
+            'label_tingkat' => $this->labelOrTidakDiisi($r['DimPerusahaan.label_tingkat_instansi'] ?? null),
             'count'         => (int) ($r['FactTracerStudy.count_alumni']   ?? 0),
         ]);
     }
@@ -364,21 +364,13 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             [self::FILTER_BEKERJA],
         );
 
-        if (!empty($jenisInstansi)) {
-            $values = is_array($jenisInstansi) ? $jenisInstansi : [$jenisInstansi];
-            $filters[] = [
-                'member'   => 'DimPerusahaan.label_jenis_perusahaan',
-                'operator' => 'equals',   // Cube.js "equals" dengan multi-values = IN
-                'values'   => $values,
-            ];
+        // Cube.js "equals" dengan multi-values = IN; "Tidak Mengisi" -> notSet.
+        if ($f = $this->labelFilter('DimPerusahaan.label_jenis_perusahaan', (array) ($jenisInstansi ?? []))) {
+            $filters[] = $f;
         }
 
-        if ($tingkatInstansi !== null && $tingkatInstansi !== '') {
-            $filters[] = [
-                'member'   => 'DimPerusahaan.label_tingkat_instansi',
-                'operator' => 'equals',
-                'values'   => [$tingkatInstansi],
-            ];
+        if ($f = $this->labelFilter('DimPerusahaan.label_tingkat_instansi', (array) ($tingkatInstansi ?? []))) {
+            $filters[] = $f;
         }
 
         if ($search !== null && $search !== '') {
@@ -418,9 +410,8 @@ class SebaranInstansiRepository extends BaseAnalyticalRepository
             'nama_kota'        => $r['DimPerusahaan.nama_kota']                     ?? '',
             // Kelompok "Lainnya": tampilkan isian ketikannya bila ada.
             'jenis_instansi'   => $r['DimPerusahaan.jenis_perusahaan_lainnya']
-                ?? $r['DimPerusahaan.label_jenis_perusahaan']
-                ?? '',
-            'tingkat_instansi' => $r['DimPerusahaan.label_tingkat_instansi']        ?? '',
+                ?? $this->labelOrTidakDiisi($r['DimPerusahaan.label_jenis_perusahaan'] ?? null),
+            'tingkat_instansi' => $this->labelOrTidakDiisi($r['DimPerusahaan.label_tingkat_instansi'] ?? null),
             'status'           => $r['DimStatusAlumni.label']                       ?? '',
         ])->toArray();
 

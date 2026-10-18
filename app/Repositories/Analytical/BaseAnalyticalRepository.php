@@ -123,6 +123,47 @@ abstract class BaseAnalyticalRepository
     }
 
     /**
+     * Label kelompok untuk alumni yang tidak mengisi pertanyaannya. ETL
+     * menyimpan jawaban kosong (termasuk "0" dari ekspor kementerian) sebagai
+     * null; tanpa label ini kelompoknya tampil sebagai batang tanpa nama.
+     */
+    public const TIDAK_DIISI = 'Tidak Mengisi';
+
+    protected function labelOrTidakDiisi(?string $value): string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? self::TIDAK_DIISI : $value;
+    }
+
+    /**
+     * Filter drill-down untuk label kategori. "Tidak Mengisi" bukan nilai asli
+     * di dimensi, jadi diterjemahkan ke notSet; dicampur dengan label lain
+     * lewat OR supaya tetap bermakna IN.
+     *
+     * @param  array<string> $values
+     * @return array<string, mixed>|null  null bila tidak ada nilai
+     */
+    protected function labelFilter(string $member, array $values): ?array
+    {
+        $values = array_values(array_filter(array_map('strval', $values), fn ($v) => $v !== ''));
+        if ($values === []) {
+            return null;
+        }
+
+        $asli    = array_values(array_filter($values, fn ($v) => $v !== self::TIDAK_DIISI));
+        $kosong  = count($asli) < count($values);
+        $equals  = ['member' => $member, 'operator' => 'equals', 'values' => $asli];
+        $notSet  = ['member' => $member, 'operator' => 'notSet'];
+
+        return match (true) {
+            ! $kosong       => $equals,
+            $asli === []    => $notSet,
+            default         => ['or' => [$equals, $notSet]],
+        };
+    }
+
+    /**
      * Helper: ambil nilai tahun yang tersedia untuk dropdown FE.
      * Tidak pakai pre-agg — metadata dimension kecil.
      *

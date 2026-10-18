@@ -34,6 +34,16 @@ class FilterHarnessRepository extends BaseAnalyticalRepository
             idProdiIn: $idProdiIn,
         );
     }
+
+    public function callLabelOrTidakDiisi(?string $value): string
+    {
+        return $this->labelOrTidakDiisi($value);
+    }
+
+    public function callLabelFilter(string $member, array $values): ?array
+    {
+        return $this->labelFilter($member, $values);
+    }
 }
 
 class BaseAnalyticalRepositoryFilterTest extends TestCase
@@ -102,5 +112,35 @@ class BaseAnalyticalRepositoryFilterTest extends TestCase
         $this->assertSame(['D4'], $byMember['DimProdi.jenjang']['values']);
         $this->assertSame(['Teknik Informatika'], $byMember['DimProdi.nama_prodi']['values']);
         $this->assertSame(['2024'], $byMember['DimAlumni.tahun_lulus']['values']);
+    }
+
+    public function test_label_kosong_jadi_tidak_mengisi(): void
+    {
+        $this->assertSame('Tidak Mengisi', $this->repo()->callLabelOrTidakDiisi(null));
+        $this->assertSame('Tidak Mengisi', $this->repo()->callLabelOrTidakDiisi('  '));
+        $this->assertSame('BUMN/BUMD', $this->repo()->callLabelOrTidakDiisi('BUMN/BUMD'));
+    }
+
+    /** "Tidak Mengisi" bukan nilai di dimensi: drill-nya harus notSet, bukan equals. */
+    public function test_filter_label_menerjemahkan_tidak_mengisi_ke_not_set(): void
+    {
+        $m = 'DimPerusahaan.label_jenis_perusahaan';
+
+        $this->assertNull($this->repo()->callLabelFilter($m, ['']));
+        $this->assertSame(
+            ['member' => $m, 'operator' => 'equals', 'values' => ['BUMN/BUMD']],
+            $this->repo()->callLabelFilter($m, ['BUMN/BUMD']),
+        );
+        $this->assertSame(
+            ['member' => $m, 'operator' => 'notSet'],
+            $this->repo()->callLabelFilter($m, ['Tidak Mengisi']),
+        );
+        $this->assertSame(
+            ['or' => [
+                ['member' => $m, 'operator' => 'equals', 'values' => ['Lainnya']],
+                ['member' => $m, 'operator' => 'notSet'],
+            ]],
+            $this->repo()->callLabelFilter($m, ['Lainnya', 'Tidak Mengisi']),
+        );
     }
 }
