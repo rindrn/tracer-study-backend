@@ -58,21 +58,28 @@ class MasaTungguRepository extends BaseAnalyticalRepository
             ],
         ]);
 
-        $cepatByGroup = $this->cepatCountsByGroup($dims, $filters, $batasCepatBulan);
+        $cepatByGroup   = $this->cepatCountsByGroup($dims, $filters, $batasCepatBulan);
+        $bekerjaByGroup = $this->bekerjaStatsByGroup($dims, $filters);
 
-        return $raw->map(fn($r) => [
-            'nama_prodi'                 => $r['DimProdi.nama_prodi']                       ?? '',
-            'jenjang'                    => $r['DimProdi.jenjang']                          ?? '',
-            'jurusan'                    => $r['DimProdi.jurusan']                          ?? '',
-            'tahun_lulus'                => $r['DimAlumni.tahun_lulus']                     ?? '',
-            'count_alumni'               => (int)   ($r['FactTracerStudy.count_alumni']               ?? 0),
-            'count_terserap'             => (int)   ($r['FactTracerStudy.count_terserap']             ?? 0),
-            'count_masa_tunggu_cepat'    => $cepatByGroup->get(
-                self::rowKey($dims, $r), 0
-            ),
-            'avg_masa_tunggu_bekerja'    => (float) ($r['FactTracerStudy.avg_masa_tunggu_bekerja']    ?? 0),
-            'median_masa_tunggu_bekerja' => (float) ($r['FactTracerStudy.median_masa_tunggu_bekerja'] ?? 0),
-        ]);
+        return $raw->map(function ($r) use ($dims, $cepatByGroup, $bekerjaByGroup) {
+            $key     = self::rowKey($dims, $r);
+            $bekerja = $bekerjaByGroup->get($key);
+
+            return [
+                'nama_prodi'                 => $r['DimProdi.nama_prodi']                       ?? '',
+                'jenjang'                    => $r['DimProdi.jenjang']                          ?? '',
+                'jurusan'                    => $r['DimProdi.jurusan']                          ?? '',
+                'tahun_lulus'                => $r['DimAlumni.tahun_lulus']                     ?? '',
+                'count_alumni'               => (int)   ($r['FactTracerStudy.count_alumni']               ?? 0),
+                'count_terserap'             => (int)   ($r['FactTracerStudy.count_terserap']             ?? 0),
+                // Penyebut "% cepat" dan bobot rata-rata/median: hanya alumni
+                // yang memang punya masa tunggu kerja (lihat bekerjaStatsByGroup).
+                'count_bekerja'              => $bekerja['count'] ?? 0,
+                'count_masa_tunggu_cepat'    => $cepatByGroup->get($key, 0),
+                'avg_masa_tunggu_bekerja'    => $bekerja['avg'] ?? 0.0,
+                'median_masa_tunggu_bekerja' => $bekerja['median'] ?? 0.0,
+            ];
+        });
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -110,12 +117,9 @@ class MasaTungguRepository extends BaseAnalyticalRepository
             namaProdi:      $namaProdi,
             tahunLulus:     $tahunLulus,
             mingguSnapshot: $mingguSnapshot,
-            extra: [[
-                // Hanya alumni bekerja di perusahaan — sejalan dengan denominator
-                // masa tunggu di getBarData().
-                'member'   => 'FactTracerStudy.perusahaan_sk',
-                'operator' => 'set',
-            ]],
+            // Populasi yang sama dengan getBarData(). Dulu "punya perusahaan",
+            // yang ikut memasukkan alumni tidak bekerja berperusahaan "0".
+            extra: $this->bekerjaFilters(),
         );
 
         $dims = ['DimProdi.jenjang', 'DimProdi.jurusan', 'DimProdi.nama_prodi', 'DimAlumni.tahun_lulus'];
@@ -200,10 +204,7 @@ class MasaTungguRepository extends BaseAnalyticalRepository
             idProdiIn:      $idProdiIn,
             namaProdi:      $namaProdi,
             mingguSnapshot: $mingguSnapshot,
-            extra: [[
-                'member'   => 'FactTracerStudy.perusahaan_sk',
-                'operator' => 'set',
-            ]],
+            extra: $this->bekerjaFilters(),
         );
 
         return $this->cube->load([
@@ -492,14 +493,10 @@ class MasaTungguRepository extends BaseAnalyticalRepository
      */
     private function cepatCountsByGroup(array $dimensions, array $baseFilters, float $batasBulan): Collection
     {
-        $filters = array_merge($baseFilters, [
-            $this->statusEligibleFilter(),
-            ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'set'],
-            // gte 0 (BUKAN gt 0) -- masa tunggu persis 0 bulan (sudah bekerja
-            // saat/sebelum lulus) tetap termasuk "cepat", bahkan yang paling
-            // cepat dari semua. Dulu dikecualikan, menyebabkan angka "cepat"
-            // lebih rendah dari seharusnya dibanding bucket histogram 0-3 bulan.
-            ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'gte', 'values' => ['0']],
+        // bekerjaFilters() memakai gte 0 (BUKAN gt 0) -- masa tunggu persis 0
+        // bulan (sudah bekerja saat/sebelum lulus) tetap termasuk "cepat",
+        // bahkan yang paling cepat dari semua.
+        $filters = array_merge($baseFilters, $this->bekerjaFilters(), [
             ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'lte', 'values' => [(string) $batasBulan]],
         ]);
 
@@ -509,6 +506,47 @@ class MasaTungguRepository extends BaseAnalyticalRepository
             'filters'    => $filters,
         ])->keyBy(fn ($r) => self::rowKey($dimensions, $r))
           ->map(fn ($r) => (int) ($r['FactTracerStudy.count_alumni'] ?? 0));
+    }
+
+    /**
+     * Populasi masa tunggu kerja: alumni Bekerja/Wiraswasta yang punya nilai
+     * masa_tunggu_bekerja. Sama dengan populasi histogram dan "cepat". Tanpa
+     * ini, alumni yang sedang kuliah atau mencari kerja ikut jadi penyebut,
+     * dan nilai 0 bawaan data lama mereka menurunkan rata-rata dan median.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function bekerjaFilters(): array
+    {
+        return [
+            $this->statusEligibleFilter(),
+            ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'set'],
+            ['member' => 'FactTracerStudy.masa_tunggu_bekerja', 'operator' => 'gte', 'values' => ['0']],
+        ];
+    }
+
+    /**
+     * Jumlah, rata-rata, dan median masa tunggu per grup, hanya dari
+     * populasi bekerjaFilters().
+     *
+     * @return Collection  keyed by rowKey($dimensions, $row) -> array{count:int, avg:float, median:float}
+     */
+    private function bekerjaStatsByGroup(array $dimensions, array $baseFilters): Collection
+    {
+        return $this->cube->load([
+            'measures'   => [
+                'FactTracerStudy.count_alumni',
+                'FactTracerStudy.avg_masa_tunggu_bekerja',
+                'FactTracerStudy.median_masa_tunggu_bekerja',
+            ],
+            'dimensions' => $dimensions,
+            'filters'    => array_merge($baseFilters, $this->bekerjaFilters()),
+        ])->keyBy(fn ($r) => self::rowKey($dimensions, $r))
+          ->map(fn ($r) => [
+              'count'  => (int)   ($r['FactTracerStudy.count_alumni']               ?? 0),
+              'avg'    => (float) ($r['FactTracerStudy.avg_masa_tunggu_bekerja']    ?? 0),
+              'median' => (float) ($r['FactTracerStudy.median_masa_tunggu_bekerja'] ?? 0),
+          ]);
     }
 
     /** Kunci gabungan nilai dimension (pipe-separated) -- dipakai merge dua cube->load() berbeda by group. */

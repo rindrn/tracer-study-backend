@@ -94,16 +94,16 @@ class EmploymentSummaryServiceCardsTest extends TestCase
 
     // ── Masa tunggu cepat ────────────────────────────────────────────────
 
-    public function test_masa_tunggu_cepat_dihitung_terhadap_total_terserap(): void
+    public function test_masa_tunggu_cepat_dihitung_terhadap_alumni_bekerja_bukan_semua_alumni(): void
     {
         $rows = new Collection([
-            ['count_alumni' => 50, 'count_masa_tunggu_cepat' => 40],
-            ['count_alumni' => 30, 'count_masa_tunggu_cepat' => 10],
+            ['count_alumni' => 70, 'count_bekerja' => 50, 'count_masa_tunggu_cepat' => 40],
+            ['count_alumni' => 45, 'count_bekerja' => 30, 'count_masa_tunggu_cepat' => 10],
         ]);
 
         $card = $this->callPrivate($this->service(), 'buildMasaTungguCard', [$rows]);
 
-        // (40 + 10) / (50 + 30) * 100 = 62.5
+        // (40 + 10) / (50 + 30) * 100 = 62.5 -- alumni yang tidak bekerja tidak ikut jadi penyebut
         $this->assertSame(62.5, $card['value']);
     }
 

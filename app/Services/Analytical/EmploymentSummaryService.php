@@ -187,12 +187,11 @@ class EmploymentSummaryService
      * Card Masa Tunggu Cepat
      *
      * Ikut logic MasaTungguService::getBar() persis:
-     *   pct_cepat = count_masa_tunggu_cepat / count_terserap × 100
+     *   pct_cepat = count_masa_tunggu_cepat / count_bekerja × 100
      *
-     * Measure count_masa_tunggu_cepat = alumni Bekerja/Wirausaha masa tunggu ≤ 6 bln
-     *                                   (pre-computed di Cube.js, bukan filter PHP).
-     * Measure count_terserap          = total alumni yang sudah bekerja/wirausaha
-     *                                   (denominator — bukan total semua alumni).
+     * count_masa_tunggu_cepat = alumni Bekerja/Wiraswasta masa tunggu ≤ ambang.
+     * count_bekerja           = alumni Bekerja/Wiraswasta yang punya masa tunggu
+     *                           (denominator — bukan total semua alumni).
      *
      * Sum di PHP karena getBarData() mengembalikan baris per prodi × tahun_lulus.
      * Dengan menjumlahkan seluruh baris, kita dapat agregat keseluruhan
@@ -200,10 +199,10 @@ class EmploymentSummaryService
      */
     private function buildMasaTungguCard(\Illuminate\Support\Collection $rows): array
     {
-        $totalAlumni = $rows->sum('count_alumni');
-        $totalCepat  = $rows->sum('count_masa_tunggu_cepat');
- 
-        $pct = $totalAlumni > 0 ? round($totalCepat / $totalAlumni * 100, 1) : 0.0;
+        $totalBekerja = $rows->sum('count_bekerja');
+        $totalCepat   = $rows->sum('count_masa_tunggu_cepat');
+
+        $pct = $totalBekerja > 0 ? round($totalCepat / $totalBekerja * 100, 1) : 0.0;
  
         return [
             'value' => $pct,

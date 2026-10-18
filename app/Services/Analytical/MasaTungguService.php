@@ -44,8 +44,10 @@ class MasaTungguService
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
                 batasCepatBulan: $this->batasCepat($params),
             )->map(function ($r) {
-                $pctCepat = $r['count_terserap'] > 0
-                    ? round($r['count_masa_tunggu_cepat'] / $r['count_terserap'] * 100, 1)
+                // Penyebut: alumni bekerja/wiraswasta yang punya masa tunggu,
+                // populasi yang sama dengan pembilangnya.
+                $pctCepat = $r['count_bekerja'] > 0
+                    ? round($r['count_masa_tunggu_cepat'] / $r['count_bekerja'] * 100, 1)
                     : 0.0;
 
                 return [
@@ -55,6 +57,7 @@ class MasaTungguService
                     'tahun_lulus'             => $r['tahun_lulus'],
                     'count_alumni'            => $r['count_alumni'],
                     'count_terserap'          => $r['count_terserap'],
+                    'count_bekerja'           => $r['count_bekerja'],
                     'count_masa_tunggu_cepat' => $r['count_masa_tunggu_cepat'],
                     'pct_cepat'                  => $pctCepat,
                     'avg_masa_tunggu_bekerja'    => $r['avg_masa_tunggu_bekerja'],
