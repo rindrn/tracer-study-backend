@@ -37,6 +37,31 @@ use Illuminate\Support\Collection;
  */
 class AlumniFactBuilderService
 {
+    /**
+     * Kode status (role status_pekerjaan) yang juga memenuhi syarat show_if
+     * kode lain: "Melanjutkan pendidikan sambil bekerja" (6) berlaku untuk
+     * pertanyaan Bekerja (1) dan studi lanjut (4); "sambil wiraswasta" (7)
+     * untuk Wiraswasta (3) dan studi lanjut (4).
+     */
+    private const STATUS_SETARA = ['6' => ['1', '4'], '7' => ['3', '4']];
+
+    /** Kode status wiraswasta, termasuk yang sambil studi lanjut. */
+    private const KODE_WIRASWASTA = ['3', '7'];
+
+    /**
+     * Role yang show_if-nya hanya Bekerja (1), tetapi jawaban wiraswasta
+     * tetap dihitung: instrumen kementerian menanyakannya juga ke wirausaha
+     * (nama & jenis usaha, kesesuaian bidang/level).
+     */
+    private const ROLE_JUGA_WIRASWASTA = ['nama_perusahaan', 'jenis_perusahaan', 'relevansi_bidang', 'kesesuaian_level'];
+
+    /**
+     * Jabatan dim_wirausaha bagi wiraswasta yang tidak mengisi f5c. Sengaja
+     * bukan "Tidak Ada Data": Insight sudah memakai "Tidak ada data" untuk
+     * alumni tanpa baris wirausaha sama sekali (bukan wiraswasta).
+     */
+    private const JABATAN_KOSONG = 'Tidak ada Jabatan';
+
     public function __construct(
         private readonly AnswerResolverService $resolver,
         private readonly StatusAlumniDimService $statusAlumniDim,
@@ -104,6 +129,16 @@ class AlumniFactBuilderService
                 $skipped++;
                 continue;
             }
+
+            // ── Buang jawaban yang tidak berlaku bagi alumni ini (show_if
+            // tidak terpenuhi, atau "0" pengganti sel kosong). HARUS sebelum
+            // pivot: semua jalur di bawah (role, f8/f14/f15 mentah, multi
+            // select, range evaluasi) membaca koleksi yang sama. ──
+            $answersForThisAlumni = $this->jawabanBerlaku(
+                $response->questionnaire_id,
+                $answersForThisAlumni,
+                $mappingIndex,
+            );
 
             // ── Pivot EAV -> array asosiatif per question_code (LAMA,
             // dipertahankan apa adanya -- masih sumber nilai f1201). ──
@@ -258,8 +293,12 @@ class AlumniFactBuilderService
             // Business key = $alumniSk (id_alumni dari dim_alumni).
             // Lihat WirausahaDimService untuk penjelasan lengkap perubahan
             // dari business key lama "jabatan|kota" ke id_alumni.
+            // Wiraswasta yang tidak mengisi f5c tetap punya baris wirausaha
+            // (lokasi & tingkat usahanya ada), jabatannya "Tidak ada Jabatan".
+            $wiraswasta = $f8Answer !== null
+                && in_array(trim((string) $this->resolver->getRawOptionCode($f8Answer)), self::KODE_WIRASWASTA, true);
             $wirausahaSk = $this->wirausahaDim->syncAndResolveSk([
-                'jabatan'          => $resolvedByRole['jabatan_wirausaha'] ?? null,
+                'jabatan'          => $resolvedByRole['jabatan_wirausaha'] ?? ($wiraswasta ? self::JABATAN_KOSONG : null),
                 'kota'             => $resolvedByRole['kota_kerja'] ?? null,
                 'provinsi'         => $resolvedByRole['provinsi_kerja'] ?? null,
                 'tingkat_instansi' => $resolvedByRole['tingkat_instansi'] ?? null,
@@ -375,7 +414,13 @@ class AlumniFactBuilderService
                 ),
                 'bulan_sebelum_lulus'   => isset($resolvedByRole['bulan_sebelum_lulus']) ? (int) $resolvedByRole['bulan_sebelum_lulus'] : null,
                 'bulan_sesudah_lulus'   => isset($resolvedByRole['bulan_sesudah_lulus']) ? (int) $resolvedByRole['bulan_sesudah_lulus'] : null,
-                'masa_tunggu_wirausaha' => null,
+                // f502 bagi wiraswasta: "berapa bulan setelah lulus memulai wiraswasta".
+                'masa_tunggu_wirausaha' => $wiraswasta
+                    ? $this->masaTungguBekerja(
+                        $resolvedByRole,
+                        $mappingIndex['by_role']->has($response->questionnaire_id . ':mulai_mencari_kerja'),
+                    )
+                    : null,
                 'take_home_pay'         => $takeHomePay,
                 'ump_sk'                => $umpSk,
                 'flag_above_ump'        => $flagAboveUmp,
@@ -417,6 +462,84 @@ class AlumniFactBuilderService
      *                       tidak ada cara struktural memvalidasi "bentuk"
      *                       teks bebas lebih jauh dari sekadar keberadaannya.
      */
+    /**
+     * Jawaban yang berlaku bagi satu response. Data impor kementerian
+     * mengisi pertanyaan bersyarat tanpa memedulikan show_if-nya (f5c
+     * jabatan wirausaha terisi pada alumni Bekerja, studi lanjut pada
+     * Wiraswasta, dst.), sehingga alumni masuk dimensi yang bukan
+     * miliknya. Dibuang:
+     *   - jawaban yang syarat show_if-nya tidak terpenuhi. Induk yang tidak
+     *     ditarik ETL (di luar whitelist) tidak bisa dinilai, jadi syarat
+     *     itu dilewati;
+     *   - "0" pada isian teks/tanggal: ekspor kementerian menulis 0 untuk
+     *     sel kosong. Isian angka tidak disentuh (0 bisa sah, lihat
+     *     masaTungguBekerja()).
+     */
+    private function jawabanBerlaku(int $questionnaireId, Collection $answers, Collection $mappingIndex): Collection
+    {
+        $statusCode = $this->semanticRepo->questionCodeFor($questionnaireId, 'status_pekerjaan');
+        $nilaiPerKode = $answers->groupBy('question_code')
+            ->map(fn (Collection $group) => $group->map(fn ($a) => trim((string) $a->answer_text))->all())
+            ->all();
+
+        return $answers->filter(function ($answer) use ($questionnaireId, $statusCode, $nilaiPerKode, $mappingIndex) {
+            $meta = $this->resolver->getQuestionMeta($questionnaireId, $answer->question_code);
+            if ($meta === null) {
+                return true;
+            }
+
+            if (trim((string) $answer->answer_text) === '0'
+                && in_array($meta->question_type, ['short_text', 'long_text', 'date'], true)) {
+                return false;
+            }
+
+            $showIf = $meta->metadata['show_if'] ?? null;
+            if (! is_array($showIf)) {
+                return true;
+            }
+
+            $role = $mappingIndex['by_code']->get($questionnaireId . ':' . $answer->question_code)?->semantic_role;
+
+            foreach ($showIf as $parentCode => $allowed) {
+                $parentCode = (string) $parentCode;
+                if ($this->resolver->getQuestionMeta($questionnaireId, $parentCode) === null) {
+                    continue;
+                }
+
+                $allowed = array_map('strval', (array) $allowed);
+                if ($parentCode === $statusCode) {
+                    $allowed = self::statusBerlaku($allowed, $role);
+                }
+
+                if (! array_intersect($nilaiPerKode[$parentCode] ?? [], $allowed)) {
+                    return false;
+                }
+            }
+
+            return true;
+        })->values();
+    }
+
+    /**
+     * Kode status yang memenuhi syarat show_if $allowed bagi pertanyaan
+     * ber-role $role: ditambah wiraswasta untuk ROLE_JUGA_WIRASWASTA, lalu
+     * kode "sambil studi" yang setara (STATUS_SETARA).
+     */
+    private static function statusBerlaku(array $allowed, ?string $role): array
+    {
+        if (in_array($role, self::ROLE_JUGA_WIRASWASTA, true) && in_array('1', $allowed, true)) {
+            $allowed[] = '3';
+        }
+
+        foreach (self::STATUS_SETARA as $kode => $setara) {
+            if (array_intersect($setara, $allowed)) {
+                $allowed[] = $kode;
+            }
+        }
+
+        return array_values(array_unique($allowed));
+    }
+
     /**
      * Ekspor kementerian menulis 0 untuk sel kosong, jadi masa tunggu 0
      * bisa berarti "sudah dapat kerja saat lulus" atau tidak diisi. 0
