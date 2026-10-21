@@ -611,45 +611,45 @@ SELECT pg_catalog.setval('tracer_oltp.cities_id_seq', 528, true);
 
 
 
-COPY tracer_oltp.programs (id, name, code, degree, is_active, created_at, updated_at, jurusan, dikti_code) FROM stdin;
-1	D-3 Teknik Konstruksi Gedung	TKG	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Sipil	22403
-2	D-3 Teknik Konstruksi Sipil	TKS	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Sipil	22402
-3	D-4 Teknik Perancangan Jalan & Jembatan	TPJJ	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Sipil	22301
-4	D-4 Teknik Perawatan & Perbaikan Gedung	TPPG	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Sipil	22303
-5	D-3 Teknik Mesin	TM	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Mesin	21401
-6	D-4 Teknik Perancangan & Konstruksi Mesin	TPKM	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Mesin	36301
-7	D-4 Proses Manufaktur	PM	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Mesin	21307
-36	D-3 Teknik Aeronautika	TA	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Mesin	40402
-8	D-3 Teknik Pendingin & Tata Udara	TPTU3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Refrigerasi & Tata Udara	21405
-9	D-4 Teknik Pendingin & Tata Udara	TPTU4	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Refrigerasi & Tata Udara	21305
-10	D-3 Teknik Konversi Energi	TKE3	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Konversi Energi	21406
-11	D-4 Teknik Konservasi Energi	TKE4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Konversi Energi	21308
-18	D-4 Teknologi Pembangkit Tenaga Listrik	TPTL	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Konversi Energi	20303
-12	D-3 Teknik Elektronika	TEL3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Elektro	20401
-13	D-4 Teknik Elektronika	TEL4	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Elektro	20301
-14	D-3 Teknik Listrik	TL	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Elektro	20403
-15	D-3 Teknik Telekomunikasi	TELKOM3	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Elektro	20402
-16	D-4 Teknik Telekomunikasi	TELKOM4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Elektro	20304
-17	D-4 Teknik Otomasi Industri	TOI	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Elektro	36304
-19	D-3 Teknik Kimia	TK3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Kimia	24401
-20	D-3 Analis Kimia	AK3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Kimia	24402
-21	D-4 Teknik Kimia Produksi Bersih	TKPB	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Kimia	24301
-22	D-3 Teknik Informatika	TI3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Komputer & Informatika	56401
-23	D-4 Teknik Informatika	TI	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Komputer & Informatika	55301
-24	D-3 Akuntansi	AKT3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Akuntansi	62401
-25	D-3 Keuangan & Perbankan	KP	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Akuntansi	61406
-26	D-4 Akuntansi	AKT4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Akuntansi	62306
-27	D-4 Akuntansi Manajemen Pemerintahan	AMP	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Akuntansi	62301
-28	D-4 Keuangan Syariah	KS	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Akuntansi	61306
-37	S-2 Keuangan & Perbankan Syariah	KPS2	S2	t	2026-06-04 04:34:56	2026-06-04 04:34:56	Akuntansi	60104
-38	S-2 Rekayasa Infrastruktur	RIS2	S2	t	2026-06-04 04:34:56	2026-06-04 04:34:56	Teknik Sipil	31104
-29	D-4 Manajemen Aset	MA	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	61307
-30	D-3 Administrasi Bisnis	AB3	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	63411
-31	D-3 Manajemen Pemasaran	MP3	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	61404
-32	D-3 Usaha Perjalanan Wisata	UPW	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	93401
-33	D-4 Administrasi Bisnis	AB4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	63311
-34	D-4 Manajemen Pemasaran	MP4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	61304
-35	D-3 Bahasa Inggris	BIG	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Bahasa Inggris	79402
+COPY tracer_oltp.programs (id, name, code, degree, is_active, created_at, updated_at, jurusan, dikti_code, accreditation, accredited_until) FROM stdin;
+1	D-3 Teknik Konstruksi Gedung	TKG	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Sipil	22403	\N	\N
+2	D-3 Teknik Konstruksi Sipil	TKS	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Sipil	22402	\N	\N
+3	D-4 Teknik Perancangan Jalan & Jembatan	TPJJ	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Sipil	22301	\N	\N
+4	D-4 Teknik Perawatan & Perbaikan Gedung	TPPG	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Sipil	22303	\N	\N
+5	D-3 Teknik Mesin	TM	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Mesin	21401	\N	\N
+6	D-4 Teknik Perancangan & Konstruksi Mesin	TPKM	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Mesin	36301	\N	\N
+7	D-4 Proses Manufaktur	PM	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Mesin	21307	\N	\N
+36	D-3 Teknik Aeronautika	TA	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Mesin	40402	\N	\N
+8	D-3 Teknik Pendingin & Tata Udara	TPTU3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Refrigerasi & Tata Udara	21405	\N	\N
+9	D-4 Teknik Pendingin & Tata Udara	TPTU4	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Refrigerasi & Tata Udara	21305	\N	\N
+10	D-3 Teknik Konversi Energi	TKE3	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Konversi Energi	21406	\N	\N
+11	D-4 Teknik Konservasi Energi	TKE4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Konversi Energi	21308	\N	\N
+18	D-4 Teknologi Pembangkit Tenaga Listrik	TPTL	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Konversi Energi	20303	\N	\N
+12	D-3 Teknik Elektronika	TEL3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Elektro	20401	\N	\N
+13	D-4 Teknik Elektronika	TEL4	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Elektro	20301	\N	\N
+14	D-3 Teknik Listrik	TL	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Elektro	20403	\N	\N
+15	D-3 Teknik Telekomunikasi	TELKOM3	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Elektro	20402	\N	\N
+16	D-4 Teknik Telekomunikasi	TELKOM4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Teknik Elektro	20304	\N	\N
+17	D-4 Teknik Otomasi Industri	TOI	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Elektro	36304	\N	\N
+19	D-3 Teknik Kimia	TK3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Kimia	24401	\N	\N
+20	D-3 Analis Kimia	AK3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Kimia	24402	\N	\N
+21	D-4 Teknik Kimia Produksi Bersih	TKPB	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Kimia	24301	\N	\N
+22	D-3 Teknik Informatika	TI3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Komputer & Informatika	56401	\N	\N
+23	D-4 Teknik Informatika	TI	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Teknik Komputer & Informatika	55301	\N	\N
+24	D-3 Akuntansi	AKT3	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Akuntansi	62401	\N	\N
+25	D-3 Keuangan & Perbankan	KP	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Akuntansi	61406	\N	\N
+26	D-4 Akuntansi	AKT4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Akuntansi	62306	\N	\N
+27	D-4 Akuntansi Manajemen Pemerintahan	AMP	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Akuntansi	62301	\N	\N
+28	D-4 Keuangan Syariah	KS	D4	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Akuntansi	61306	\N	\N
+37	S-2 Keuangan & Perbankan Syariah	KPS2	S2	t	2026-06-04 04:34:56	2026-06-04 04:34:56	Akuntansi	60104	\N	\N
+38	S-2 Rekayasa Infrastruktur	RIS2	S2	t	2026-06-04 04:34:56	2026-06-04 04:34:56	Teknik Sipil	31104	\N	\N
+29	D-4 Manajemen Aset	MA	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	61307	\N	\N
+30	D-3 Administrasi Bisnis	AB3	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	63411	\N	\N
+31	D-3 Manajemen Pemasaran	MP3	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	61404	\N	\N
+32	D-3 Usaha Perjalanan Wisata	UPW	D3	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	93401	\N	\N
+33	D-4 Administrasi Bisnis	AB4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	63311	\N	\N
+34	D-4 Manajemen Pemasaran	MP4	D4	t	2026-06-01 10:16:25	2026-06-01 10:16:25	Administrasi Niaga	61304	\N	\N
+35	D-3 Bahasa Inggris	BIG	D3	t	2026-06-01 10:16:25	2026-06-09 22:25:39	Bahasa Inggris	79402	\N	\N
 \.
 
 
@@ -689,61 +689,61 @@ SELECT pg_catalog.setval('tracer_oltp.jurusans_id_seq', 10, true);
 
 
 
-COPY tracer_oltp.users (id, name, email, password, role, program_id, created_at, updated_at, jurusan, status) FROM stdin;
-3	Tim Tracer 2	tracer2@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	tracer_team	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	\N	t
-4	Wakil Direktur 1	wakil.direktur.1@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	wadir	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	\N	t
-5	Wakil Direktur 2	wakil.direktur.2@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	wadir	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	\N	t
-6	Kajur Teknik Elektro	kajur.teknik.elektro@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Elektro	t
-7	Kajur Teknik Refrigerasi & Tata Udara	kajur.teknik.refrigerasi.tata.udara@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Refrigerasi & Tata Udara	t
-8	Kajur Teknik Komputer & Informatika	kajur.teknik.komputer.informatika@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Komputer & Informatika	t
-9	Kajur Administrasi Niaga	kajur.administrasi.niaga@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Administrasi Niaga	t
-10	Kajur Teknik Mesin	kajur.teknik.mesin@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Mesin	t
-11	Kajur Bahasa Inggris	kajur.bahasa.inggris@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Bahasa Inggris	t
-12	Kajur Teknik Kimia	kajur.teknik.kimia@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Kimia	t
-13	Kajur Teknik Konversi Energi	kajur.teknik.konversi.energi@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Konversi Energi	t
-14	Kajur Teknik Sipil	kajur.teknik.sipil@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Sipil	t
-15	Kajur Teknik Aeronautika	kajur.teknik.aeronautika@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Aeronautika	t
-16	Kajur Akuntansi	kajur.akuntansi@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	2026-06-01 10:16:26	2026-06-01 10:16:26	Akuntansi	t
-55	Kaprodi D-3 Teknik Konstruksi Gedung	kaprodi.d3.teknik.konstruksi.gedung@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	1	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-56	Kaprodi D-3 Teknik Konstruksi Sipil	kaprodi.d3.teknik.konstruksi.sipil@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	2	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-57	Kaprodi D-4 Teknik Perancangan Jalan & Jembatan	kaprodi.d4.teknik.perancangan.jalan.dan.jembatan@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	3	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-58	Kaprodi D-4 Teknik Perawatan & Perbaikan Gedung	kaprodi.d4.teknik.perawatan.dan.perbaikan.gedung@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	4	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-59	Kaprodi D-3 Teknik Mesin	kaprodi.d3.teknik.mesin@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	5	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-60	Kaprodi D-4 Teknik Perancangan & Konstruksi Mesin	kaprodi.d4.teknik.perancangan.dan.konstruksi.mesin@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	6	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-61	Kaprodi D-4 Proses Manufaktur	kaprodi.d4.proses.manufaktur@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	7	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-62	Kaprodi D-3 Teknik Pendingin & Tata Udara	kaprodi.d3.teknik.pendingin.dan.tata.udara@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	8	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-63	Kaprodi D-4 Teknik Pendingin & Tata Udara	kaprodi.d4.teknik.pendingin.dan.tata.udara@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	9	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-64	Kaprodi D-3 Teknik Konversi Energi	kaprodi.d3.teknik.konversi.energi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	10	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-65	Kaprodi D-4 Teknik Konservasi Energi	kaprodi.d4.teknik.konservasi.energi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	11	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-66	Kaprodi D-3 Teknik Elektronika	kaprodi.d3.teknik.elektronika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	12	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-67	Kaprodi D-4 Teknik Elektronika	kaprodi.d4.teknik.elektronika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	13	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-68	Kaprodi D-3 Teknik Listrik	kaprodi.d3.teknik.listrik@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	14	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-69	Kaprodi D-3 Teknik Telekomunikasi	kaprodi.d3.teknik.telekomunikasi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	15	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-70	Kaprodi D-4 Teknik Telekomunikasi	kaprodi.d4.teknik.telekomunikasi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	16	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-71	Kaprodi D-4 Teknik Otomasi Industri	kaprodi.d4.teknik.otomasi.industri@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	17	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-72	Kaprodi D-4 Teknologi Pembangkit Tenaga Listrik	kaprodi.d4.teknologi.pembangkit.tenaga.listrik@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	18	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-73	Kaprodi D-3 Teknik Kimia	kaprodi.d3.teknik.kimia@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	19	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-74	Kaprodi D-3 Analis Kimia	kaprodi.d3.analis.kimia@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	20	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-75	Kaprodi D-4 Teknik Kimia Produksi Bersih	kaprodi.d4.teknik.kimia.produksi.bersih@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	21	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-76	Kaprodi D-3 Teknik Informatika	kaprodi.d3.teknik.informatika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	22	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-77	Kaprodi D-4 Teknik Informatika	kaprodi.d4.teknik.informatika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	23	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-78	Kaprodi D-3 Akuntansi	kaprodi.d3.akuntansi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	24	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-79	Kaprodi D-3 Keuangan & Perbankan	kaprodi.d3.keuangan.dan.perbankan@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	25	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-80	Kaprodi D-4 Akuntansi	kaprodi.d4.akuntansi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	26	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-81	Kaprodi D-4 Akuntansi Manajemen Pemerintahan	kaprodi.d4.akuntansi.manajemen.pemerintahan@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	27	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-82	Kaprodi D-4 Keuangan Syariah	kaprodi.d4.keuangan.syariah@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	28	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-83	Kaprodi D-4 Manajemen Aset	kaprodi.d4.manajemen.aset@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	29	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-84	Kaprodi D-3 Administrasi Bisnis	kaprodi.d3.administrasi.bisnis@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	30	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-85	Kaprodi D-3 Manajemen Pemasaran	kaprodi.d3.manajemen.pemasaran@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	31	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-86	Kaprodi D-3 Usaha Perjalanan Wisata	kaprodi.d3.usaha.perjalanan.wisata@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	32	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-87	Kaprodi D-4 Administrasi Bisnis	kaprodi.d4.administrasi.bisnis@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	33	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-88	Kaprodi D-4 Manajemen Pemasaran	kaprodi.d4.manajemen.pemasaran@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	34	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-89	Kaprodi D-3 Bahasa Inggris	kaprodi.d3.bahasa.inggris@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	35	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-90	Kaprodi D-3 Teknik Aeronautika	kaprodi.d3.teknik.aeronautika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	36	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-91	Kaprodi S-2 Keuangan & Perbankan Syariah	kaprodi.s2.keuangan.dan.perbankan.syariah@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	37	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-92	Kaprodi S-2 Rekayasa Infrastruktur	kaprodi.s2.rekayasa.infrastruktur@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	38	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	t
-1	Kepala Tracer Study	head.tracer@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	head_tracer	\N	2026-06-01 10:16:26	2026-08-12 09:32:00	\N	t
-2	SPMI	spmi@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	wadir	\N	2026-06-01 10:16:26	2026-08-12 09:32:00	\N	t
+COPY tracer_oltp.users (id, name, email, password, role, program_id, status, created_at, updated_at, jurusan, jurusan_id, fakultas_id) FROM stdin;
+3	Tim Tracer 2	tracer2@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	tracer_team	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	\N	\N	\N
+4	Wakil Direktur 1	wakil.direktur.1@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	wadir	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	\N	\N	\N
+5	Wakil Direktur 2	wakil.direktur.2@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	wadir	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	\N	\N	\N
+15	Kajur Teknik Aeronautika	kajur.teknik.aeronautika@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Aeronautika	\N	\N
+55	Kaprodi D-3 Teknik Konstruksi Gedung	kaprodi.d3.teknik.konstruksi.gedung@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	1	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+56	Kaprodi D-3 Teknik Konstruksi Sipil	kaprodi.d3.teknik.konstruksi.sipil@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	2	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+57	Kaprodi D-4 Teknik Perancangan Jalan & Jembatan	kaprodi.d4.teknik.perancangan.jalan.dan.jembatan@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	3	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+58	Kaprodi D-4 Teknik Perawatan & Perbaikan Gedung	kaprodi.d4.teknik.perawatan.dan.perbaikan.gedung@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	4	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+59	Kaprodi D-3 Teknik Mesin	kaprodi.d3.teknik.mesin@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	5	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+60	Kaprodi D-4 Teknik Perancangan & Konstruksi Mesin	kaprodi.d4.teknik.perancangan.dan.konstruksi.mesin@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	6	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+61	Kaprodi D-4 Proses Manufaktur	kaprodi.d4.proses.manufaktur@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	7	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+62	Kaprodi D-3 Teknik Pendingin & Tata Udara	kaprodi.d3.teknik.pendingin.dan.tata.udara@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	8	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+63	Kaprodi D-4 Teknik Pendingin & Tata Udara	kaprodi.d4.teknik.pendingin.dan.tata.udara@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	9	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+64	Kaprodi D-3 Teknik Konversi Energi	kaprodi.d3.teknik.konversi.energi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	10	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+65	Kaprodi D-4 Teknik Konservasi Energi	kaprodi.d4.teknik.konservasi.energi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	11	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+66	Kaprodi D-3 Teknik Elektronika	kaprodi.d3.teknik.elektronika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	12	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+67	Kaprodi D-4 Teknik Elektronika	kaprodi.d4.teknik.elektronika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	13	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+68	Kaprodi D-3 Teknik Listrik	kaprodi.d3.teknik.listrik@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	14	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+69	Kaprodi D-3 Teknik Telekomunikasi	kaprodi.d3.teknik.telekomunikasi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	15	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+70	Kaprodi D-4 Teknik Telekomunikasi	kaprodi.d4.teknik.telekomunikasi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	16	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+71	Kaprodi D-4 Teknik Otomasi Industri	kaprodi.d4.teknik.otomasi.industri@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	17	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+72	Kaprodi D-4 Teknologi Pembangkit Tenaga Listrik	kaprodi.d4.teknologi.pembangkit.tenaga.listrik@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	18	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+73	Kaprodi D-3 Teknik Kimia	kaprodi.d3.teknik.kimia@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	19	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+74	Kaprodi D-3 Analis Kimia	kaprodi.d3.analis.kimia@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	20	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+75	Kaprodi D-4 Teknik Kimia Produksi Bersih	kaprodi.d4.teknik.kimia.produksi.bersih@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	21	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+76	Kaprodi D-3 Teknik Informatika	kaprodi.d3.teknik.informatika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	22	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+77	Kaprodi D-4 Teknik Informatika	kaprodi.d4.teknik.informatika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	23	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+78	Kaprodi D-3 Akuntansi	kaprodi.d3.akuntansi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	24	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+79	Kaprodi D-3 Keuangan & Perbankan	kaprodi.d3.keuangan.dan.perbankan@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	25	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+80	Kaprodi D-4 Akuntansi	kaprodi.d4.akuntansi@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	26	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+81	Kaprodi D-4 Akuntansi Manajemen Pemerintahan	kaprodi.d4.akuntansi.manajemen.pemerintahan@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	27	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+82	Kaprodi D-4 Keuangan Syariah	kaprodi.d4.keuangan.syariah@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	28	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+83	Kaprodi D-4 Manajemen Aset	kaprodi.d4.manajemen.aset@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	29	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+84	Kaprodi D-3 Administrasi Bisnis	kaprodi.d3.administrasi.bisnis@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	30	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+85	Kaprodi D-3 Manajemen Pemasaran	kaprodi.d3.manajemen.pemasaran@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	31	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+86	Kaprodi D-3 Usaha Perjalanan Wisata	kaprodi.d3.usaha.perjalanan.wisata@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	32	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+87	Kaprodi D-4 Administrasi Bisnis	kaprodi.d4.administrasi.bisnis@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	33	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+88	Kaprodi D-4 Manajemen Pemasaran	kaprodi.d4.manajemen.pemasaran@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	34	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+89	Kaprodi D-3 Bahasa Inggris	kaprodi.d3.bahasa.inggris@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	35	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+90	Kaprodi D-3 Teknik Aeronautika	kaprodi.d3.teknik.aeronautika@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	36	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+91	Kaprodi S-2 Keuangan & Perbankan Syariah	kaprodi.s2.keuangan.dan.perbankan.syariah@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	37	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+92	Kaprodi S-2 Rekayasa Infrastruktur	kaprodi.s2.rekayasa.infrastruktur@polban.ac.id	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kaprodi	38	t	2026-06-17 22:20:08	2026-06-17 22:20:08	\N	\N	\N
+1	Kepala Tracer Study	head.tracer@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	head_tracer	\N	t	2026-06-01 10:16:26	2026-08-12 09:32:00	\N	\N	\N
+2	SPMI	spmi@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	wadir	\N	t	2026-06-01 10:16:26	2026-08-12 09:32:00	\N	\N	\N
+6	Kajur Teknik Elektro	kajur.teknik.elektro@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Elektro	4	\N
+7	Kajur Teknik Refrigerasi & Tata Udara	kajur.teknik.refrigerasi.tata.udara@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Refrigerasi & Tata Udara	9	\N
+8	Kajur Teknik Komputer & Informatika	kajur.teknik.komputer.informatika@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Komputer & Informatika	6	\N
+9	Kajur Administrasi Niaga	kajur.administrasi.niaga@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Administrasi Niaga	1	\N
+10	Kajur Teknik Mesin	kajur.teknik.mesin@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Mesin	8	\N
+11	Kajur Bahasa Inggris	kajur.bahasa.inggris@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Bahasa Inggris	3	\N
+12	Kajur Teknik Kimia	kajur.teknik.kimia@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Kimia	5	\N
+13	Kajur Teknik Konversi Energi	kajur.teknik.konversi.energi@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Konversi Energi	7	\N
+14	Kajur Teknik Sipil	kajur.teknik.sipil@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Teknik Sipil	10	\N
+16	Kajur Akuntansi	kajur.akuntansi@test.com	$2y$12$/4v8rj/8Nkjxr7InfTyCHu1SaCnmAE6oEgTbA97lcMfel7DYRe5sm	kajur	\N	t	2026-06-01 10:16:26	2026-06-01 10:16:26	Akuntansi	2	\N
 \.
 
 
@@ -826,12 +826,16 @@ SELECT pg_catalog.setval('tracer_oltp.role_permissions_id_seq', 22, true);
 
 
 COPY tracer_oltp.lams (id, name, code, created_at, updated_at) FROM stdin;
-3	LAM EMBA	EMBA	2026-05-13 22:15:12	2026-07-14 04:38:14
+3	LAM Teknik D3	LAMTEK-D3	2026-10-21 23:24:41	2026-10-21 23:24:41
+4	LAM Teknik Sarjana Terapan	LAMTEK-STR	2026-10-21 23:24:41	2026-10-21 23:24:41
+5	LAMSAMA	LAMSAMA	2026-10-21 23:24:41	2026-10-21 23:24:41
+6	BAN-PT D3	BANPT-D3	2026-10-21 23:24:41	2026-10-21 23:24:41
+7	BAN-PT Sarjana Terapan	BANPT-STR	2026-10-21 23:24:41	2026-10-21 23:24:41
 \.
 
 
 
-SELECT pg_catalog.setval('tracer_oltp.lams_id_seq', 2, true);
+SELECT pg_catalog.setval('tracer_oltp.lams_id_seq', 7, true);
 
 
 
@@ -842,13 +846,16 @@ SELECT pg_catalog.setval('tracer_oltp.lams_id_seq', 2, true);
 
 
 COPY tracer_oltp.lam_versions (id, lam_id, year, version_name, is_active, created_at, updated_at) FROM stdin;
-8	3	2021	2021	t	2026-07-11 03:13:19	2026-07-11 03:13:19
-7	3	2020	\N	t	2026-06-21 18:44:23	2026-07-12 14:20:25
+9	3	2025	Matriks LED & LKPS D3 APS-AV 2025 1.0	t	2026-10-21 23:24:41	2026-10-21 23:24:41
+10	4	2025	Matriks LED & LKPS Sarjana APS-AV 2025 1.0	t	2026-10-21 23:24:41	2026-10-21 23:24:41
+11	5	2022	IAPS LAMSAMA 1.0 (PerBAN-PT 15/2022)	t	2026-10-21 23:24:41	2026-10-21 23:24:41
+12	6	2025	IAPS 5.1 (PerBAN-PT 36/2025)	t	2026-10-21 23:24:41	2026-10-21 23:24:41
+13	7	2025	IAPS 5.1 (PerBAN-PT 36/2025)	t	2026-10-21 23:24:41	2026-10-21 23:24:41
 \.
 
 
 
-SELECT pg_catalog.setval('tracer_oltp.lam_versions_id_seq', 8, true);
+SELECT pg_catalog.setval('tracer_oltp.lam_versions_id_seq', 13, true);
 
 
 
@@ -859,18 +866,36 @@ SELECT pg_catalog.setval('tracer_oltp.lam_versions_id_seq', 8, true);
 
 
 COPY tracer_oltp.lam_programs (id, lam_id, program_id, created_at) FROM stdin;
-13	3	5	2026-05-17 11:18:21
-14	3	3	2026-05-17 11:18:21
-15	3	2	2026-05-17 11:18:21
-16	3	4	2026-05-17 11:18:21
-17	3	1	2026-05-17 11:18:21
-4	3	23	2026-06-21 18:36:37
-5	3	24	2026-07-14 04:37:34
+6	3	1	2026-10-21 23:24:41
+7	3	2	2026-10-21 23:24:41
+8	3	5	2026-10-21 23:24:41
+9	3	8	2026-10-21 23:24:41
+10	3	10	2026-10-21 23:24:41
+11	3	12	2026-10-21 23:24:41
+12	3	14	2026-10-21 23:24:41
+13	3	15	2026-10-21 23:24:41
+14	3	19	2026-10-21 23:24:41
+15	3	36	2026-10-21 23:24:41
+16	4	3	2026-10-21 23:24:41
+17	4	4	2026-10-21 23:24:41
+18	4	6	2026-10-21 23:24:41
+19	4	7	2026-10-21 23:24:41
+20	4	9	2026-10-21 23:24:41
+21	4	11	2026-10-21 23:24:41
+22	4	13	2026-10-21 23:24:41
+23	4	16	2026-10-21 23:24:41
+24	4	17	2026-10-21 23:24:41
+25	4	18	2026-10-21 23:24:41
+26	4	21	2026-10-21 23:24:41
+27	5	20	2026-10-21 23:24:41
+28	6	32	2026-10-21 23:24:41
+29	6	35	2026-10-21 23:24:41
+30	7	28	2026-10-21 23:24:41
 \.
 
 
 
-SELECT pg_catalog.setval('tracer_oltp.lam_programs_id_seq', 5, true);
+SELECT pg_catalog.setval('tracer_oltp.lam_programs_id_seq', 30, true);
 
 
 
@@ -902,35 +927,21 @@ SELECT pg_catalog.setval('tracer_oltp.threshold_indicators_id_seq', 1, true);
 
 
 COPY tracer_oltp.thresholds (id, name, value, created_by, created_at, updated_at, lam_version_id, indicator_id, level) FROM stdin;
-3	Lulusan Bekerja ≤ 6 Bulan	60.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	1	baik
-7	Respon Tracer Study Alumni	87.14	1	2026-06-21 18:44:24	2026-07-11 03:10:44	7	3	baik
-8	Respon Tracer Study Alumni	87.14	1	2026-06-21 18:44:24	2026-07-11 03:10:44	7	3	unggul
-4	Lulusan Bekerja ≤ 6 Bulan	70.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	1	unggul
-5	Lulusan Berwirausaha	5.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	2	baik
-6	Lulusan Berwirausaha	10.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	2	unggul
-9	Kesesuaian Bidang Kerja	77.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	4	baik
-10	Kesesuaian Bidang Kerja	92.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	4	unggul
-11	Penghasilan ≥ UMP/UMK	70.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	5	baik
-19	Respon Tracer Study Alumni	88.15	1	2026-07-11 03:13:20	2026-07-11 03:13:20	8	3	baik
-20	Respon Tracer Study Alumni	88.15	1	2026-07-11 03:13:20	2026-07-11 03:13:20	8	3	unggul
-12	Penghasilan ≥ UMP/UMK	85.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	5	unggul
-13	Keterserapan Alumni	75.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	6	baik
-14	Keterserapan Alumni	80.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	6	unggul
-15	Lulusan Bekerja ≤ {value} Bulan	50.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	1	baik
-16	Lulusan Bekerja ≤ {value} Bulan	55.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	1	unggul
-17	Lulusan Berwirausaha	55.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	2	baik
-18	Lulusan Berwirausaha	55.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	2	unggul
-21	Kesesuaian Bidang Kerja	60.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	4	baik
-22	Kesesuaian Bidang Kerja	70.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	4	unggul
-23	Penghasilan ≥ {value}x UMP/UMK	60.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	5	baik
-24	Penghasilan ≥ {value}x UMP/UMK	70.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	5	unggul
-25	Keterserapan Alumni	60.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	6	baik
-26	Keterserapan Alumni	85.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	6	unggul
+27	Kesesuaian Bidang Kerja	60.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	9	4	baik
+28	Kesesuaian Bidang Kerja	80.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	9	4	unggul
+29	Kesesuaian Bidang Kerja	45.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	10	4	baik
+30	Kesesuaian Bidang Kerja	60.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	10	4	unggul
+31	Keterserapan Alumni	61.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	11	6	baik
+32	Keterserapan Alumni	80.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	11	6	unggul
+33	Keterserapan Alumni	40.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	12	6	baik
+34	Keterserapan Alumni	60.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	12	6	unggul
+35	Keterserapan Alumni	20.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	13	6	baik
+36	Keterserapan Alumni	60.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	13	6	unggul
 \.
 
 
 
-SELECT pg_catalog.setval('tracer_oltp.thresholds_id_seq', 26, true);
+SELECT pg_catalog.setval('tracer_oltp.thresholds_id_seq', 36, true);
 
 
 
@@ -941,10 +952,6 @@ SELECT pg_catalog.setval('tracer_oltp.thresholds_id_seq', 26, true);
 
 
 COPY tracer_oltp.threshold_configs (id, lam_version_id, indicator_id, param_value, created_at, updated_at) FROM stdin;
-3	8	1	2.00	2026-07-14 04:36:41	2026-07-14 04:36:41
-4	8	5	1.40	2026-07-14 04:36:41	2026-07-14 04:36:41
-1	7	1	3.00	2026-07-14 05:56:36	2026-07-14 05:56:36
-2	7	5	1.20	2026-07-14 05:56:36	2026-07-14 05:56:36
 \.
 
 
@@ -1301,6 +1308,7 @@ kompetensi_evaluasi	Evaluasi Kompetensi	kompetensi	Battery evaluasi kompetensi l
 metode_pembelajaran	Metode Pembelajaran	metode_pembelajaran	Evaluasi metode pembelajaran yang berkontribusi pada kompetensi (f21-f27)	integer	1.00	5.00	4	fact_range_evaluasi	\N	wide	t	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
 alasan_kerja_tidak_sesuai	Alasan Kerja Tidak Sesuai Bidang	ketidaksesuaian_kerja	Alasan multi-pilihan kenapa pekerjaan tidak sesuai bidang studi (f1601-f1613)	boolean	\N	\N	true	fact_multi_select	\N	wide	t	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
 bulan_sesudah_lulus	Bulan Sesudah Lulus Mulai Cari Kerja	waktu_tunggu	Jumlah bulan sesudah lulus alumni mulai mencari kerja	integer	0.00	60.00	2	fact_tracer_study	bulan_sesudah_lulus	narrow	t	2026-08-11 16:39:40	2026-08-11 16:39:40
+mulai_mencari_kerja	Kapan Mulai Mencari Kerja	waktu_tunggu	Sebelum lulus, sesudah lulus, atau tidak mencari kerja; dipakai memvalidasi masa tunggu 0	categorical	\N	\N	1	fact_tracer_study	\N	narrow	t	2026-10-19 21:43:36	2026-10-19 21:43:36
 \.
 
 
@@ -1390,7 +1398,6 @@ COPY tracer_oltp.questionnaire_questions (id, questionnaire_id, section_id, code
 11	1	2	f502	Dalam berapa bulan Anda mendapatkan pekerjaan pertama? / Dalam berapa bulan setelah lulus Anda memulai wiraswasta?	number	f	11	{"show_if":{"f8":[1,3]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 12	1	2	f505	Berapa rata-rata pendapatan Anda per bulan? (take home pay)	number	f	12	{"show_if":{"f8":[1,3]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 15	1	2	f1101	Apa jenis perusahaan/instansi/institusi tempat Anda bekerja sekarang?	single_choice	f	15	{"show_if":{"f8":[1]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
-16	1	2	f1102	Sebutkan jenis perusahaan/instansi lainnya	short_text	f	16	{"show_if":{"f1101":[5]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 17	1	2	f5b	Apa nama perusahaan/kantor tempat Anda bekerja?	short_text	f	17	{"show_if":{"f8":[1]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 19	1	2	f5d	Apa tingkat tempat kerja Anda?	single_choice	f	19	{"show_if":{"f8":[1,3]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 20	1	3	f18a	Sumber biaya untuk studi lanjut?	single_choice	f	20	{"show_if":{"f8":[4]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
@@ -1473,7 +1480,6 @@ COPY tracer_oltp.questionnaire_questions (id, questionnaire_id, section_id, code
 98	2	12	f505	Berapa rata-rata pendapatan Anda per bulan? (take home pay)	number	f	12	{"show_if":{"f8":[1,3]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 90	2	11	kdpstmsmh	Kode Prodi	short_text	t	4	{"lookup":"program","lookup_value":"code"}	2026-06-01 10:16:26	2026-08-11 16:39:40
 101	2	12	f1101	Apa jenis perusahaan/instansi/institusi tempat Anda bekerja sekarang?	single_choice	f	15	{"show_if":{"f8":[1]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
-102	2	12	f1102	Sebutkan jenis perusahaan/instansi lainnya	short_text	f	16	{"show_if":{"f1101":[5]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 103	2	12	f5b	Apa nama perusahaan/kantor tempat Anda bekerja?	short_text	f	17	{"show_if":{"f8":[1]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 105	2	12	f5d	Apa tingkat tempat kerja Anda?	single_choice	f	19	{"show_if":{"f8":[1,3]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 106	2	13	f18a	Sumber biaya untuk studi lanjut?	single_choice	f	20	{"show_if":{"f8":[4]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
@@ -1557,7 +1563,6 @@ COPY tracer_oltp.questionnaire_questions (id, questionnaire_id, section_id, code
 183	3	22	f502	Dalam berapa bulan Anda mendapatkan pekerjaan pertama? / Dalam berapa bulan setelah lulus Anda memulai wiraswasta?	number	f	11	{"show_if":{"f8":[1,3]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 184	3	22	f505	Berapa rata-rata pendapatan Anda per bulan? (take home pay)	number	f	12	{"show_if":{"f8":[1,3]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 187	3	22	f1101	Apa jenis perusahaan/instansi/institusi tempat Anda bekerja sekarang?	single_choice	f	15	{"show_if":{"f8":[1]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
-188	3	22	f1102	Sebutkan jenis perusahaan/instansi lainnya	short_text	f	16	{"show_if":{"f1101":[5]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 189	3	22	f5b	Apa nama perusahaan/kantor tempat Anda bekerja?	short_text	f	17	{"show_if":{"f8":[1]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 191	3	22	f5d	Apa tingkat tempat kerja Anda?	single_choice	f	19	{"show_if":{"f8":[1,3]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
 192	3	23	f18a	Sumber biaya untuk studi lanjut?	single_choice	f	20	{"show_if":{"f8":[4]}}	2026-06-01 10:16:26	2026-06-01 10:16:26
@@ -1654,6 +1659,9 @@ COPY tracer_oltp.questionnaire_questions (id, questionnaire_id, section_id, code
 662	3	33	stk2_email	Tuliskan alamat surel Penilai 2	short_text	f	90	{"show_if":{"f8":[1,3,4]},"description":"Sesuai nama yang Anda tulis di atas.","format":"email"}	2026-08-11 16:39:40	2026-08-11 16:39:40
 663	3	33	stk3_nama	Tuliskan nama HRD Anda (bekerja) / rekan kerja lainnya (wiraswasta) / mahasiswa seangkatan (lanjut studi)	short_text	f	91	{"show_if":{"f8":[1,3,4]},"divider_label":"Penilai 3","description":"Orang ketiga yang dapat memberi gambaran berbeda tentang Anda."}	2026-08-11 16:39:40	2026-08-11 16:39:40
 664	3	33	stk3_email	Tuliskan alamat surel Penilai 3	short_text	f	92	{"show_if":{"f8":[1,3,4]},"description":"Sesuai nama yang Anda tulis di atas.","format":"email"}	2026-08-11 16:39:40	2026-08-11 16:39:40
+16	1	2	f1102	Sebutkan jenis perusahaan/instansi lainnya	short_text	f	16	{"show_if":{"f1101":[5]}}	2026-06-01 10:16:26	2026-10-18 21:16:27
+102	2	12	f1102	Sebutkan jenis perusahaan/instansi lainnya	short_text	f	16	{"show_if":{"f1101":[5]}}	2026-06-01 10:16:26	2026-10-18 21:16:27
+188	3	22	f1102	Sebutkan jenis perusahaan/instansi lainnya	short_text	f	16	{"show_if":{"f1101":[5]}}	2026-06-01 10:16:26	2026-10-18 21:16:27
 \.
 
 
@@ -1709,9 +1717,6 @@ COPY tracer_oltp.questionnaire_options (id, question_id, option_code, option_lab
 41	71	3	Ya, saya akan mulai bekerja dalam 2 minggu ke depan	\N	3	t	2026-06-01 10:16:26	2026-06-01 10:16:26	f
 42	71	4	Ya, tapi saya belum pasti akan bekerja dalam 2 minggu ke depan	\N	4	t	2026-06-01 10:16:26	2026-06-01 10:16:26	f
 43	71	5	Lainnya	\N	5	t	2026-06-01 10:16:26	2026-06-01 10:16:26	f
-10	15	5	BUMN/BUMD	\N	5	t	2026-06-01 10:16:26	2026-06-01 10:16:26	f
-11	15	6	Institusi/Organisasi Multilateral	\N	6	t	2026-06-01 10:16:26	2026-06-01 10:16:26	f
-12	15	7	Lainnya, tuliskan	\N	7	t	2026-06-01 10:16:26	2026-06-01 10:16:26	f
 134	86	1	Pertanyaan tidak sesuai; pekerjaan saya sudah sesuai pendidikan	\N	1	t	\N	\N	f
 135	86	2	Saya belum mendapatkan pekerjaan yang lebih sesuai	\N	1	t	\N	\N	f
 136	86	3	Di pekerjaan ini saya memperoleh prospek karir yang baik	\N	1	t	\N	\N	f
@@ -1741,12 +1746,6 @@ COPY tracer_oltp.questionnaire_options (id, question_id, option_code, option_lab
 160	187	2	Organisasi non-profit/Lembaga Swadaya Masyarakat	\N	2	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
 161	101	3	Perusahaan swasta	\N	3	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
 162	187	3	Perusahaan swasta	\N	3	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
-163	101	7	Lainnya, tuliskan	\N	7	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
-164	187	7	Lainnya, tuliskan	\N	7	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
-165	101	6	Institusi/Organisasi Multilateral	\N	6	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
-166	187	6	Institusi/Organisasi Multilateral	\N	6	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
-167	101	5	BUMN/BUMD	\N	5	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
-168	187	5	BUMN/BUMD	\N	5	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
 169	101	4	Wiraswasta/perusahaan sendiri	\N	4	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
 170	187	4	Wiraswasta/perusahaan sendiri	\N	4	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
 179	105	1	Lokal/Wilayah/Wiraswasta tidak berbadan hukum	\N	1	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
@@ -1837,12 +1836,6 @@ COPY tracer_oltp.questionnaire_options (id, question_id, option_code, option_lab
 264	258	6	Saya dapat memperoleh pendapatan yang lebih tinggi di pekerjaan ini	\N	1	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
 265	172	7	Pekerjaan saya saat ini lebih aman/terjamin/secure	\N	1	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
 266	258	7	Pekerjaan saya saat ini lebih aman/terjamin/secure	\N	1	t	2026-06-19 20:27:02	2026-06-19 20:27:02	f
-267	10	6	Melanjutkan pendidikan sambil bekerja	\N	6	t	2026-06-19 20:38:06	2026-06-19 20:38:06	f
-268	10	7	Melanjutkan pendidikan sambil wiraswasta	\N	7	t	2026-06-19 20:38:06	2026-06-19 20:38:06	f
-269	96	6	Melanjutkan pendidikan sambil bekerja	\N	6	t	2026-06-19 20:38:06	2026-06-19 20:38:06	f
-270	96	7	Melanjutkan pendidikan sambil wiraswasta	\N	7	t	2026-06-19 20:38:06	2026-06-19 20:38:06	f
-271	182	6	Melanjutkan pendidikan sambil bekerja	\N	6	t	2026-06-19 20:38:06	2026-06-19 20:38:06	f
-272	182	7	Melanjutkan pendidikan sambil wiraswasta	\N	7	t	2026-06-19 20:38:06	2026-06-19 20:38:06	f
 171	104	1	Founder	\N	1	t	2026-08-11 16:39:40	2026-08-11 16:39:40	f
 177	104	2	Co-Founder	\N	2	t	2026-08-11 16:39:40	2026-08-11 16:39:40	f
 175	104	3	Staff	\N	3	t	2026-08-11 16:39:40	2026-08-11 16:39:40	f
@@ -1855,6 +1848,15 @@ COPY tracer_oltp.questionnaire_options (id, question_id, option_code, option_lab
 131	18	2	Co-Founder	\N	2	t	2026-08-11 16:39:40	2026-08-11 16:39:40	f
 132	18	3	Staff	\N	3	t	2026-08-11 16:39:40	2026-08-11 16:39:40	f
 133	18	4	Freelance / Kerja Lepas	\N	4	t	2026-08-11 16:39:40	2026-08-11 16:39:40	f
+10	15	6	BUMN/BUMD	\N	5	t	2026-06-01 10:16:26	2026-10-18 21:16:27	f
+11	15	7	Institusi/Organisasi Multilateral	\N	6	t	2026-06-01 10:16:26	2026-10-18 21:16:27	f
+12	15	5	Lainnya, tuliskan	\N	7	t	2026-06-01 10:16:26	2026-10-18 21:16:27	f
+163	101	5	Lainnya, tuliskan	\N	7	t	2026-06-19 20:27:02	2026-10-18 21:16:27	f
+165	101	7	Institusi/Organisasi Multilateral	\N	6	t	2026-06-19 20:27:02	2026-10-18 21:16:27	f
+167	101	6	BUMN/BUMD	\N	5	t	2026-06-19 20:27:02	2026-10-18 21:16:27	f
+164	187	5	Lainnya, tuliskan	\N	7	t	2026-06-19 20:27:02	2026-10-18 21:16:27	f
+166	187	7	Institusi/Organisasi Multilateral	\N	6	t	2026-06-19 20:27:02	2026-10-18 21:16:27	f
+168	187	6	BUMN/BUMD	\N	5	t	2026-06-19 20:27:02	2026-10-18 21:16:27	f
 \.
 
 
@@ -2023,11 +2025,14 @@ COPY tracer_oltp.question_semantic_mapping (id, questionnaire_id, question_code,
 154	1	f303	Kira-kira berapa bulan sesudah lulus Anda mulai mencari pekerjaan?	bulan_sesudah_lulus	narrow	2026-08-11	t	\N	\N	\N	2026-08-11 16:39:40	2026-08-11 16:39:40
 155	2	f303	Kira-kira berapa bulan sesudah lulus Anda mulai mencari pekerjaan?	bulan_sesudah_lulus	narrow	2026-08-11	t	\N	\N	\N	2026-08-11 16:39:40	2026-08-11 16:39:40
 156	3	f303	Kira-kira berapa bulan sesudah lulus Anda mulai mencari pekerjaan?	bulan_sesudah_lulus	narrow	2026-08-11	t	\N	\N	\N	2026-08-11 16:39:40	2026-08-11 16:39:40
+157	1	f301	Kapan Anda mulai mencari pekerjaan? Mohon pekerjaan sambilan tidak dimasukkan.	mulai_mencari_kerja	narrow	2026-10-19	t	\N	\N	\N	2026-10-19 21:43:36	2026-10-19 21:43:36
+158	2	f301	Kapan Anda mulai mencari pekerjaan? Mohon pekerjaan sambilan tidak dimasukkan.	mulai_mencari_kerja	narrow	2026-10-19	t	\N	\N	\N	2026-10-19 21:43:36	2026-10-19 21:43:36
+159	3	f301	Kapan Anda mulai mencari pekerjaan? Mohon pekerjaan sambilan tidak dimasukkan.	mulai_mencari_kerja	narrow	2026-10-19	t	\N	\N	\N	2026-10-19 21:43:36	2026-10-19 21:43:36
 \.
 
 
 
-SELECT pg_catalog.setval('tracer_oltp.question_semantic_mapping_id_seq', 156, true);
+SELECT pg_catalog.setval('tracer_oltp.question_semantic_mapping_id_seq', 159, true);
 
 
 
@@ -2074,11 +2079,131 @@ COPY tracer_oltp.tracer_response_thresholds (id, program_id, graduated_year, tot
 35	3	2020	25	0.0230	25	98.69	2026-07-12 14:19:37
 36	2	2021	55	0.0230	53	97.17	2026-07-12 14:19:37
 1	4	2019	28	0.0230	28	98.54	2026-07-12 14:19:53
+37	6	2019	26	0.0230	26	98.64	2026-10-21 23:24:48
+38	6	2020	26	0.0230	26	98.64	2026-10-21 23:24:48
+39	6	2021	27	0.0230	27	98.59	2026-10-21 23:24:48
+40	6	2022	23	0.0230	23	98.80	2026-10-21 23:24:48
+41	6	2023	24	0.0230	24	98.75	2026-10-21 23:24:48
+42	6	2024	27	0.0230	27	98.59	2026-10-21 23:24:48
+43	7	2019	30	0.0230	30	98.44	2026-10-21 23:24:48
+44	7	2020	29	0.0230	29	98.49	2026-10-21 23:24:48
+45	7	2021	32	0.0230	31	98.34	2026-10-21 23:24:48
+46	7	2022	29	0.0230	29	98.49	2026-10-21 23:24:48
+47	7	2023	24	0.0230	24	98.75	2026-10-21 23:24:48
+48	7	2024	31	0.0230	30	98.39	2026-10-21 23:24:48
+49	8	2019	61	0.0230	59	96.87	2026-10-21 23:24:48
+50	8	2020	54	0.0230	53	97.22	2026-10-21 23:24:48
+51	8	2021	60	0.0230	58	96.92	2026-10-21 23:24:48
+52	8	2022	61	0.0230	59	96.87	2026-10-21 23:24:48
+53	8	2023	61	0.0230	59	96.87	2026-10-21 23:24:48
+54	8	2024	58	0.0230	56	97.02	2026-10-21 23:24:48
+55	9	2019	32	0.0230	31	98.34	2026-10-21 23:24:48
+56	9	2020	28	0.0230	28	98.54	2026-10-21 23:24:48
+57	9	2021	30	0.0230	30	98.44	2026-10-21 23:24:48
+58	9	2022	30	0.0230	30	98.44	2026-10-21 23:24:48
+59	9	2023	28	0.0230	28	98.54	2026-10-21 23:24:48
+60	9	2024	54	0.0230	53	97.22	2026-10-21 23:24:48
+61	10	2019	72	0.0230	69	96.33	2026-10-21 23:24:48
+62	10	2020	46	0.0230	45	97.62	2026-10-21 23:24:48
+63	10	2021	39	0.0230	38	97.98	2026-10-21 23:24:48
+64	10	2022	60	0.0230	58	96.92	2026-10-21 23:24:48
+65	10	2023	66	0.0230	64	96.63	2026-10-21 23:24:48
+66	10	2024	62	0.0230	60	96.82	2026-10-21 23:24:48
+67	11	2019	31	0.0230	30	98.39	2026-10-21 23:24:48
+68	11	2020	24	0.0230	24	98.75	2026-10-21 23:24:48
+69	11	2021	28	0.0230	28	98.54	2026-10-21 23:24:48
+70	11	2022	20	0.0230	20	98.95	2026-10-21 23:24:48
+71	11	2023	33	0.0230	32	98.28	2026-10-21 23:24:48
+72	11	2024	33	0.0230	32	98.28	2026-10-21 23:24:48
+73	12	2019	62	0.0230	60	96.82	2026-10-21 23:24:48
+74	12	2020	54	0.0230	53	97.22	2026-10-21 23:24:48
+75	12	2021	47	0.0230	46	97.57	2026-10-21 23:24:48
+76	12	2022	54	0.0230	53	97.22	2026-10-21 23:24:48
+77	12	2023	55	0.0230	53	97.17	2026-10-21 23:24:48
+78	12	2024	63	0.0230	61	96.77	2026-10-21 23:24:48
+79	13	2019	27	0.0230	27	98.59	2026-10-21 23:24:48
+80	13	2020	25	0.0230	25	98.69	2026-10-21 23:24:48
+81	13	2021	27	0.0230	27	98.59	2026-10-21 23:24:48
+82	13	2022	22	0.0230	22	98.85	2026-10-21 23:24:48
+83	13	2023	29	0.0230	29	98.49	2026-10-21 23:24:48
+84	13	2024	24	0.0230	24	98.75	2026-10-21 23:24:48
+85	14	2019	60	0.0230	58	96.92	2026-10-21 23:24:48
+86	14	2020	56	0.0230	54	97.12	2026-10-21 23:24:48
+87	14	2021	63	0.0230	61	96.77	2026-10-21 23:24:48
+88	14	2022	60	0.0230	58	96.92	2026-10-21 23:24:48
+89	14	2023	61	0.0230	59	96.87	2026-10-21 23:24:48
+90	14	2024	63	0.0230	61	96.77	2026-10-21 23:24:48
+91	15	2019	56	0.0230	54	97.12	2026-10-21 23:24:48
+92	15	2020	60	0.0230	58	96.92	2026-10-21 23:24:48
+93	15	2021	60	0.0230	58	96.92	2026-10-21 23:24:48
+94	15	2022	62	0.0230	60	96.82	2026-10-21 23:24:48
+95	15	2023	63	0.0230	61	96.77	2026-10-21 23:24:48
+96	15	2024	60	0.0230	58	96.92	2026-10-21 23:24:48
+97	16	2019	29	0.0230	29	98.49	2026-10-21 23:24:48
+98	16	2020	24	0.0230	24	98.75	2026-10-21 23:24:48
+99	16	2021	29	0.0230	29	98.49	2026-10-21 23:24:48
+100	16	2022	27	0.0230	27	98.59	2026-10-21 23:24:48
+101	16	2023	31	0.0230	30	98.39	2026-10-21 23:24:48
+102	16	2024	28	0.0230	28	98.54	2026-10-21 23:24:48
+103	17	2019	28	0.0230	28	98.54	2026-10-21 23:24:48
+104	17	2020	29	0.0230	29	98.49	2026-10-21 23:24:48
+105	17	2021	30	0.0230	30	98.44	2026-10-21 23:24:48
+106	17	2022	27	0.0230	27	98.59	2026-10-21 23:24:48
+107	17	2023	29	0.0230	29	98.49	2026-10-21 23:24:48
+108	17	2024	28	0.0230	28	98.54	2026-10-21 23:24:48
+109	18	2019	26	0.0230	26	98.64	2026-10-21 23:24:48
+110	18	2020	29	0.0230	29	98.49	2026-10-21 23:24:48
+111	18	2021	27	0.0230	27	98.59	2026-10-21 23:24:48
+112	18	2022	27	0.0230	27	98.59	2026-10-21 23:24:48
+113	18	2023	53	0.0230	52	97.27	2026-10-21 23:24:48
+114	18	2024	32	0.0230	31	98.34	2026-10-21 23:24:48
+115	19	2019	90	0.0230	86	95.46	2026-10-21 23:24:48
+116	19	2020	88	0.0230	84	95.55	2026-10-21 23:24:48
+117	19	2021	84	0.0230	80	95.75	2026-10-21 23:24:48
+118	19	2022	92	0.0230	88	95.36	2026-10-21 23:24:48
+119	19	2023	90	0.0230	86	95.46	2026-10-21 23:24:48
+120	19	2024	90	0.0230	86	95.46	2026-10-21 23:24:48
+121	20	2019	28	0.0230	28	98.54	2026-10-21 23:24:48
+122	20	2020	29	0.0230	29	98.49	2026-10-21 23:24:48
+123	20	2021	28	0.0230	28	98.54	2026-10-21 23:24:48
+124	20	2022	31	0.0230	30	98.39	2026-10-21 23:24:48
+125	20	2023	30	0.0230	30	98.44	2026-10-21 23:24:48
+126	20	2024	62	0.0230	60	96.82	2026-10-21 23:24:48
+127	21	2019	27	0.0230	27	98.59	2026-10-21 23:24:48
+128	21	2020	27	0.0230	27	98.59	2026-10-21 23:24:48
+129	21	2021	32	0.0230	31	98.34	2026-10-21 23:24:48
+130	21	2022	38	0.0230	37	98.03	2026-10-21 23:24:48
+131	21	2023	28	0.0230	28	98.54	2026-10-21 23:24:48
+132	21	2024	23	0.0230	23	98.80	2026-10-21 23:24:48
+133	28	2019	31	0.0230	30	98.39	2026-10-21 23:24:48
+134	28	2020	60	0.0230	58	96.92	2026-10-21 23:24:48
+135	28	2021	61	0.0230	59	96.87	2026-10-21 23:24:48
+136	28	2022	63	0.0230	61	96.77	2026-10-21 23:24:48
+137	28	2023	63	0.0230	61	96.77	2026-10-21 23:24:48
+138	28	2024	60	0.0230	58	96.92	2026-10-21 23:24:48
+139	32	2019	29	0.0230	29	98.49	2026-10-21 23:24:48
+140	32	2020	29	0.0230	29	98.49	2026-10-21 23:24:48
+141	32	2021	28	0.0230	28	98.54	2026-10-21 23:24:48
+142	32	2022	56	0.0230	54	97.12	2026-10-21 23:24:48
+143	32	2023	57	0.0230	55	97.07	2026-10-21 23:24:48
+144	32	2024	60	0.0230	58	96.92	2026-10-21 23:24:48
+145	35	2019	54	0.0230	53	97.22	2026-10-21 23:24:48
+146	35	2020	50	0.0230	49	97.42	2026-10-21 23:24:48
+147	35	2021	46	0.0230	45	97.62	2026-10-21 23:24:48
+148	35	2022	56	0.0230	54	97.12	2026-10-21 23:24:48
+149	35	2023	64	0.0230	62	96.73	2026-10-21 23:24:48
+150	35	2024	56	0.0230	54	97.12	2026-10-21 23:24:48
+151	36	2019	73	0.0230	70	96.28	2026-10-21 23:24:48
+152	36	2020	28	0.0230	28	98.54	2026-10-21 23:24:48
+153	36	2021	49	0.0230	48	97.47	2026-10-21 23:24:48
+154	36	2022	57	0.0230	55	97.07	2026-10-21 23:24:48
+155	36	2023	43	0.0230	42	97.78	2026-10-21 23:24:48
+156	36	2024	45	0.0230	44	97.67	2026-10-21 23:24:48
 \.
 
 
 
-SELECT pg_catalog.setval('tracer_oltp.tracer_response_thresholds_id_seq', 36, true);
+SELECT pg_catalog.setval('tracer_oltp.tracer_response_thresholds_id_seq', 156, true);
 
 
 

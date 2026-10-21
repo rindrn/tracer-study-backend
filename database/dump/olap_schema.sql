@@ -896,15 +896,6 @@ ALTER TABLE ONLY public.migrations ALTER COLUMN id SET DEFAULT nextval('public.m
 --
 
 COPY public.kpi_category_mapping (id, semantic_role, option_code, option_label_snapshot, kpi_category, kpi_category_label, digunakan_oleh, is_active, effective_date, mapped_by, deactivated_at, deactivated_by, created_at, updated_at) FROM stdin;
-8	status_pekerjaan	1	Bekerja (full time / part time)	valid	Dihitung Masa Tunggu	masa_tunggu_valid_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
-9	status_pekerjaan	3	Wiraswasta	valid	Dihitung Masa Tunggu	masa_tunggu_valid_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
-10	status_pekerjaan	6	Melanjutkan pendidikan sambil bekerja	valid	Dihitung Masa Tunggu	masa_tunggu_valid_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
-11	status_pekerjaan	7	Melanjutkan pendidikan sambil wiraswasta	valid	Dihitung Masa Tunggu	masa_tunggu_valid_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
-12	status_pekerjaan	1	Bekerja (full time / part time)	valid	Dihitung Kesesuaian Bidang	kesesuaian_bidang_employed_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
-13	status_pekerjaan	6	Melanjutkan pendidikan sambil bekerja	valid	Dihitung Kesesuaian Bidang	kesesuaian_bidang_employed_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
-15	relevansi_bidang	2	Erat	sesuai	Sesuai Bidang	kesesuaian_bidang_relevance	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
-16	relevansi_bidang	4	Kurang Erat	tidak_sesuai	Tidak Sesuai Bidang	kesesuaian_bidang_relevance	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
-17	relevansi_bidang	5	Tidak Sama Sekali	tidak_sesuai	Tidak Sesuai Bidang	kesesuaian_bidang_relevance	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
 1	status_pekerjaan	1	Bekerja (full time / part time)	terserap	Terserap	iku2_keterserapan	f	2020-01-01	\N	2026-07-12 22:31:52	\N	2026-07-12 23:23:38.609238	2026-07-12 22:31:52
 2	status_pekerjaan	3	Wiraswasta	terserap	Terserap	iku2_keterserapan	f	2020-01-01	\N	2026-07-12 22:31:52	\N	2026-07-12 23:23:38.609238	2026-07-12 22:31:52
 3	status_pekerjaan	4	Melanjutkan Pendidikan	terserap	Terserap	iku2_keterserapan	f	2020-01-01	\N	2026-07-12 22:31:52	\N	2026-07-12 23:23:38.609238	2026-07-12 22:31:52
@@ -912,19 +903,31 @@ COPY public.kpi_category_mapping (id, semantic_role, option_code, option_label_s
 5	status_pekerjaan	7	Melanjutkan pendidikan sambil wiraswasta	terserap	Terserap	iku2_keterserapan	f	2020-01-01	\N	2026-07-12 22:31:52	\N	2026-07-12 23:23:38.609238	2026-07-12 22:31:52
 6	status_pekerjaan	2	Belum memungkinkan bekerja	tidak	Tidak Terserap	iku2_keterserapan	f	2020-01-01	\N	2026-07-12 22:31:52	\N	2026-07-12 23:23:38.609238	2026-07-12 22:31:52
 7	status_pekerjaan	5	Tidak kerja tetapi sedang mencari kerja	tidak	Tidak Terserap	iku2_keterserapan	f	2020-01-01	\N	2026-07-12 22:31:52	\N	2026-07-12 23:23:38.609238	2026-07-12 22:31:52
+8	status_pekerjaan	1	Bekerja (full time / part time)	valid	Dihitung Masa Tunggu	masa_tunggu_valid_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
+9	status_pekerjaan	3	Wiraswasta	valid	Dihitung Masa Tunggu	masa_tunggu_valid_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
+10	status_pekerjaan	6	Melanjutkan pendidikan sambil bekerja	valid	Dihitung Masa Tunggu	masa_tunggu_valid_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
+11	status_pekerjaan	7	Melanjutkan pendidikan sambil wiraswasta	valid	Dihitung Masa Tunggu	masa_tunggu_valid_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
+12	status_pekerjaan	1	Bekerja (full time / part time)	valid	Dihitung Kesesuaian Bidang	kesesuaian_bidang_employed_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
+13	status_pekerjaan	6	Melanjutkan pendidikan sambil bekerja	valid	Dihitung Kesesuaian Bidang	kesesuaian_bidang_employed_status	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
 14	relevansi_bidang	1	Sangat Erat	sesuai	Sesuai Bidang	kesesuaian_bidang_relevance	f	2020-01-01	\N	2026-07-12 22:47:12	1	2026-07-12 23:23:38.609238	2026-07-12 22:47:12
+15	relevansi_bidang	2	Erat	sesuai	Sesuai Bidang	kesesuaian_bidang_relevance	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
+16	relevansi_bidang	4	Kurang Erat	tidak_sesuai	Tidak Sesuai Bidang	kesesuaian_bidang_relevance	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
+17	relevansi_bidang	5	Tidak Sama Sekali	tidak_sesuai	Tidak Sesuai Bidang	kesesuaian_bidang_relevance	t	2020-01-01	\N	\N	\N	2026-07-12 23:23:38.609238	2026-07-12 23:23:38.609238
+18	relevansi_bidang	1	Sangat Erat	tidak_sesuai	Tidak Sesuai Bidang	kesesuaian_bidang_relevance	f	2026-07-12	1	2026-07-13 19:26:39	1	2026-07-12 22:47:14	2026-07-13 19:26:39
 19	status_pekerjaan	1	Bekerja (full time / part time)	terserap	Terserap	iku2_keterserapan	t	2026-07-13	1	\N	\N	2026-07-13 15:06:55	2026-07-13 15:06:55
 20	status_pekerjaan	2	Belum memungkinkan bekerja	tidak	Tidak Terserap	iku2_keterserapan	t	2026-07-13	1	\N	\N	2026-07-13 15:06:58	2026-07-13 15:06:58
 21	status_pekerjaan	3	Wiraswasta	terserap	Terserap	iku2_keterserapan	t	2026-07-13	1	\N	\N	2026-07-13 15:07:04	2026-07-13 15:07:04
 22	status_pekerjaan	4	Melanjutkan Pendidikan	terserap	Terserap	iku2_keterserapan	t	2026-07-13	1	\N	\N	2026-07-13 15:07:07	2026-07-13 15:07:07
 23	status_pekerjaan	5	Tidak kerja tetapi sedang mencari kerja	tidak	Tidak Terserap	iku2_keterserapan	t	2026-07-13	1	\N	\N	2026-07-13 15:07:18	2026-07-13 15:07:18
-18	relevansi_bidang	1	Sangat Erat	tidak_sesuai	Tidak Sesuai Bidang	kesesuaian_bidang_relevance	f	2026-07-12	1	2026-07-13 19:26:39	1	2026-07-12 22:47:14	2026-07-13 19:26:39
-26	relevansi_bidang	1	Sangat Erat	sesuai	Sesuai Bidang	kesesuaian_bidang_relevance	f	2026-07-13	1	2026-07-13 20:26:08	1	2026-07-13 19:26:43	2026-07-13 20:26:08
-27	relevansi_bidang	1	Sangat Erat	tidak_sesuai	Tidak Sesuai Bidang	kesesuaian_bidang_relevance	t	2026-07-13	1	\N	\N	2026-07-13 20:26:12	2026-07-13 20:26:12
 24	status_pekerjaan	6	Melanjutkan pendidikan sambil bekerja	terserap	Terserap	iku2_keterserapan	f	2026-07-13	1	2026-07-14 04:20:13	1	2026-07-13 15:07:26	2026-07-14 04:20:13
-28	status_pekerjaan	6	Melanjutkan pendidikan sambil bekerja	tidak	Tidak Terserap	iku2_keterserapan	t	2026-07-14	1	\N	\N	2026-07-14 04:20:19	2026-07-14 04:20:19
 25	status_pekerjaan	7	Melanjutkan pendidikan sambil wiraswasta	terserap	Terserap	iku2_keterserapan	f	2026-07-13	1	2026-07-14 04:20:27	1	2026-07-13 15:07:32	2026-07-14 04:20:27
+26	relevansi_bidang	1	Sangat Erat	sesuai	Sesuai Bidang	kesesuaian_bidang_relevance	f	2026-07-13	1	2026-07-13 20:26:08	1	2026-07-13 19:26:43	2026-07-13 20:26:08
+27	relevansi_bidang	1	Sangat Erat	tidak_sesuai	Tidak Sesuai Bidang	kesesuaian_bidang_relevance	f	2026-07-13	1	2026-10-21 23:23:51	1	2026-07-13 20:26:12	2026-10-21 23:23:51
+28	status_pekerjaan	6	Melanjutkan pendidikan sambil bekerja	tidak	Tidak Terserap	iku2_keterserapan	t	2026-07-14	1	\N	\N	2026-07-14 04:20:19	2026-07-14 04:20:19
 29	status_pekerjaan	7	Melanjutkan pendidikan sambil wiraswasta	tidak	Tidak Terserap	iku2_keterserapan	t	2026-07-14	1	\N	\N	2026-07-14 04:20:30	2026-07-14 04:20:30
+30	relevansi_bidang	1	Sangat Erat	sesuai	Sesuai Bidang	kesesuaian_bidang_relevance	t	2026-10-21	1	\N	\N	2026-10-21 23:23:51	2026-10-21 23:23:51
+31	relevansi_bidang	3	Cukup Erat	tidak_sesuai	Tidak Sesuai Bidang	kesesuaian_bidang_relevance	f	2026-10-21	1	2026-10-21 23:45:45	1	2026-10-21 23:23:51	2026-10-21 23:45:45
+32	relevansi_bidang	3	Cukup Erat	sesuai	Sesuai Bidang	kesesuaian_bidang_relevance	t	2026-10-21	1	\N	\N	2026-10-21 23:45:45	2026-10-21 23:45:45
 \.
 
 
@@ -1080,7 +1083,7 @@ SELECT pg_catalog.setval('public.fact_tracer_study_id_fact_seq', 1, false);
 -- Name: kpi_category_mapping_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.kpi_category_mapping_id_seq', 29, true);
+SELECT pg_catalog.setval('public.kpi_category_mapping_id_seq', 32, true);
 
 
 --
