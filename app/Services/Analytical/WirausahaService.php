@@ -44,23 +44,28 @@ class WirausahaService
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             );
 
-            $totalMap = $totals->keyBy(fn($r) => $r['nama_prodi'] . '|' . $r['tahun_lulus']);
+            $wirausahaMap = $wirausaha->keyBy(fn($r) => $r['nama_prodi'] . '|' . $r['tahun_lulus']);
 
-            return $wirausaha->map(function ($r) use ($totalMap) {
-                $key         = $r['nama_prodi'] . '|' . $r['tahun_lulus'];
-                $totalAlumni = $totalMap->get($key)['count_alumni'] ?? 0;
-                $pct         = $totalAlumni > 0
-                    ? round($r['count_wirausaha'] / $totalAlumni * 100, 1)
-                    : 0.0;
+            // Berangkat dari SEMUA prodi × tahun (bukan hanya yang punya
+            // wirausaha): prodi tanpa wirausaha tetap menyumbang alumninya ke
+            // penyebut. Dulu baris itu hilang, sehingga FE yang menjumlah per
+            // tahun membagi dengan alumni prodi-prodi berwirausaha saja dan
+            // persentasenya membengkak (mis. 2023: 0,1% tampil 3,6%).
+            return $totals->map(function ($t) use ($wirausahaMap) {
+                $key         = $t['nama_prodi'] . '|' . $t['tahun_lulus'];
+                $w           = $wirausahaMap->get($key);
+                $totalAlumni = $t['count_alumni'];
+                $count       = $w['count_wirausaha'] ?? 0;
+                $pct         = $totalAlumni > 0 ? round($count / $totalAlumni * 100, 1) : 0.0;
 
                 return [
-                    'nama_prodi'                => $r['nama_prodi'],
-                    'jenjang'                   => $r['jenjang'],
-                    'tahun_lulus'               => $r['tahun_lulus'],
+                    'nama_prodi'                => $t['nama_prodi'],
+                    'jenjang'                   => $t['jenjang'],
+                    'tahun_lulus'               => $t['tahun_lulus'],
                     'count_alumni'              => $totalAlumni,
-                    'count_wirausaha'           => $r['count_wirausaha'],
+                    'count_wirausaha'           => $count,
                     'pct_wirausaha'             => $pct,
-                    'avg_masa_tunggu_wirausaha' => round($r['avg_masa_tunggu_wirausaha'], 1),
+                    'avg_masa_tunggu_wirausaha' => round($w['avg_masa_tunggu_wirausaha'] ?? 0, 1),
                 ];
             })->values()->toArray();
         }, self::TTL, ['analytics-dashboard']);

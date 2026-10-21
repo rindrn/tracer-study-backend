@@ -93,11 +93,13 @@ class WirausahaRepository extends BaseAnalyticalRepository
         return $this->cube->load([
             'measures'   => ['FactTracerStudy.count_alumni'],
             'dimensions' => [
+                'DimProdi.jenjang',
                 'DimProdi.nama_prodi',
                 'DimAlumni.tahun_lulus',
             ],
             'filters' => $filters,
         ])->map(fn($r) => [
+            'jenjang'     => $r['DimProdi.jenjang']              ?? '',
             'nama_prodi'  => $r['DimProdi.nama_prodi']           ?? '',
             'tahun_lulus' => $r['DimAlumni.tahun_lulus']         ?? '',
             'count_alumni'=> (int) ($r['FactTracerStudy.count_alumni'] ?? 0),
