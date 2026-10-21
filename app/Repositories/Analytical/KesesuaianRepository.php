@@ -72,6 +72,16 @@ class KesesuaianRepository extends BaseAnalyticalRepository
             mingguSnapshot: $mingguSnapshot,
         );
 
+        // Distribusi dihitung atas lulusan yang menjawab kesesuaian bidang
+        // (yang bekerja/berwirausaha). "Tidak Ada Data" -- alumni yang
+        // mencari kerja, studi lanjut, atau tidak menjawab -- bukan bagian
+        // dari penyebutnya.
+        $filters[] = [
+            'member'   => 'DimKesesuaianBidang.id_kesesuaian_level',
+            'operator' => 'notEquals',
+            'values'   => ['0:tidak_ada_data'],
+        ];
+
         return $this->cube->load([
             'measures'   => ['FactTracerStudy.count_alumni'],
             'dimensions' => ['DimKesesuaianBidang.label'],

@@ -33,7 +33,9 @@ class KesesuaianService
                 tahunLulus:     $params['tahun_lulus']     ?? null,
                 mingguSnapshot: $params['minggu_snapshot'] ?? null,
             )->map(function ($r) {
-                $total     = $r['count_alumni'];
+                // Penyebut = lulusan bekerja yang kesesuaiannya terkategori,
+                // bukan semua alumni (lihat rumus KPI di Kpi6FieldRelevanceChart).
+                $total     = $r['count_sesuai_bidang'] + $r['count_tidak_sesuai_bidang'];
                 $pctSesuai = $total > 0 ? round($r['count_sesuai_bidang']        / $total * 100, 1) : 0.0;
                 $pctTidak  = $total > 0 ? round($r['count_tidak_sesuai_bidang']  / $total * 100, 1) : 0.0;
 
@@ -132,6 +134,7 @@ class KesesuaianService
             $total    = $r['count_alumni'];
             $sesuai   = $r['count_sesuai_bidang'];
             $tidakSesuai = $r['count_tidak_sesuai_bidang'];
+            $dinilai  = $sesuai + $tidakSesuai;
 
             $data[] = [
                 'nama_prodi'               => $r['nama_prodi'],
@@ -139,8 +142,8 @@ class KesesuaianService
                 'total'                    => $total,
                 'count_sesuai_bidang'      => $sesuai,
                 'count_tidak_sesuai_bidang'=> $tidakSesuai,
-                'pct_sesuai'               => $total > 0 ? round($sesuai      / $total * 100, 1) : 0.0,
-                'pct_tidak_sesuai'         => $total > 0 ? round($tidakSesuai / $total * 100, 1) : 0.0,
+                'pct_sesuai'               => $dinilai > 0 ? round($sesuai      / $dinilai * 100, 1) : 0.0,
+                'pct_tidak_sesuai'         => $dinilai > 0 ? round($tidakSesuai / $dinilai * 100, 1) : 0.0,
             ];
 
             $prodiList[] = $r['nama_prodi'];
