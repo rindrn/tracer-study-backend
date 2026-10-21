@@ -208,6 +208,22 @@ class ThresholdService
             ];
         }
 
+        // Prodi sudah punya LAM, tetapi LAM itu belum menetapkan threshold untuk
+        // indikator ini (tidak semua standar mengatur semua indikator, atau LAM
+        // belum punya standar sama sekali): kembalikan LAM-nya tanpa versi.
+        if (collect($result->rows)->isEmpty()) {
+            return [
+                'context'   => 'prodi',
+                'lam'       => [
+                    'id'   => $result->lam->lam_id,
+                    'name' => $result->lam->lam_name,
+                    'code' => $result->lam->lam_code,
+                ],
+                'indicator' => $this->resolveIndicatorMeta($indicatorKey),
+                'versions'  => [],
+            ];
+        }
+
         $versions = collect($result->rows)
             ->groupBy('version_id')
             ->map(function ($items) use ($result) {
