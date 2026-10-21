@@ -8,6 +8,7 @@ use App\Repositories\Analytical\MasaTungguRepository;
 use App\Repositories\Analytical\PendapatanRepository;
 use App\Repositories\Analytical\SebaranInstansiRepository;
 use App\Repositories\Analytical\WirausahaRepository;
+use App\Repositories\Config\KpiCategoryMappingRepository;
 use App\Services\Analytical\EmploymentSummaryService;
 use Illuminate\Support\Collection;
 use Mockery;
@@ -23,7 +24,7 @@ use Tests\TestCase;
  */
 class EmploymentSummaryServiceCardsTest extends TestCase
 {
-    private function service(): EmploymentSummaryService
+    private function service(?KpiCategoryMappingRepository $kpiMappingRepo = null): EmploymentSummaryService
     {
         return new EmploymentSummaryService(
             Mockery::mock(KeterserapanRepository::class),
@@ -32,7 +33,62 @@ class EmploymentSummaryServiceCardsTest extends TestCase
             Mockery::mock(WirausahaRepository::class),
             Mockery::mock(PendapatanRepository::class),
             Mockery::mock(SebaranInstansiRepository::class),
+            $kpiMappingRepo ?? Mockery::mock(KpiCategoryMappingRepository::class),
         );
+    }
+
+    private function kesesuaianMapping(array $sesuai, array $tidakSesuai): KpiCategoryMappingRepository
+    {
+        $repo = Mockery::mock(KpiCategoryMappingRepository::class);
+        $repo->shouldReceive('optionLabelsFor')
+            ->with('relevansi_bidang', 'kesesuaian_bidang_relevance', 'sesuai')
+            ->andReturn($sesuai);
+        $repo->shouldReceive('optionLabelsFor')
+            ->with('relevansi_bidang', 'kesesuaian_bidang_relevance', 'tidak_sesuai')
+            ->andReturn($tidakSesuai);
+
+        return $repo;
+    }
+
+    // ── Kesesuaian bidang ───────────────────────────────────────────────
+
+    public function test_kesesuaian_mengikuti_pemetaan_kategori_bukan_label_tetap(): void
+    {
+        $rows = new Collection([
+            ['label' => 'Sangat Erat', 'count' => 40],
+            ['label' => 'Erat', 'count' => 20],
+            ['label' => 'Cukup Erat', 'count' => 20],
+            ['label' => 'Kurang Erat', 'count' => 15],
+            ['label' => 'Tidak Sama Sekali', 'count' => 5],
+            // Tidak terpetakan -> bukan pembilang maupun penyebut.
+            ['label' => 'Tidak Ada Data', 'count' => 50],
+        ]);
+        $repo = $this->kesesuaianMapping(
+            ['Sangat Erat', 'Erat', 'Cukup Erat'],
+            ['Kurang Erat', 'Tidak Sama Sekali'],
+        );
+
+        $card = $this->callPrivate($this->service($repo), 'buildKesesuaianCard', [$rows]);
+
+        // (40 + 20 + 20) / 100 * 100 = 80.0
+        $this->assertSame(80.0, $card['value']);
+        $this->assertSame('Sangat erat + erat + cukup erat', $card['hint']);
+    }
+
+    public function test_kesesuaian_tidak_menghitung_kurang_erat_meski_mengandung_kata_erat(): void
+    {
+        $rows = new Collection([
+            ['label' => 'Sangat Erat', 'count' => 30],
+            ['label' => 'Erat', 'count' => 30],
+            ['label' => 'Cukup Erat', 'count' => 20],
+            ['label' => 'Kurang Erat', 'count' => 20],
+        ]);
+        $repo = $this->kesesuaianMapping(['Sangat Erat', 'Erat'], ['Cukup Erat', 'Kurang Erat']);
+
+        $card = $this->callPrivate($this->service($repo), 'buildKesesuaianCard', [$rows]);
+
+        // (30 + 30) / 100 * 100 = 60.0
+        $this->assertSame(60.0, $card['value']);
     }
 
     private function callPrivate(EmploymentSummaryService $service, string $method, array $args)

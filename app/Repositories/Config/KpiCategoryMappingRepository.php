@@ -189,6 +189,9 @@ class KpiCategoryMappingRepository
             ->where('digunakan_oleh', $digunakanOleh)
             ->where('kpi_category', $kpiCategory)
             ->where('is_active', true)
+            // Urut kode opsi (urutan di kuesioner), bukan id -- id mengikuti
+            // urutan pemetaan dibuat, sehingga label tampil acak di UI.
+            ->orderByRaw("LPAD(option_code, 4, '0')")
             ->orderBy('id')
             ->pluck('option_label_snapshot')
             ->filter()

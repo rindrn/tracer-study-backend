@@ -9,6 +9,7 @@ use App\Repositories\Analytical\KesesuaianRepository;
 use App\Repositories\Analytical\WirausahaRepository;
 use App\Repositories\Analytical\PendapatanRepository;
 use App\Repositories\Analytical\SebaranInstansiRepository;
+use App\Repositories\Config\KpiCategoryMappingRepository;
 use App\Traits\WithCache;
 
 /**
@@ -51,6 +52,7 @@ class EmploymentSummaryService
         private readonly WirausahaRepository       $wirausahaRepo,
         private readonly PendapatanRepository      $pendapatanRepo,
         private readonly SebaranInstansiRepository $sebaranInstansiRepo,
+        private readonly KpiCategoryMappingRepository $kpiMappingRepo,
     ) {}
 
     // ──────────────────────────────────────────────────────────────
@@ -215,27 +217,39 @@ class EmploymentSummaryService
      *
      * Sumber: KesesuaianRepository::getPieData()
      * Repo sudah filter status_alumni_sk = 1 (Bekerja).
-     * Label dari DimKesesuaianBidang: "Sangat Erat", "Erat", "Kurang Erat", "Tidak Erat".
      *
-     * Numerator  : label "Sangat Erat" + "Erat" (exact match setelah lowercase).
-     * Denominator: semua alumni Bekerja yang punya data kesesuaian.
+     * Label "sesuai" dan "tidak sesuai" dibaca dari kpi_category_mapping
+     * (relevansi_bidang / kesesuaian_bidang_relevance) -- pemetaan yang SAMA
+     * dengan grafik per angkatan (FactTracerStudy.count_sesuai_bidang).
+     * Dulu kartu memakai "Sangat Erat" + "Erat" yang ditulis langsung di
+     * sini, sehingga begitu pemetaan diubah di menu Pemetaan Pertanyaan
+     * (mis. "Cukup Erat" ikut sesuai) kartu dan grafik menunjukkan angka
+     * berbeda.
      *
-     * KENAPA exact match, bukan str_contains("erat")?
-     * Karena "Kurang Erat" dan "Tidak Erat" juga mengandung substring "erat" —
-     * jika pakai contains maka semua label ikut terhitung.
+     * Numerator  : label yang dipetakan sesuai.
+     * Denominator: label yang dipetakan sesuai + tidak sesuai (label tak
+     *              terpetakan, mis. "Tidak Ada Data", tidak dihitung).
+     * Label dicocokkan exact setelah lowercase -- "Kurang Erat" juga
+     * mengandung substring "erat".
      */
     private function buildKesesuaianCard(\Illuminate\Support\Collection $rows): array
     {
-        $total = $rows->sum('count');
+        $normalize = fn (array $labels) => array_map(fn ($l) => mb_strtolower(trim($l)), $labels);
 
-        $erat = $rows->filter(function ($r) {
-            $lower = mb_strtolower(trim($r['label']));
-            return $lower === 'sangat erat' || $lower === 'erat';
-        })->sum('count');
+        $sesuaiLabels = $this->kpiMappingRepo->optionLabelsFor('relevansi_bidang', 'kesesuaian_bidang_relevance', 'sesuai');
+        $sesuai = $normalize($sesuaiLabels);
+        $tidak  = $normalize($this->kpiMappingRepo->optionLabelsFor('relevansi_bidang', 'kesesuaian_bidang_relevance', 'tidak_sesuai'));
+
+        $countOf = fn (array $labels) => $rows
+            ->filter(fn ($r) => in_array(mb_strtolower(trim($r['label'])), $labels, true))
+            ->sum('count');
+
+        $jmlSesuai = $countOf($sesuai);
+        $total     = $jmlSesuai + $countOf($tidak);
 
         return [
-            'value' => $total > 0 ? round($erat / $total * 100, 1) : 0.0,
-            'hint'  => 'Sangat erat + erat',
+            'value' => $total > 0 ? round($jmlSesuai / $total * 100, 1) : 0.0,
+            'hint'  => ucfirst(mb_strtolower(implode(' + ', $sesuaiLabels))),
         ];
     }
 
