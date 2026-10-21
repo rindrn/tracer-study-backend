@@ -24,11 +24,12 @@ COPY tracer_oltp.lams (id, name, code, created_at, updated_at) FROM stdin;
 5	LAMSAMA	LAMSAMA	2026-10-21 23:24:41	2026-10-21 23:24:41
 6	BAN-PT D3	BANPT-D3	2026-10-21 23:24:41	2026-10-21 23:24:41
 7	BAN-PT Sarjana Terapan	BANPT-STR	2026-10-21 23:24:41	2026-10-21 23:24:41
+8	LAM Contoh (data uji lama)	CONTOH	2026-05-13 22:15:12	2026-07-14 04:38:14
 \.
 
 
 
-SELECT pg_catalog.setval('tracer_oltp.lams_id_seq', 7, true);
+SELECT pg_catalog.setval('tracer_oltp.lams_id_seq', 8, true);
 
 
 
@@ -44,6 +45,8 @@ COPY tracer_oltp.lam_versions (id, lam_id, year, version_name, is_active, create
 11	5	2022	IAPS LAMSAMA 1.0 (PerBAN-PT 15/2022)	t	2026-10-21 23:24:41	2026-10-21 23:24:41
 12	6	2025	IAPS 5.1 (PerBAN-PT 36/2025)	t	2026-10-21 23:24:41	2026-10-21 23:24:41
 13	7	2025	IAPS 5.1 (PerBAN-PT 36/2025)	t	2026-10-21 23:24:41	2026-10-21 23:24:41
+8	8	2021	2021	t	2026-07-11 03:13:19	2026-07-11 03:13:19
+7	8	2020	\N	t	2026-06-21 18:44:23	2026-07-12 14:20:25
 \.
 
 
@@ -130,6 +133,30 @@ COPY tracer_oltp.thresholds (id, name, value, created_by, created_at, updated_at
 34	Keterserapan Alumni	60.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	12	6	unggul
 35	Keterserapan Alumni	20.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	13	6	baik
 36	Keterserapan Alumni	60.00	1	2026-10-21 23:24:41	2026-10-21 23:24:41	13	6	unggul
+3	Lulusan Bekerja ≤ 6 Bulan	60.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	1	baik
+7	Respon Tracer Study Alumni	87.14	1	2026-06-21 18:44:24	2026-07-11 03:10:44	7	3	baik
+8	Respon Tracer Study Alumni	87.14	1	2026-06-21 18:44:24	2026-07-11 03:10:44	7	3	unggul
+4	Lulusan Bekerja ≤ 6 Bulan	70.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	1	unggul
+5	Lulusan Berwirausaha	5.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	2	baik
+6	Lulusan Berwirausaha	10.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	2	unggul
+9	Kesesuaian Bidang Kerja	77.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	4	baik
+10	Kesesuaian Bidang Kerja	92.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	4	unggul
+11	Penghasilan ≥ UMP/UMK	70.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	5	baik
+19	Respon Tracer Study Alumni	88.15	1	2026-07-11 03:13:20	2026-07-11 03:13:20	8	3	baik
+20	Respon Tracer Study Alumni	88.15	1	2026-07-11 03:13:20	2026-07-11 03:13:20	8	3	unggul
+12	Penghasilan ≥ UMP/UMK	85.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	5	unggul
+13	Keterserapan Alumni	75.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	6	baik
+14	Keterserapan Alumni	80.00	1	2026-06-21 18:44:24	2026-07-14 05:36:33	7	6	unggul
+15	Lulusan Bekerja ≤ {value} Bulan	50.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	1	baik
+16	Lulusan Bekerja ≤ {value} Bulan	55.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	1	unggul
+17	Lulusan Berwirausaha	55.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	2	baik
+18	Lulusan Berwirausaha	55.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	2	unggul
+21	Kesesuaian Bidang Kerja	60.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	4	baik
+22	Kesesuaian Bidang Kerja	70.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	4	unggul
+23	Penghasilan ≥ {value}x UMP/UMK	60.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	5	baik
+24	Penghasilan ≥ {value}x UMP/UMK	70.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	5	unggul
+25	Keterserapan Alumni	60.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	6	baik
+26	Keterserapan Alumni	85.00	1	2026-07-11 03:13:20	2026-07-14 05:56:36	8	6	unggul
 \.
 
 
@@ -145,6 +172,10 @@ SELECT pg_catalog.setval('tracer_oltp.thresholds_id_seq', 36, true);
 
 
 COPY tracer_oltp.threshold_configs (id, lam_version_id, indicator_id, param_value, created_at, updated_at) FROM stdin;
+3	8	1	2.00	2026-07-14 04:36:41	2026-07-14 04:36:41
+4	8	5	1.40	2026-07-14 04:36:41	2026-07-14 04:36:41
+1	7	1	3.00	2026-07-14 05:56:36	2026-07-14 05:56:36
+2	7	5	1.20	2026-07-14 05:56:36	2026-07-14 05:56:36
 \.
 
 
