@@ -3,39 +3,36 @@
 namespace App\Services\Analytical;
 
 use App\DTOs\Analytical\Kpi13\Kpi13ChartDTO;
+use App\Repositories\Analytical\KesesuaianRepository;
 use App\Repositories\Analytical\Kpi13Repository;
+use App\Repositories\Analytical\MasaTungguRepository;
+use App\Repositories\Analytical\PendapatanRepository;
+use App\Repositories\Analytical\WirausahaRepository;
 use App\Services\Transactional\ThresholdService;
 use Illuminate\Support\Collection;
 
 /**
  * Kpi13Service — Perbandingan KPI Lintas Program Studi
  *
- * Alur:
- *  1. Fetch 6 query dari Cube.js via Kpi13Repository (5 metrik + pendapatan)
- *  2. Join result per id_prodi menggunakan Collection
- *  3. Hitung persentase dengan denominator yang tepat
- *  4. Resolve status threshold (baik/unggul/kurang) per metrik per prodi via ThresholdService
- *  5. Rakit Kpi13ChartDTO
+ * Satu baris per prodi berisi 5 metrik tab Employment Outcome beserta status
+ * threshold LAM prodi itu sendiri (unggul/baik/kurang, null = belum ada).
+ * Dipakai halaman "Bandingkan per Prodi": tiap tab menampilkan satu metrik.
  *
- * Tidak ada koneksi ke OLTP untuk data KPI — murni dari OLAP (Cube.js).
- * Threshold tetap dibaca dari OLTP (tabel thresholds) via ThresholdService,
- * sama seperti chart Kpi3/Kpi4-8 lainnya.
+ * Setiap metrik dihitung dari repository dan penyebut yang SAMA dengan grafik
+ * per angkatan di tabnya, dijumlahkan lintas tahun lulus per prodi:
+ *  - keterserapan = count_terserap / count_alumni        (MasaTungguRepository::getBarData)
+ *  - masa_tunggu  = cepat ≤ N bulan / count_bekerja      (MasaTungguRepository::getBarData)
+ *  - kesesuaian   = sesuai / (sesuai + tidak sesuai)     (KesesuaianRepository::getBarData)
+ *  - wirausaha    = wirausaha / count_alumni             (WirausahaRepository::getBarData + getBarDataTotal)
+ *  - pendapatan   = gaji ≥ x UMP / punya data UMP        (PendapatanRepository::getUmpPerProdi)
  *
- * DENOMINATOR:
- *  - keterserapan  = bekerja / total_alumni × 100
- *  - wirausaha     = wirausaha / total_alumni × 100
- *  - masa_tunggu   = cepat / bekerja × 100   (% dari yang bekerja, lebih valid)
- *  - kesesuaian    = sesuai / bekerja × 100  (% dari yang bekerja)
- *  - pendapatan    = rata-rata take-home pay (bukan %, satuan rupiah)
+ * N bulan dan x UMP mengikuti param LAM aktif prodi (default 6 bulan dan
+ * 1,2x UMP), sama seperti grafik tab yang membaca param dari useLamFilter.
  *
- * INDICATOR KEY (tabel threshold_indicators, dipakai untuk resolve threshold):
- *  - keterserapan → graduate_absorption
- *  - masa_tunggu  → employment_time
- *  - kesesuaian   → field_relevance
- *  - wirausaha    → entrepreneurship
- *  - pendapatan   → salary_above_ump
- *
- * Taruh di: app/Services/Analytical/Kpi13Service.php
+ * INDICATOR KEY (tabel threshold_indicators):
+ *  keterserapan → graduate_absorption, masa_tunggu → employment_time,
+ *  kesesuaian → field_relevance, wirausaha → entrepreneurship,
+ *  pendapatan → salary_above_ump
  */
 class Kpi13Service
 {
@@ -47,13 +44,15 @@ class Kpi13Service
         'pendapatan'   => 'salary_above_ump',
     ];
 
-    // Ambang default % ≥ x UMP dipakai untuk metrik pendapatan lintas-prodi —
-    // sama dengan default di PendapatanService, dipakai seragam demi
-    // perbandingan yang adil antar prodi (lihat komentar di Kpi13Repository).
-    private const AMBANG_UMP_DEFAULT = 1.2;
+    private const BATAS_CEPAT_DEFAULT = 6.0;
+    private const AMBANG_UMP_DEFAULT  = 1.2;
 
     public function __construct(
         private readonly Kpi13Repository $repo,
+        private readonly MasaTungguRepository $masaTungguRepo,
+        private readonly KesesuaianRepository $kesesuaianRepo,
+        private readonly WirausahaRepository $wirausahaRepo,
+        private readonly PendapatanRepository $pendapatanRepo,
         private readonly ThresholdService $thresholdService,
     ) {}
 
@@ -61,137 +60,315 @@ class Kpi13Service
     //  PUBLIC
     // ──────────────────────────────────────────────────────────────
 
-    public function getChart(array $filters): Kpi13ChartDTO
+    /**
+     * @param array $params query params yang sudah lewat EnforcesProdiScope
+     *                      (jenjang, jurusan, nama_prodi, id_prodi_in,
+     *                      tahun_lulus / tahun, minggu_snapshot)
+     */
+    public function getChart(array $params): Kpi13ChartDTO
     {
-        $tahun = isset($filters['tahun']) ? (string) $filters['tahun'] : null;
+        $scope = $this->resolveScope($params);
 
-        // 1. Fetch semua data dari Cube.js (sequential — Cube pre-agg sangat cepat)
-        $total       = $this->repo->getTotalAlumniPerProdi($tahun);
-        $bekerja     = $this->repo->getBekerjaPerProdi($tahun);
-        $cepat       = $this->repo->getMasaTungguCepatPerProdi($tahun);
-        $sesuai      = $this->repo->getKesesuaianPerProdi($tahun);
-        $wirausaha   = $this->repo->getWirausahaPerProdi($tahun);
-        $pendapatan  = $this->repo->getPendapatanPerProdi($tahun);
-        $aboveAmbang = $this->repo->getPendapatanAboveAmbangPerProdi($tahun, self::AMBANG_UMP_DEFAULT);
-        $years       = $this->repo->getAvailableYears();
+        $prodis = $this->repo->getProdiIdentity($scope);
 
-        // 2. Build lookup maps indexed by id_prodi untuk O(1) lookup
-        $bekerjaMap     = $bekerja->keyBy('id_prodi');
-        $cepatMap       = $cepat->keyBy('id_prodi');
-        $sesuaiMap      = $sesuai->keyBy('id_prodi');
-        $wirausahaMap   = $wirausaha->keyBy('id_prodi');
-        $pendapatanMap  = $pendapatan->keyBy('id_prodi');
-        $aboveAmbangMap = $aboveAmbang->keyBy('id_prodi');
+        // Threshold aktif per prodi per metrik -- dibaca dulu karena param
+        // (batas bulan, kelipatan UMP) menentukan cara menghitung metriknya.
+        $thresholds = $prodis->mapWithKeys(fn (array $p) => [
+            self::key($p['nama_prodi'], $p['jenjang']) => $this->resolveThresholds($p['id_prodi']),
+        ]);
 
-        // 3. Hitung persentase per prodi
-        $prodiRows = $total->map(function (array $row) use (
-            $bekerjaMap,
-            $cepatMap,
-            $sesuaiMap,
-            $wirausahaMap,
-            $pendapatanMap,
-            $aboveAmbangMap
-        ): array {
-            $id  = $row['id_prodi'];
-            $n   = max($row['total'], 1); // guard div/0
+        $masaTunggu = $this->masaTungguPerProdi($scope, $prodis, $thresholds);
+        $sesuai     = $this->kesesuaianPerProdi($scope);
+        $wirausaha  = $this->wirausahaPerProdi($scope);
+        $pendapatan = $this->pendapatanPerProdi($scope, $prodis, $thresholds);
 
-            $jmlBekerja   = (int) ($bekerjaMap[$id]['bekerja']   ?? 0);
-            $jmlCepat     = (int) ($cepatMap[$id]['cepat']       ?? 0);
-            $jmlSesuai    = (int) ($sesuaiMap[$id]['sesuai']     ?? 0);
-            $jmlWirausaha = (int) ($wirausahaMap[$id]['wirausaha'] ?? 0);
-
-            $avgGaji           = (int) ($pendapatanMap[$id]['avg_gaji'] ?? 0);
-            $totalDenganDataUmp = (int) ($pendapatanMap[$id]['total_dengan_data_ump'] ?? 0);
-            $jmlAboveAmbang     = (int) ($aboveAmbangMap[$id]['count_above'] ?? 0);
-
-            // Denominator masa tunggu & kesesuaian = jumlah yang bekerja
-            $nBekerja = max($jmlBekerja, 1);
+        $prodiRows = $prodis->map(function (array $p) use ($thresholds, $masaTunggu, $sesuai, $wirausaha, $pendapatan): array {
+            $key = self::key($p['nama_prodi'], $p['jenjang']);
+            $mt  = $masaTunggu[$key] ?? ['alumni' => 0, 'terserap' => 0, 'bekerja' => 0, 'cepat' => 0];
+            $ks  = $sesuai[$key]     ?? ['sesuai' => 0, 'tidak' => 0];
+            $ws  = $wirausaha[$key]  ?? ['wirausaha' => 0, 'alumni' => 0];
+            $pd  = $pendapatan[$key] ?? ['above' => 0, 'total' => 0];
 
             $metrics = [
-                'keterserapan' => $this->pct($jmlBekerja,       $n),
-                'wirausaha'    => $this->pct($jmlWirausaha,     $n),
-                'masa_tunggu'  => $this->pct($jmlCepat,         $nBekerja),
-                'kesesuaian'   => $this->pct($jmlSesuai,        $nBekerja),
-                'pendapatan'   => $this->pct($jmlAboveAmbang,   max($totalDenganDataUmp, 1)),
+                'keterserapan' => $this->pct($mt['terserap'], $mt['alumni']),
+                'masa_tunggu'  => $this->pct($mt['cepat'], $mt['bekerja']),
+                'kesesuaian'   => $this->pct($ks['sesuai'], $ks['sesuai'] + $ks['tidak']),
+                'wirausaha'    => $this->pct($ws['wirausaha'], $ws['alumni']),
+                'pendapatan'   => $this->pct($pd['above'], $pd['total']),
             ];
 
+            $prodiThresholds = $thresholds[$key];
+
             return [
-                'id_prodi'     => $id,
-                'prodi'        => $row['nama_prodi'],
-                'jurusan'      => $row['jurusan'],
-                'total_alumni' => $row['total'],
-
-                // Persentase — 2 desimal (pendapatan = % alumni bergaji >= 1,2x UMP)
+                'id_prodi'     => $p['id_prodi'],
+                'prodi'        => $p['nama_prodi'],
+                'jenjang'      => $p['jenjang'],
+                'jurusan'      => $p['jurusan'],
+                'total_alumni' => $p['total'],
                 ...$metrics,
-
-                // Status threshold per metrik: 'unggul' | 'baik' | 'kurang' | null (belum ada data threshold)
-                'threshold_status' => $this->resolveThresholdStatus($id, $metrics),
-
-                // Angka mentah — untuk tooltip detail di FE
+                'threshold_status' => collect($metrics)
+                    ->map(fn (float $value, string $metric) => $this->statusOf($value, $prodiThresholds[$metric]))
+                    ->all(),
+                // LAM + nilai batas per metrik, untuk tooltip FE
+                // ("LAM Teknik D3 — Unggul ≥ 80%").
+                'thresholds' => $prodiThresholds,
                 'raw' => [
-                    'bekerja'          => $jmlBekerja,
-                    'cepat'            => $jmlCepat,
-                    'sesuai'           => $jmlSesuai,
-                    'wirausaha'        => $jmlWirausaha,
-                    'avg_gaji'         => $avgGaji,
-                    'ambang_ump_multiplier' => self::AMBANG_UMP_DEFAULT,
+                    'alumni'          => $mt['alumni'],
+                    'terserap'        => $mt['terserap'],
+                    'bekerja'         => $mt['bekerja'],
+                    'cepat'           => $mt['cepat'],
+                    'sesuai'          => $ks['sesuai'],
+                    'tidak_sesuai'    => $ks['tidak'],
+                    'wirausaha'       => $ws['wirausaha'],
+                    'gaji_above_ump'  => $pd['above'],
+                    'gaji_dengan_ump' => $pd['total'],
                 ],
             ];
         })->values()->toArray();
 
         return new Kpi13ChartDTO(
             prodiRows:      $prodiRows,
-            availableYears: $years->toArray(),
-            filters:        array_filter(['tahun' => $tahun]),
+            availableYears: $this->repo->getAvailableYears()->toArray(),
+            filters:        array_filter([
+                'tahun_lulus'     => $scope['tahun_lulus'],
+                'minggu_snapshot' => $scope['minggu_snapshot'],
+            ]),
         );
     }
 
+    public function getExportRows(array $params): array
+    {
+        return $this->getChart($params)->prodiRows;
+    }
+
     // ──────────────────────────────────────────────────────────────
-    //  Threshold status per metrik, per prodi
+    //  Metrik per prodi
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * @param array<string,float> $metrics key metrik → nilai persentase yang sudah dihitung
-     * @return array<string, 'unggul'|'baik'|'kurang'|null>
+     * Keterserapan dan masa tunggu dari MasaTungguRepository::getBarData.
+     * Batas "cepat" berbeda antar LAM, jadi query diulang per batas yang
+     * dipakai (biasanya hanya satu atau dua nilai).
+     *
+     * @return array<string, array{alumni:int, terserap:int, bekerja:int, cepat:int}>
      */
-    private function resolveThresholdStatus(int $prodiId, array $metrics): array
+    private function masaTungguPerProdi(array $scope, Collection $prodis, Collection $thresholds): array
     {
-        $status = [];
+        $batasPerProdi = $prodis->mapWithKeys(function (array $p) use ($thresholds) {
+            $key = self::key($p['nama_prodi'], $p['jenjang']);
+            return [$key => $thresholds[$key]['masa_tunggu']['param'] ?? self::BATAS_CEPAT_DEFAULT];
+        });
+
+        $result = [];
+        foreach ($batasPerProdi->unique()->push(self::BATAS_CEPAT_DEFAULT)->unique() as $batas) {
+            $rows = $this->masaTungguRepo->getBarData(
+                jenjang:         $scope['jenjang'],
+                jurusan:         $scope['jurusan'],
+                idProdiIn:       $scope['id_prodi_in'],
+                namaProdi:       $scope['nama_prodi'],
+                tahunLulus:      $scope['tahun_lulus'],
+                mingguSnapshot:  $scope['minggu_snapshot'],
+                batasCepatBulan: (float) $batas,
+            );
+
+            foreach ($this->sumPerProdi($rows, ['count_alumni', 'count_terserap', 'count_bekerja', 'count_masa_tunggu_cepat']) as $key => $sum) {
+                if ((float) ($batasPerProdi[$key] ?? self::BATAS_CEPAT_DEFAULT) !== (float) $batas) {
+                    continue;
+                }
+                $result[$key] = [
+                    'alumni'   => $sum['count_alumni'],
+                    'terserap' => $sum['count_terserap'],
+                    'bekerja'  => $sum['count_bekerja'],
+                    'cepat'    => $sum['count_masa_tunggu_cepat'],
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    /** @return array<string, array{sesuai:int, tidak:int}> */
+    private function kesesuaianPerProdi(array $scope): array
+    {
+        $rows = $this->kesesuaianRepo->getBarData(
+            jenjang:        $scope['jenjang'],
+            jurusan:        $scope['jurusan'],
+            idProdiIn:      $scope['id_prodi_in'],
+            namaProdi:      $scope['nama_prodi'],
+            tahunLulus:     $scope['tahun_lulus'],
+            mingguSnapshot: $scope['minggu_snapshot'],
+        );
+
+        return array_map(fn (array $s) => [
+            'sesuai' => $s['count_sesuai_bidang'],
+            'tidak'  => $s['count_tidak_sesuai_bidang'],
+        ], $this->sumPerProdi($rows, ['count_sesuai_bidang', 'count_tidak_sesuai_bidang']));
+    }
+
+    /**
+     * Penyebut = seluruh alumni prodi (getBarDataTotal), termasuk prodi yang
+     * tidak punya alumni wirausaha sama sekali -- sama dengan grafik tab.
+     *
+     * @return array<string, array{wirausaha:int, alumni:int}>
+     */
+    private function wirausahaPerProdi(array $scope): array
+    {
+        $args = [
+            'jenjang'        => $scope['jenjang'],
+            'jurusan'        => $scope['jurusan'],
+            'idProdiIn'      => $scope['id_prodi_in'],
+            'namaProdi'      => $scope['nama_prodi'],
+            'tahunLulus'     => $scope['tahun_lulus'],
+            'mingguSnapshot' => $scope['minggu_snapshot'],
+        ];
+
+        $wirausaha = $this->sumPerProdi($this->wirausahaRepo->getBarData(...$args), ['count_wirausaha']);
+        $total     = $this->sumPerProdi($this->wirausahaRepo->getBarDataTotal(...$args), ['count_alumni']);
+
+        return collect($total)->map(fn (array $t, string $key) => [
+            'wirausaha' => $wirausaha[$key]['count_wirausaha'] ?? 0,
+            'alumni'    => $t['count_alumni'],
+        ])->all();
+    }
+
+    /**
+     * Kelipatan UMP berbeda antar LAM, jadi query diulang per ambang.
+     *
+     * @return array<string, array{above:int, total:int}>
+     */
+    private function pendapatanPerProdi(array $scope, Collection $prodis, Collection $thresholds): array
+    {
+        $ambangPerProdi = $prodis->mapWithKeys(function (array $p) use ($thresholds) {
+            $key = self::key($p['nama_prodi'], $p['jenjang']);
+            return [$key => $thresholds[$key]['pendapatan']['param'] ?? self::AMBANG_UMP_DEFAULT];
+        });
+
+        // getUmpPerProdi tidak menerima nama_prodi sebagai filter tunggal;
+        // scope kaprodi diteruskan lewat $prodiFilter + jenjang.
+        $prodiFilter = $scope['nama_prodi'] !== null ? [$scope['nama_prodi']] : [];
+
+        $result = [];
+        foreach ($ambangPerProdi->unique()->push(self::AMBANG_UMP_DEFAULT)->unique() as $ambang) {
+            $res = $this->pendapatanRepo->getUmpPerProdi(
+                prodiFilter:      $prodiFilter,
+                jenjang:          $scope['jenjang'],
+                jurusan:          $scope['jurusan'],
+                idProdiIn:        $scope['id_prodi_in'],
+                tahunLulus:       $scope['tahun_lulus'],
+                mingguSnapshot:   $scope['minggu_snapshot'],
+                ambangMultiplier: (float) $ambang,
+            );
+
+            foreach ($res['chart'] as $row) {
+                $key = self::key($row['nama_prodi'], $row['jenjang']);
+                if ((float) ($ambangPerProdi[$key] ?? self::AMBANG_UMP_DEFAULT) !== (float) $ambang) {
+                    continue;
+                }
+                $result[$key] = [
+                    'above' => (int) ($row['statuses'][0]['count'] ?? 0),
+                    'total' => (int) $row['total'],
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  Threshold
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Versi standar aktif per metrik untuk satu prodi (id_prodi OLTP).
+     *
+     * @return array<string, array{lam:?string, baik:?float, unggul:?float, param:?float}>
+     */
+    private function resolveThresholds(int $prodiId): array
+    {
+        $out = [];
 
         foreach (self::METRIC_INDICATOR_KEY as $metricKey => $indicatorKey) {
             $chart   = $this->thresholdService->forChart($prodiId, $indicatorKey);
             $version = collect($chart['versions'] ?? [])->firstWhere('is_active', true);
-            $baik    = $version['thresholds']['baik']['value']   ?? null;
-            $unggul  = $version['thresholds']['unggul']['value'] ?? null;
-            $value   = $metrics[$metricKey];
 
-            $status[$metricKey] = match (true) {
-                $baik === null && $unggul === null => null,
-                $unggul !== null && $value >= $unggul => 'unggul',
-                $baik !== null && $value >= $baik => 'baik',
-                default => 'kurang',
-            };
+            $out[$metricKey] = [
+                'lam'    => $chart['lam']['name'] ?? null,
+                'baik'   => isset($version['thresholds']['baik']['value'])   ? (float) $version['thresholds']['baik']['value']   : null,
+                'unggul' => isset($version['thresholds']['unggul']['value']) ? (float) $version['thresholds']['unggul']['value'] : null,
+                'param'  => isset($version['dynamic_param']['value'])        ? (float) $version['dynamic_param']['value']        : null,
+            ];
         }
 
-        return $status;
+        return $out;
     }
 
-    // ──────────────────────────────────────────────────────────────
-    //  Data for export — reuse getChart, strip ke flat array
-    // ──────────────────────────────────────────────────────────────
-
-    public function getExportRows(array $filters): array
+    /** @return 'unggul'|'baik'|'kurang'|null */
+    private function statusOf(float $value, array $threshold): ?string
     {
-        return $this->getChart($filters)->prodiRows;
+        return match (true) {
+            $threshold['baik'] === null && $threshold['unggul'] === null => null,
+            $threshold['unggul'] !== null && $value >= $threshold['unggul'] => 'unggul',
+            $threshold['baik'] !== null && $value >= $threshold['baik'] => 'baik',
+            default => 'kurang',
+        };
     }
 
     // ──────────────────────────────────────────────────────────────
     //  PRIVATE
     // ──────────────────────────────────────────────────────────────
 
+    /**
+     * Normalisasi params. minggu_snapshot WAJIB terisi: tanpanya setiap
+     * snapshot ETL ikut terjumlah dan semua hitungan berlipat.
+     *
+     * @return array{jenjang:?string, jurusan:?string, nama_prodi:?string, id_prodi_in:?array, tahun_lulus:?string, minggu_snapshot:?string}
+     */
+    private function resolveScope(array $params): array
+    {
+        $str = fn (string $k) => isset($params[$k]) && $params[$k] !== '' ? (string) $params[$k] : null;
+
+        $tahun = $str('tahun_lulus') ?? $str('tahun');
+
+        return [
+            'jenjang'         => $str('jenjang'),
+            'jurusan'         => $str('jurusan'),
+            'nama_prodi'      => $str('nama_prodi'),
+            'id_prodi_in'     => $params['id_prodi_in'] ?? null,
+            'tahun_lulus'     => $tahun === 'all' ? null : $tahun,
+            'minggu_snapshot' => $str('minggu_snapshot') ?? $this->repo->latestSnapshotId(),
+        ];
+    }
+
+    /**
+     * Jumlahkan kolom count per prodi (lintas tahun lulus).
+     *
+     * @param  string[] $columns
+     * @return array<string, array<string, int>>
+     */
+    private function sumPerProdi(Collection $rows, array $columns): array
+    {
+        $out = [];
+        foreach ($rows as $r) {
+            if (($r['nama_prodi'] ?? '') === '') {
+                continue;
+            }
+            $key = self::key($r['nama_prodi'], $r['jenjang'] ?? '');
+            foreach ($columns as $c) {
+                $out[$key][$c] = ($out[$key][$c] ?? 0) + (int) ($r[$c] ?? 0);
+            }
+        }
+        return $out;
+    }
+
+    /** Nama prodi tidak unik antar jenjang (lihat EnforcesProdiScope), jadi kunci = nama + jenjang. */
+    private static function key(string $namaProdi, string $jenjang): string
+    {
+        return $namaProdi . '|' . $jenjang;
+    }
+
     private function pct(int $numerator, int $denominator): float
     {
         if ($denominator <= 0) return 0.0;
-        return round(($numerator / $denominator) * 100, 2);
+        return round(($numerator / $denominator) * 100, 1);
     }
 }

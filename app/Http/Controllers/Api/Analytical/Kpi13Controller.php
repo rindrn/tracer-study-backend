@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Analytical;
 
+use App\Http\Controllers\Api\Analytical\Concerns\EnforcesProdiScope;
 use App\Http\Controllers\Controller;
 use App\Services\Analytical\Kpi13Service;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,8 @@ use Illuminate\Http\Response;
  */
 class Kpi13Controller extends Controller
 {
+    use EnforcesProdiScope;
+
     public function __construct(
         private readonly Kpi13Service $service,
     ) {}
@@ -28,29 +31,32 @@ class Kpi13Controller extends Controller
     /**
      * GET /api/dashboard/kpi/13/chart
      *
-     * Query params:
-     *   ?tahun=2023   — filter tahun_snapshot (opsional)
+     * Query params (semua opsional, kaprodi/kajur dipaksa ke cakupannya):
+     *   tahun_lulus (alias lama: tahun), minggu_snapshot (default snapshot
+     *   terbaru), jenjang, jurusan, nama_prodi
      *
      * Response:
      * {
      *   "success": true,
      *   "data": {
      *     "kpi": { "id": 13, "name": "Perbandingan KPI Lintas Program Studi" },
-     *     "filters": { "tahun": "2023" },
+     *     "filters": { "tahun_lulus": "2023", "minggu_snapshot": "4" },
      *     "available_years": ["2024","2023","2022"],
      *     "data": [
      *       {
-     *         "id_prodi": 1,
-     *         "prodi": "Teknik Elektro",
+     *         "id_prodi": 12,
+     *         "prodi": "D-3 Teknik Elektronika",
+     *         "jenjang": "D3",
      *         "jurusan": "Teknik Elektro",
      *         "total_alumni": 120,
-     *         "keterserapan": 86.50,
-     *         "wirausaha": 6.67,
-     *         "masa_tunggu": 76.21,
-     *         "kesesuaian": 82.14,
-     *         "pendapatan": 54.32,
-     *         "threshold_status": { "keterserapan": "baik", "wirausaha": "kurang", "masa_tunggu": "unggul", "kesesuaian": "baik", "pendapatan": null },
-     *         "raw": { "bekerja": 103, "cepat": 78, "sesuai": 85, "wirausaha": 8, "avg_gaji": 4500000, "ambang_ump_multiplier": 1.2 }
+     *         "keterserapan": 86.5,
+     *         "wirausaha": 6.7,
+     *         "masa_tunggu": 76.2,
+     *         "kesesuaian": 82.1,
+     *         "pendapatan": 54.3,
+     *         "threshold_status": { "keterserapan": null, "wirausaha": null, "masa_tunggu": null, "kesesuaian": "unggul", "pendapatan": null },
+     *         "thresholds": { "kesesuaian": { "lam": "LAM Teknik D3", "baik": 60, "unggul": 80, "param": null }, ... },
+     *         "raw": { "alumni": 120, "terserap": 104, "bekerja": 98, "cepat": 75, "sesuai": 78, "tidak_sesuai": 17, ... }
      *       }
      *     ]
      *   }
@@ -59,7 +65,7 @@ class Kpi13Controller extends Controller
     public function chart(Request $request): JsonResponse
     {
         try {
-            $dto = $this->service->getChart($request->query());
+            $dto = $this->service->getChart($this->scopedParams($request));
 
             return response()->json([
                 'success' => true,
@@ -86,7 +92,8 @@ class Kpi13Controller extends Controller
     {
         try {
             $format  = $request->query('format', 'csv');
-            $filters = $request->except('format');
+            $filters = $this->scopedParams($request);
+            unset($filters['format']);
             $rows    = $this->service->getExportRows($filters);
 
             return match ($format) {
@@ -107,7 +114,7 @@ class Kpi13Controller extends Controller
 
     private function toCsv(array $rows): \Illuminate\Http\Response
     {
-        $headers = ['Program Studi', 'Jurusan', 'Total Alumni', 'Keterserapan (%)', 'Wirausaha (%)', 'Masa Tunggu ≤6bln (%)', 'Kesesuaian Bidang (%)', 'Pendapatan ≥1,2x UMP (%)'];
+        $headers = ['Program Studi', 'Jurusan', 'Total Alumni', 'Keterserapan (%)', 'Wirausaha (%)', 'Masa Tunggu Cepat (%)', 'Kesesuaian Bidang (%)', 'Pendapatan ≥ Ambang UMP (%)'];
         $lines   = [implode(',', $headers)];
 
         foreach ($rows as $r) {
@@ -142,7 +149,7 @@ class Kpi13Controller extends Controller
         $sheet       = $spreadsheet->getActiveSheet()->setTitle('KPI 13');
 
         $sheet->fromArray(
-            [['Program Studi', 'Jurusan', 'Total Alumni', 'Keterserapan (%)', 'Wirausaha (%)', 'Masa Tunggu ≤6bln (%)', 'Kesesuaian Bidang (%)', 'Pendapatan ≥1,2x UMP (%)']],
+            [['Program Studi', 'Jurusan', 'Total Alumni', 'Keterserapan (%)', 'Wirausaha (%)', 'Masa Tunggu Cepat (%)', 'Kesesuaian Bidang (%)', 'Pendapatan ≥ Ambang UMP (%)']],
             null, 'A1'
         );
         $sheet->fromArray(

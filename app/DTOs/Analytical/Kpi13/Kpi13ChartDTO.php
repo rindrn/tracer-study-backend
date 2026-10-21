@@ -21,6 +21,7 @@ class Kpi13ChartDTO
          * @var array<array{
          *   id_prodi: int,
          *   prodi: string,
+         *   jenjang: string,
          *   jurusan: string,
          *   total_alumni: int,
          *   keterserapan: float,
@@ -29,7 +30,8 @@ class Kpi13ChartDTO
          *   wirausaha: float,
          *   pendapatan: float,
          *   threshold_status: array<string, 'unggul'|'baik'|'kurang'|null>,
-         *   raw: array{bekerja:int, cepat:int, sesuai:int, wirausaha:int, avg_gaji:int, ambang_ump_multiplier:float}
+         *   thresholds: array<string, array{lam:?string, baik:?float, unggul:?float, param:?float}>,
+         *   raw: array<string, int>
          * }>
          */
         public readonly array $prodiRows,
