@@ -14,6 +14,19 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
     ];
 
     /**
+     * Kuesioner (f21–f27) bertanya "seberapa besar penekanan metode X" dengan
+     * skala 1 = Sangat Besar … 5 = Tidak Sama Sekali, dan nilainya disimpan
+     * apa adanya. Untuk ditampilkan skalanya dibalik (6 − skor) agar searah
+     * dengan grafik: makin besar makin ditekankan. Rata-rata dari jawaban
+     * terbalik sama dengan jawaban terbalik dari rata-rata, jadi pembalikan
+     * cukup di hasil agregat. 0 (tidak ada data) dibiarkan 0.
+     */
+    private static function penekanan(float $skorKuesioner): float
+    {
+        return $skorKuesioner > 0 ? 6 - $skorKuesioner : 0.0;
+    }
+
+    /**
      *
      * @return Collection<array{kode_field, label, avg_skor, count}>
      */
@@ -51,7 +64,7 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
         ])->map(fn($r) => [
             'kode_field' => $r['DimIndikatorEvaluasi.kode_field']       ?? '',
             'label'      => $r['DimIndikatorEvaluasi.label_pertanyaan'] ?? '',
-            'avg_skor'   => (float) ($r['FactRangeEvaluasi.avg_skor']   ?? 0),
+            'avg_skor'   => self::penekanan((float) ($r['FactRangeEvaluasi.avg_skor'] ?? 0)),
             'count'      => (int)   ($r['FactRangeEvaluasi.count']      ?? 0),
         ]);
     }
@@ -115,7 +128,7 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
             'jenjang'     => $r['DimProdi.jenjang']                      ?? '',
             'jurusan'     => $r['DimProdi.jurusan']                      ?? '',
             'tahun_lulus' => $r['DimAlumni.tahun_lulus']                 ?? '',
-            'avg_skor'    => (float) ($r['FactRangeEvaluasi.avg_skor']   ?? 0),
+            'avg_skor'    => self::penekanan((float) ($r['FactRangeEvaluasi.avg_skor'] ?? 0)),
             'count'       => (int)   ($r['FactRangeEvaluasi.count']      ?? 0),
         ]);
     }
@@ -191,7 +204,7 @@ class MetodePembelajaranRepository extends BaseAnalyticalRepository
             'jenjang'     => $r['DimProdi.jenjang']                      ?? '',
             'tahun_lulus' => $r['DimAlumni.tahun_lulus']                 ?? '',
             'metode'      => $r['DimIndikatorEvaluasi.label_pertanyaan'] ?? '',
-            'skor'        => round((float) ($r['FactRangeEvaluasi.avg_skor'] ?? 0), 2),
+            'skor'        => round(self::penekanan((float) ($r['FactRangeEvaluasi.avg_skor'] ?? 0)), 2),
         ])->toArray();
 
         return [
