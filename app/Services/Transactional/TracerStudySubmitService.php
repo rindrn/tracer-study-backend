@@ -398,6 +398,23 @@ class TracerStudySubmitService
      */
     private function persistNormalizedRecords(array $validated, int $alumniId, int $questionnaireId): void
     {
+        $this->persistStatusRecords($validated, $alumniId, $questionnaireId);
+
+        $this->persistStakeholderContacts($validated, $alumniId, $questionnaireId, (int) ($validated['f8'] ?? 0));
+    }
+
+    /**
+     * Bagian persistNormalizedRecords() yang hanya bergantung pada jawaban
+     * kuesioner umum: employment_records dan education_records.
+     *
+     * Publik supaya impor PDDikti (PddiktiImportService) menormalkan jawaban
+     * dengan aturan yang sama persis dengan pengisian online. Kontak penilai
+     * sengaja tidak ikut: berkas PDDikti tidak memuatnya, dan memanggil
+     * persistStakeholderContacts() dengan isian kosong akan menghapus kontak
+     * yang sudah ada.
+     */
+    public function persistStatusRecords(array $validated, int $alumniId, int $questionnaireId): void
+    {
         $status = (int) ($validated['f8'] ?? 0);
 
         $employmentStatus = self::EMPLOYMENT_STATUS_BY_F8[$status] ?? null;
@@ -426,8 +443,6 @@ class TracerStudySubmitService
                 'major'            => $validated['f18c'] ?? null,
             ]);
         }
-
-        $this->persistStakeholderContacts($validated, $alumniId, $questionnaireId, $status);
     }
 
     /** Nilai f8 → kolom alumni_status di stakeholder_contacts. */

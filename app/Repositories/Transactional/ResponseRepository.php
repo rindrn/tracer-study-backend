@@ -321,6 +321,32 @@ class ResponseRepository
     }
 
     /**
+     * Respons hasil impor PDDikti: langsung 'submitted', bertanda
+     * source = 'import' dan nomor batch-nya.
+     *
+     * Tanda itu yang membedakannya dari pengisian online — impor berikutnya
+     * boleh menggantinya, tetapi tidak boleh menimpa pengisian online — dan
+     * yang memungkinkan satu impor dibatalkan utuh (lihat
+     * PddiktiImportService::rollback()). started_at dibiarkan NULL: tidak ada
+     * sesi pengisian yang bisa diukur durasinya.
+     */
+    public function createImportedResponse(int $questionnaireId, int $alumniId, int $batchId): int
+    {
+        $now = Carbon::now();
+
+        return DB::connection(self::CONN)->table('responses')->insertGetId([
+            'questionnaire_id' => $questionnaireId,
+            'alumni_id'        => $alumniId,
+            'status'           => 'submitted',
+            'source'           => 'import',
+            'import_batch_id'  => $batchId,
+            'submitted_at'     => $now,
+            'created_at'       => $now,
+            'updated_at'       => $now,
+        ]);
+    }
+
+    /**
      * Bulk insert ke response_answers.
      * $records: list of ['question_code' => ..., 'answer_text' => ...] (response_id akan di-inject).
      */

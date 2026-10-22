@@ -406,6 +406,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('questionnaires', [QuestionnaireController::class, 'store']);
         Route::put('questionnaires/{questionnaire}', [QuestionnaireController::class, 'update']);
 
+        // Impor jawaban berformat PDDikti (tombol di halaman Manajemen Kuesioner).
+        // Validasi dan impor berjalan di queue; FE mempoll show() untuk progresnya.
+        Route::prefix('pddikti-imports')->controller(\App\Http\Controllers\Api\Transactional\PddiktiImportController::class)->group(function () {
+            Route::get('template', 'template');
+            Route::post('/', 'store');
+            Route::get('{id}', 'show')->whereNumber('id');
+            Route::get('{id}/errors', 'errors')->whereNumber('id');
+            Route::post('{id}/confirm', 'confirm')->whereNumber('id');
+            Route::post('{id}/cancel', 'cancel')->whereNumber('id');
+        });
+
         // Request delete (tracer_team submits)
         Route::post('approvals/request-delete', [ApprovalController::class, 'requestDelete']);
 
