@@ -104,12 +104,16 @@ class ProgramService
                 : $program->jurusan,
             'degree'    => $validated['degree'],
             'is_active' => $validated['is_active'] ?? $program->is_active,
-            // ?? mempertahankan nilai lama saat kunci tidak dikirim; itu yang
-            // membuat form yang belum punya isian akreditasi tidak menghapus
-            // data yang sudah ada. Mengosongkan tetap bisa, dengan mengirim
-            // null secara eksplisit.
-            'accreditation'    => $validated['accreditation'] ?? $program->accreditation,
-            'accredited_until' => $validated['accredited_until'] ?? $program->accredited_until,
+            // Sama seperti dikti_code: kunci yang tidak dikirim mempertahankan
+            // nilai lama, null yang dikirim sengaja mengosongkannya. Dengan ??
+            // null eksplisit ikut jatuh ke nilai lama, jadi akreditasi yang
+            // salah isi tidak pernah bisa dihapus dari form.
+            'accreditation'    => array_key_exists('accreditation', $validated)
+                ? $validated['accreditation']
+                : $program->accreditation,
+            'accredited_until' => array_key_exists('accredited_until', $validated)
+                ? $validated['accredited_until']
+                : $program->accredited_until,
         ]);
 
         if ($updated->jurusan !== $jurusanLama) {
