@@ -27,20 +27,28 @@ query ke `http://cube:4000` dengan JWT (`config/cubejs.php`).
 
 Compose ini tinggal di repositori backend tetapi membangun ketiga repositori
 sekaligus. Karena itu **ketiga repositori harus berada dalam satu folder induk
-yang sama** di VPS:
+yang sama**. Di VPS produksi folder induknya `/opt/tracer-study/`:
 
 ```
-smarttracer/
-├── tracer-study-backend/     <- repositori ini
-│   └── deploy/               <- berkas di tabel bawah
+/opt/tracer-study/
+├── tracer-study-backend/      <- repositori ini
+│   └── deploy/                <- berkas di tabel bawah
 ├── fe-tracer-study/
-└── tracer-study-analytics/
+├── tracer-study-analytics/    <- juga memuat model Cube, dipasang read-only ke service `cube`
+├── certbot/                   <- sertifikat Let's Encrypt (lihat bagian HTTPS)
+└── renew-cert.sh              <- perpanjang sertifikat, dipanggil cron harian
 ```
+
+> Model Cube dulu sempat berada di clone terpisah bernama `cube/`. Clone itu
+> sudah dihapus — satu-satunya sumber model sekarang `tracer-study-analytics/`
+> (service `cube` memasangnya lewat `../../tracer-study-analytics/tracer-analytics`).
 
 | Berkas | Isi |
 |---|---|
-| `deploy/docker-compose.yml` | Delapan service beserta batas memori |
-| `deploy/nginx/default.conf` | nginx edge: pembagian jalur dan fastcgi |
+| `deploy/docker-compose.yml` | Delapan service aktif + batas memori (plus `metabase` opsional yang tidak dipakai) |
+| `deploy/docker-compose.override.yml` | Override server produksi: port 443/HTTPS, `nginx-local`, mount certbot |
+| `deploy/nginx/default.conf` | nginx edge dasar (HTTP): pembagian jalur dan fastcgi |
+| `deploy/nginx-local/default.conf` | nginx edge produksi (HTTPS), dipakai lewat override |
 | `deploy/.env.example` | Contoh variabel; salin ke `deploy/.env` |
 | `Dockerfile` | Image PHP-FPM (dipakai app, worker, scheduler) |
 | `docker/` | `entrypoint.sh`, `php.ini`, `php-fpm.conf` |
@@ -61,6 +69,8 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```bash
 cd deploy
 cp .env.example .env      # lalu isi APP_KEY, POSTGRES_PASSWORD, CUBEJS_API_SECRET
+# produksi: set juga COMPOSE_PROJECT_NAME=smarttracer di .env, supaya nama project
+# konsisten dan docker-compose.override.yml (HTTPS) ikut termuat otomatis
 docker compose up -d --build
 docker compose logs -f app
 ```
@@ -141,12 +151,15 @@ melakukannya karena image-nya berubah.
 
 ## HTTPS
 
-`docker-compose.yml` hanya membuka port 80. Cara paling ringkas menambah TLS
-tanpa mengubah susunan: pasang Caddy atau nginx di host sebagai reverse proxy
-ke `127.0.0.1:80`, atau ganti `ports: "80:80"` menjadi `"127.0.0.1:8080:80"`
-lalu arahkan Caddy host ke sana. Setelah HTTPS aktif, tambahkan header HSTS di
-`nginx/default.conf` — sengaja belum dipasang supaya domain tidak terkunci ke
-https sebelum sertifikat ada.
+Di server produksi TLS sudah aktif lewat `docker-compose.override.yml` (termuat
+otomatis saat menjalankan compose dari folder `deploy`): service nginx membuka
+port 443 dan memakai `deploy/nginx-local/default.conf`, dengan sertifikat
+Let's Encrypt dipasang read-only dari `/opt/tracer-study/certbot/`. Sertifikat
+diperpanjang otomatis oleh `/opt/tracer-study/renew-cert.sh` (dipanggil cron
+harian) yang menjalankan `certbot renew` lalu me-reload nginx.
+
+`docker-compose.yml` dasar sendiri hanya membuka port 80; seluruh konfigurasi
+HTTPS berasal dari override.
 
 ## Backup
 

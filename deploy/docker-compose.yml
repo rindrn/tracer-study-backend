@@ -164,8 +164,8 @@ services:
     volumes:
       # Model dipasang read-only langsung dari repositori analitik supaya
       # perubahan definisi cube tidak perlu build image.
-      - ../../cube/tracer-analytics/model:/cube/conf/model:ro
-      - ../../cube/tracer-analytics/cube.js:/cube/conf/cube.js:ro
+      - ../../tracer-study-analytics/tracer-analytics/model:/cube/conf/model:ro
+      - ../../tracer-study-analytics/tracer-analytics/cube.js:/cube/conf/cube.js:ro
     depends_on:
       postgres:
         condition: service_healthy

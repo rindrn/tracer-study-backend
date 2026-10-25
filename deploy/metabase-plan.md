@@ -1,5 +1,10 @@
 # Rencana Metabase: Analisis Multi-Dimensi Tracer Study
 
+> **USANG — Metabase tidak dipakai di server ini.** Service `metabase` di
+> `docker-compose.yml` berada di balik `profiles: ["metabase"]`, jadi tidak ikut
+> naik pada deploy normal. Dokumen ini disimpan sebagai catatan rencana saja,
+> bukan acuan setup yang berjalan.
+
 ## Context
 
 Ada dokumen plan (gaya laporan implementasi) yang mengusulkan setup Metabase sebagai
@@ -48,7 +53,7 @@ infrastruktur.
    network Docker (`internal`) dengan `postgres`, connect via hostname service, bukan
    IP host.
 4. **Nama sibling repo salah**: bukan `tracer-study-analytics`, tapi
-   `/opt/tracer-study/cube/tracer-analytics/model/cubes/`.
+   `/opt/tracer-study/tracer-study-analytics/tracer-analytics/model/cubes/`.
 
 ### Temuan baru di luar cakupan plan awal — celah keamanan nyata yang sudah live
 
@@ -131,7 +136,7 @@ deploy/metabase/
 - Field Filter (`{{tahun_lulus}}`, `{{prodi}}`) dan layout dashboard 2 kolom (chart +
   kartu insight teks) — desainnya tetap dipakai, valid.
 - Ganti semua referensi path Cube.js di dokumentasi/komentar ke path yang benar:
-  `/opt/tracer-study/cube/tracer-analytics/model/cubes/`.
+  `/opt/tracer-study/tracer-study-analytics/tracer-analytics/model/cubes/`.
 - Bagian "Kalau Ingin Dipindah ke Produksi Nanti" dari plan awal sudah tidak relevan
   (sudah di produksi). Soal RAM: service `metabase` sudah diberi `mem_limit: 512m` di
   compose yang sudah jalan, `JAVA_OPTS=-Xmx384m` — konsisten dengan batas VPS 2GB,
