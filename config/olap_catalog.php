@@ -147,6 +147,10 @@ return [
                     'label' => 'Rata-rata gaji', 'format' => 'currency',
                     'description' => 'Rata-rata pendapatan bersih (take home pay) per bulan.',
                 ],
+                'FactTracerStudy.count_gaji' => [
+                    'label' => 'Jumlah alumni bergaji', 'format' => 'integer',
+                    'description' => 'Alumni yang gajinya terisi dan valid; pembagi rata-rata gaji.',
+                ],
                 'FactTracerStudy.min_take_home_pay' => [
                     'label' => 'Gaji terendah', 'format' => 'currency',
                     'description' => 'Pendapatan bersih per bulan paling kecil.',
