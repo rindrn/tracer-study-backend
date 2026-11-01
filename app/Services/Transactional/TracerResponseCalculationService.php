@@ -46,6 +46,31 @@ class TracerResponseCalculationService
     }
 
     /**
+     * Hitung threshold seluruh tahun lulus untuk prodi tertentu — dipanggil saat
+     * prodi didaftarkan ke LAM, supaya garis threshold langsung tersedia tanpa
+     * menunggu jadwal harian tracer:recalc-response-threshold.
+     */
+    public function recalculateForPrograms(array $programIds): int
+    {
+        if ($programIds === []) {
+            return 0;
+        }
+
+        $combos = DB::connection('oltp')
+            ->table('alumni_profiles')
+            ->whereIn('program_id', $programIds)
+            ->select('program_id', 'graduation_year')
+            ->distinct()
+            ->get();
+
+        foreach ($combos as $combo) {
+            $this->recalculate((int) $combo->program_id, (int) $combo->graduation_year);
+        }
+
+        return $combos->count();
+    }
+
+    /**
      * Scan kombinasi program+tahun yang punya data lulusan.
      * Dibatasi ke prodi yang terdaftar di lam_programs saja — prodi tanpa LAM
      * tidak butuh threshold akreditasi, jadi tidak perlu dihitung/disimpan.

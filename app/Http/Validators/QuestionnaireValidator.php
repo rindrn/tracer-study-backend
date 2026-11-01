@@ -23,7 +23,12 @@ class QuestionnaireValidator
         // (programs/provinces/cities), bukan diketik pembuat borang. Di
         // database tetap tersimpan sebagai short_text; pembedanya ada di
         // metadata — lihat QuestionnaireService::buildQuestionMetadata().
-        $questionTypes = ['short', 'paragraph', 'number', 'multiple_choice', 'checkbox', 'dropdown', 'lookup', 'file_upload', 'linear_scale', 'rating', 'multiple_choice_grid', 'checkbox_grid', 'date', 'time'];
+        //
+        // 'file_upload' sengaja TIDAK ada (BR-007): sistem tidak menerima unggahan
+        // berkas dari alumni. Pembuat borang memang tidak menawarkannya, tapi
+        // penjaga terakhirnya harus di sini — permintaan API langsung tidak
+        // melewati dropdown pembuat borang.
+        $questionTypes = ['short', 'paragraph', 'number', 'multiple_choice', 'checkbox', 'dropdown', 'lookup', 'linear_scale', 'rating', 'multiple_choice_grid', 'checkbox_grid', 'date', 'time'];
 
         $validator = Validator::make($data, [
             'title' => ['required', 'string', 'max:200'],
@@ -97,8 +102,8 @@ class QuestionnaireValidator
             'sections.*.questions.*.group_label' => ['nullable', 'string', 'max:500'],
             'sections.*.questions.*.group_title' => ['nullable', 'string', 'max:500'],
         ], [
-            'title.required' => 'Judul kuisioner wajib diisi.',
-            'status.required' => 'Status kuisioner wajib diisi.',
+            'title.required' => 'Judul kuesioner wajib diisi.',
+            'status.required' => 'Status kuesioner wajib diisi.',
             'sections.required' => 'Minimal 1 section harus diisi.',
             'sections.min' => 'Minimal 1 section harus diisi.',
             'sections.*.title.required' => 'Judul section wajib diisi.',
@@ -106,6 +111,7 @@ class QuestionnaireValidator
             'sections.*.questions.min' => 'Minimal 1 pertanyaan harus diisi di setiap section.',
             'sections.*.questions.*.question.required' => 'Teks pertanyaan wajib diisi.',
             'sections.*.questions.*.type.required' => 'Tipe pertanyaan wajib diisi.',
+            'sections.*.questions.*.type.in' => 'Tipe pertanyaan tidak didukung. Unggahan berkas (File Upload) tidak tersedia di kuesioner.',
         ]);
 
         if ($validator->fails()) {

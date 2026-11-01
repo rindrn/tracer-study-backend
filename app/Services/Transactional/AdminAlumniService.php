@@ -34,11 +34,32 @@ class AdminAlumniService
     public function list(User $user, array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $filters = $this->applyRoleScope($user, $filters);
-        if (!empty($filters['questionnaire_id'])) {
-            return $this->alumniRepo->paginateRespondentsByQuestionnaire($filters, $perPage);
+        $page = !empty($filters['questionnaire_id'])
+            ? $this->alumniRepo->paginateRespondentsByQuestionnaire($filters, $perPage)
+            : $this->alumniRepo->paginateForAdminWithResponseStatus($filters, $perPage);
+
+        return $page->through(fn ($row) => $this->presentForUser($user, $row));
+    }
+
+    /**
+     * Bentuk data alumni untuk staf.
+     *
+     * - Hash kata sandi tidak pernah dikirim ke klien.
+     * - NIK utuh hanya untuk Ketua Tracer & Tim Tracer (penerbit kredensial dan
+     *   penanggung jawab permintaan data subjek). Peran lain (Kaprodi, Kajur,
+     *   Dekan, Wadir) menerima NIK tersamar, mis. ************1234 (NFR-02).
+     */
+    private function presentForUser(User $user, object $row): object
+    {
+        $row = clone $row;
+        unset($row->password);
+
+        if (isset($row->nik) && $row->nik !== '' && !($user->isHeadTracer() || $user->isTracerTeam())) {
+            $nik = (string) $row->nik;
+            $row->nik = str_repeat('*', max(strlen($nik) - 4, 0)) . substr($nik, -4);
         }
 
-        return $this->alumniRepo->paginateForAdminWithResponseStatus($filters, $perPage);
+        return $row;
     }
 
     /**
@@ -171,7 +192,7 @@ class AdminAlumniService
 
         $this->assertKaprodiCanAccessProgram($user, $alumni->program_id);
 
-        return $alumni;
+        return $this->presentForUser($user, $alumni);
     }
 
     // ═══════════════════════════════════════════════════════════

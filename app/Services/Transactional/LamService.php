@@ -17,6 +17,7 @@ class LamService
     public function __construct(
         private readonly LamRepository        $repo,
         private readonly LamProgramRepository $programRepo,
+        private readonly TracerResponseCalculationService $responseCalc,
     ) {}
 
     public function list(array $include = []): array
@@ -128,6 +129,7 @@ class LamService
     {
         $lam      = $this->repo->create($data, $data['program_ids'] ?? []);
         $programs = $this->programRepo->byLam($lam->id)->toArray();
+        $this->responseCalc->recalculateForPrograms($data['program_ids'] ?? []);
 
         // Bust semua cache list — key bervariasi tergantung ?include=
         $this->forgetTag('lams');
@@ -143,6 +145,7 @@ class LamService
 
         $lam      = $this->repo->update($id, $data);
         $programs = $this->programRepo->byLam($id)->toArray();
+        $this->responseCalc->recalculateForPrograms(array_column($programs, 'id'));
 
         $this->forget("lams:show:{$id}");
         $this->forgetTag('lams');

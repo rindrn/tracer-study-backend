@@ -119,7 +119,7 @@ class ResponseSeeder extends Seeder
             // begitu, dan akibatnya alumni yang angkatannya tidak disasar
             // kuesioner mana pun tetap dibuatkan respons -- yang nyantol ke
             // kuesioner angkatan lain. Kesalahannya tidak kelihatan di seeder,
-            // baru muncul di halaman Manajemen Kuisioner sebagai angkatan
+            // baru muncul di halaman Manajemen Kuesioner sebagai angkatan
             // berlabel "Belum digarap" yang anehnya punya ratusan pengisi.
             // Melewati alumninya membuat ketimpangan daftar tahun langsung
             // terlihat sebagai angkatan yang benar-benar kosong.

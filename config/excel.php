@@ -224,7 +224,7 @@ return [
     |
     */
     'value_binder'       => [
-        'default' => Maatwebsite\Excel\DefaultValueBinder::class,
+        'default' => App\Exports\Support\SafeStringValueBinder::class,
     ],
 
     'cache'        => [

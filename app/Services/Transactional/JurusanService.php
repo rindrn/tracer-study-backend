@@ -30,6 +30,7 @@ class JurusanService
             'is_active'     => (bool) $row->is_active,
             'program_count' => (int) $row->program_count,
             'user_count'    => (int) $row->user_count,
+            'fakultas_count' => (int) $row->fakultas_count,
             // Keanggotaan EKSPLISIT lewat jurusan_program_scopes (sumber
             // otorisasi Kajur) -- beda dari program_count di atas yang
             // masih dari cocokkan teks programs.jurusan. Dikirim sekalian

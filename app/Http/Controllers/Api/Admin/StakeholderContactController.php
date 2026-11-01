@@ -24,7 +24,7 @@ class StakeholderContactController extends Controller
     private function csvSafe(?string $value): string
     {
         $value = (string) $value;
-        if (preg_match('/^[=+\-@]/', $value)) {
+        if (preg_match('/^[=+\-@\t\r]/', $value)) {
             return "'" . $value;
         }
         return $value;

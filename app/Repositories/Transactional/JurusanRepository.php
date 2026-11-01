@@ -20,14 +20,26 @@ class JurusanRepository
      * Seluruh jurusan beserta jumlah pemakaiannya.
      *
      * Hitungan dipakai antarmuka untuk menerangkan akibat penggantian nama,
-     * dan untuk menonaktifkan tombol hapus ketika masih terpakai.
+     * dan untuk menonaktifkan tombol hapus ketika masih terpakai. Karena itu
+     * cara menghitungnya harus sama dengan penjaga di JurusanService::delete():
+     * prodi lewat teks `programs.jurusan` ATAU keanggotaan
+     * `jurusan_program_scopes`, staf lewat teks `users.jurusan` ATAU FK
+     * `users.jurusan_id`, ditambah Fakultas yang mencakupnya. Dulu hanya jalur
+     * teks yang dihitung, sehingga jurusan yang dipakai akun Kajur baru tampak
+     * "0 akun staf" dengan tombol hapus aktif, padahal peladen menolaknya.
      */
     public function allWithUsage(): Collection
     {
         return collect(
             DB::connection(self::CONN)->table('jurusans as j')
-                ->leftJoin('programs as p', 'p.jurusan', '=', 'j.name')
-                ->leftJoin('users as u', 'u.jurusan', '=', 'j.name')
+                ->leftJoin('jurusan_program_scopes as jps', 'jps.jurusan_id', '=', 'j.id')
+                ->leftJoin('programs as p', function ($join) {
+                    $join->on('p.jurusan', '=', 'j.name')->orOn('p.id', '=', 'jps.program_id');
+                })
+                ->leftJoin('users as u', function ($join) {
+                    $join->on('u.jurusan', '=', 'j.name')->orOn('u.jurusan_id', '=', 'j.id');
+                })
+                ->leftJoin('fakultas_jurusan_scopes as fjs', 'fjs.jurusan_id', '=', 'j.id')
                 ->groupBy('j.id', 'j.name', 'j.is_active', 'j.created_at', 'j.updated_at')
                 ->orderBy('j.name')
                 ->select([
@@ -38,6 +50,7 @@ class JurusanRepository
                     'j.updated_at',
                     DB::raw('COUNT(DISTINCT p.id) as program_count'),
                     DB::raw('COUNT(DISTINCT u.id) as user_count'),
+                    DB::raw('COUNT(DISTINCT fjs.fakultas_id) as fakultas_count'),
                 ])
                 ->get()
         );

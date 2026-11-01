@@ -7,6 +7,8 @@ use App\Http\Middleware\RoleAccessMiddleware;
 use App\Exceptions\BusinessException;
 use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\AuthenticationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -72,6 +74,32 @@ return Application::configure(basePath: dirname(__DIR__))
                     ? 'Data ini masih dipakai oleh data lain, jadi tidak bisa dihapus. Lepaskan atau hapus dulu keterkaitannya.'
                     : 'Data rujukan yang dipilih tidak ditemukan. Muat ulang halaman lalu pilih ulang.',
             ], 409);
+        });
+
+        // Galat HTTP bawaan Laravel berbahasa Inggris ("Unauthenticated.",
+        // "The route ... could not be found.") dan ikut tampil di toast
+        // dashboard (NFR-07). Hanya untuk permintaan API; frontend membaca
+        // kode statusnya, bukan teksnya, jadi pesan aman diganti.
+        $exceptions->render(function (AuthenticationException $e, $request) {
+            if (! $request->is('api/*')) return null;
+            return response()->json([
+                'success' => false,
+                'message' => 'Sesi Anda telah berakhir atau Anda belum masuk. Silakan masuk kembali.',
+            ], 401);
+        });
+        $exceptions->render(function (HttpExceptionInterface $e, $request) {
+            if (! $request->is('api/*')) return null;
+            $pesan = [
+                403 => 'Anda tidak memiliki izin untuk tindakan ini.',
+                404 => 'Data atau alamat yang diminta tidak ditemukan.',
+                405 => 'Metode permintaan ini tidak didukung untuk alamat tersebut.',
+            ][$e->getStatusCode()] ?? null;
+            // Pesan khusus dari aplikasi (abort(403, '...')) dipertahankan;
+            // yang diganti hanya pesan bawaan framework.
+            if ($pesan === null || ($e->getMessage() !== '' && ! preg_match('/could not be found|No query results|unauthorized|not supported/i', $e->getMessage()))) {
+                return null;
+            }
+            return response()->json(['success' => false, 'message' => $pesan], $e->getStatusCode(), $e->getHeaders());
         });
 
         // BusinessException → JSON dengan HTTP code sesuai $e->getCode().

@@ -39,7 +39,9 @@ class StoreAlumniRequest extends FormRequest
         // Kaprodi tidak perlu — program_id auto-fill di AdminAlumniService::create.
         // Role viewer (wadir, kajur) ditolak di service via assertCanWrite.
         if ($user && $user->isHeadTracer()) {
-            $rules['program_id'] = ['required', 'exists:oltp.programs,id'];
+            // 'integer' + bail lebih dulu: nilai non-angka yang sampai ke 'exists'
+            // membuat PostgreSQL gagal membandingkannya dengan kolom bigint (500).
+            $rules['program_id'] = ['bail', 'required', 'integer', 'exists:oltp.programs,id'];
         }
 
         return $rules;

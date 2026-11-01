@@ -36,7 +36,7 @@ class UpdateAlumniRequest extends FormRequest
         ];
 
         if ($user && $user->isHeadTracer()) {
-            $rules['program_id'] = ['sometimes', 'required', 'exists:oltp.programs,id'];
+            $rules['program_id'] = ['bail', 'sometimes', 'required', 'integer', 'exists:oltp.programs,id'];
         }
 
         return $rules;

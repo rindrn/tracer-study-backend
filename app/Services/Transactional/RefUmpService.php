@@ -63,12 +63,27 @@ class RefUmpService
                 ];
             }
 
+            // Tahun yang baru tersimpan sebagian tetap menampilkan ke-34
+            // provinsi. Tanpa ini provinsi yang belum punya baris hilang dari
+            // tabel: tidak bisa diisi inline dan peringatan "provinsi masih
+            // kosong" (BR-015) tidak pernah muncul.
+            $savedByProvince = $saved->keyBy('province_id');
+            $rows = $this->repo->allProvinces()->map(
+                fn($p) => $savedByProvince->has($p->id)
+                    ? UmpRowDTO::fromModel($savedByProvince->get($p->id))->toArray()
+                    : UmpRowDTO::preview(
+                        tahun:        $tahun,
+                        idProvinsi:   $p->id,
+                        namaProvinsi: $p->name,
+                        nilaiUmp:     null,
+                        sumber:       'KOSONG',
+                    )->toArray()
+            );
+
             return [
                 'tahun'           => $tahun,
                 'sudah_tersimpan' => true,
-                'rows'            => $saved->map(
-                    fn($r) => UmpRowDTO::fromModel($r)->toArray()
-                )->values()->toArray(),
+                'rows'            => $rows->values()->toArray(),
             ];
         }, self::TTL);
     }

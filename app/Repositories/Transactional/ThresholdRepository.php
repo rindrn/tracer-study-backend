@@ -154,6 +154,11 @@ class ThresholdRepository
             ->join('lams as l', 'l.id', '=', 'lp.lam_id')
             ->where('lp.program_id', $prodiId)
             ->select('l.id as lam_id', 'l.name as lam_name', 'l.code as lam_code')
+            // Satu prodi boleh terdaftar di lebih dari satu LAM (mis. pindah LAM).
+            // Tanpa urutan, first() memilih LAM sembarang dan standar yang tampil
+            // bisa milik LAM lama yang belum punya standar. Penetapan terbaru menang.
+            ->orderByDesc('lp.created_at')
+            ->orderByDesc('lp.id')
             ->first();
 
         if (! $lamRow) return null;

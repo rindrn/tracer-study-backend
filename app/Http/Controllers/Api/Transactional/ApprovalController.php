@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api\Transactional;
 
+use App\Exceptions\BusinessException;
 use App\Http\Controllers\Controller;
 use App\Models\Transactional\ApprovalRequest;
 use App\Models\Transactional\User;
+use App\Services\Transactional\QuestionnaireService;
 use App\Services\Transactional\ResponseReopenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +16,7 @@ class ApprovalController extends Controller
 {
     public function __construct(
         private readonly ResponseReopenService $reopenService,
+        private readonly QuestionnaireService $questionnaireService,
     ) {}
 
     /** GET /api/approvals — head_tracer melihat semua, pemohon melihat miliknya */
@@ -45,16 +48,23 @@ class ApprovalController extends Controller
             return response()->json(['success' => false, 'message' => 'Request sudah diproses.'], 422);
         }
 
-        $approval->update([
-            'status'      => ApprovalRequest::STATUS_APPROVED,
-            'approver_id' => $request->user()->id,
-            'note'        => $request->input('note'),
-            'resolved_at' => now(),
-        ]);
+        // Status disetujui dan eksekusinya satu transaksi: bila eksekusi gagal
+        // (mis. kuesioner sudah punya responden), permintaan tetap pending dan
+        // tidak tercatat "approved" padahal kuesionernya masih ada.
+        $message = DB::connection('oltp')->transaction(function () use ($approval, $request) {
+            $approval->update([
+                'status'      => ApprovalRequest::STATUS_APPROVED,
+                'approver_id' => $request->user()->id,
+                'note'        => $request->input('note'),
+                'resolved_at' => now(),
+            ]);
+
+            return $this->executeApprovedAction($approval);
+        });
 
         return response()->json([
             'success' => true,
-            'message' => $this->executeApprovedAction($approval),
+            'message' => $message,
         ]);
     }
 
@@ -85,9 +95,16 @@ class ApprovalController extends Controller
             return 'Request disetujui.';
         }
 
-        DB::connection('oltp')->table('questionnaires')
+        $updated = DB::connection('oltp')->table('questionnaires')
             ->where('id', $payload['questionnaire_id'])
             ->update(['status' => 'published', 'published_at' => now()]);
+
+        // Kuesioner yang diajukan sudah tidak ada (mis. terhapus lebih dulu).
+        // Dilempar supaya transaksi approve() batal dan permintaan tidak
+        // tercatat "disetujui, kuesioner diterbitkan" padahal tidak ada apa-apa.
+        if ($updated === 0) {
+            throw new BusinessException('Kuesioner yang diajukan sudah tidak ada, sehingga tidak dapat diterbitkan. Tolak permintaan ini.', 422);
+        }
 
         return 'Request disetujui. Kuesioner diterbitkan.';
     }
@@ -98,9 +115,9 @@ class ApprovalController extends Controller
             return 'Request disetujui.';
         }
 
-        DB::connection('oltp')->table('questionnaires')
-            ->where('id', $payload['questionnaire_id'])
-            ->delete();
+        // Jalur yang sama dengan hapus langsung oleh Ketua Tracer: menolak bila
+        // sudah ada responden dan membersihkan pemetaan semantik lebih dulu.
+        $this->questionnaireService->delete((int) $payload['questionnaire_id']);
 
         return 'Request disetujui. Kuesioner dihapus.';
     }

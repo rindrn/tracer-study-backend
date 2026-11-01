@@ -71,8 +71,8 @@ class QuestionnaireController extends Controller
         return response()->json([
             'success' => true,
             'message' => $request->user()->isTracerTeam()
-                ? 'Kuisioner berhasil diajukan sebagai draft. Menunggu approval Super Admin.'
-                : 'Kuisioner berhasil disimpan.',
+                ? 'Kuesioner berhasil diajukan sebagai draft. Menunggu approval Super Admin.'
+                : 'Kuesioner berhasil disimpan.',
             'data'    => $data,
         ], 201);
     }
@@ -85,7 +85,7 @@ class QuestionnaireController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Kuisioner berhasil diperbarui.',
+            'message' => 'Kuesioner berhasil diperbarui.',
             'data'    => $data,
         ]);
     }
@@ -97,7 +97,7 @@ class QuestionnaireController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Kuisioner berhasil dihapus.',
+            'message' => 'Kuesioner berhasil dihapus.',
         ]);
     }
 }

@@ -35,7 +35,7 @@ class RingkasanTahunRepository
 
     /**
      * @param array{program_id?: int|null, program_id_in?: array<int>|null} $scope
-     * @return array<int, array{tahun:int, alumni:int, sudah_mengisi:int, belum_mengisi:int, response_rate:float, kuesioner:int, periode:array<int,int>}>
+     * @return array<int, array{tahun:int, alumni:int, sudah_mengisi:int, belum_mengisi:int, response_rate:float, kuesioner:int, kuesioner_terbit:int, periode:array<int,int>}>
      */
     public function byGraduationYear(array $scope = []): array
     {
@@ -80,6 +80,9 @@ class RingkasanTahunRepository
             ->select([
                 DB::raw('t.tahun::int as tahun'),
                 DB::raw('COUNT(*) as kuesioner'),
+                // Kartu "Total Kuesioner — Terbit" di Overview hanya boleh
+                // menghitung kuesioner berstatus published (draf tidak ikut).
+                DB::raw("COUNT(*) FILTER (WHERE q.status = 'published') as kuesioner_terbit"),
                 DB::raw('MIN(q.period_year) as periode_min'),
                 DB::raw('MAX(q.period_year) as periode_max'),
             ])
@@ -165,6 +168,7 @@ class RingkasanTahunRepository
                 'belum_mengisi' => $total - $responded,
                 'response_rate' => $total > 0 ? round($responded / $total * 100, 1) : 0.0,
                 'kuesioner'     => (int) ($k->kuesioner ?? 0),
+                'kuesioner_terbit' => (int) ($k->kuesioner_terbit ?? 0),
                 'kontak'        => (int) ($kontakRows->get($year)->kontak ?? 0),
                 'periode'       => $periods,
             ];

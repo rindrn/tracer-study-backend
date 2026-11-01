@@ -14,6 +14,7 @@ class LamProgramService
     public function __construct(
         private readonly LamProgramRepository $repo,
         private readonly LamRepository        $lamRepo,
+        private readonly TracerResponseCalculationService $responseCalc,
     ) {}
 
     public function byLam(int $lamId): array
@@ -33,6 +34,7 @@ class LamProgramService
         if (! $lam) throw new BusinessException("LAM ID {$data['lam_id']} tidak ditemukan.", 404);
 
         $this->repo->syncAdd($data['lam_id'], $data['program_ids']);
+        $this->responseCalc->recalculateForPrograms($data['program_ids']);
 
         // Bust cache LAM karena relasi programs berubah
         $this->forget("lams:show:{$data['lam_id']}");

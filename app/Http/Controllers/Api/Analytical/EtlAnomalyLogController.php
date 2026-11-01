@@ -25,13 +25,14 @@ class EtlAnomalyLogController extends Controller
             'semantic_role' => 'nullable|string|max:50',
             'nim'           => 'nullable|string|max:30',
             'page'          => 'nullable|integer|min:1',
+            'per_page'      => 'nullable|integer|min:5|max:100',
         ]);
 
         $paginated = $this->repo->paginate([
             'etl_run_id'    => $request->query('etl_run_id'),
             'semantic_role' => $request->query('semantic_role'),
             'nim'           => $request->query('nim'),
-        ], 15);
+        ], (int) $request->query('per_page', 15));
 
         return response()->json(array_merge(['success' => true], $paginated->toArray()));
     }

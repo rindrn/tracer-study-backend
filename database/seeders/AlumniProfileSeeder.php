@@ -17,7 +17,7 @@ class AlumniProfileSeeder extends Seeder
      * ditulis terpisah dan sempat melenceng: alumni dibuat untuk 2020-2025
      * tapi kuesioner cuma menyasar 2022-2024, sehingga respons lulusan 2020,
      * 2021, dan 2025 nyasar ke kuesioner angkatan 2022. Halaman Manajemen
-     * Kuisioner lalu menampilkan angkatan yang "belum digarap" padahal
+     * Kuesioner lalu menampilkan angkatan yang "belum digarap" padahal
      * ratusan alumninya tercatat sudah mengisi.
      */
     public const GRADUATION_YEARS = [2020, 2021, 2022, 2023, 2024, 2025];

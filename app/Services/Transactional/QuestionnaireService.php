@@ -3,6 +3,7 @@
 namespace App\Services\Transactional;
 
 use App\Exceptions\BusinessException;
+use App\Models\Transactional\ApprovalRequest;
 use App\Models\Transactional\User;
 use App\Repositories\Transactional\ProgramRepository;
 use App\Repositories\Transactional\QuestionnaireRepository;
@@ -84,7 +85,7 @@ class QuestionnaireService
     {
         $questionnaire = $this->loadQuestionnaire($id);
         if (!$questionnaire) {
-            throw new BusinessException('Kuisioner tidak ditemukan.', 404);
+            throw new BusinessException('Kuesioner tidak ditemukan.', 404);
         }
         $questionnaire['response_count'] = $this->questionnaireRepo->countResponses($id);
         return $questionnaire;
@@ -138,7 +139,7 @@ class QuestionnaireService
         DB::connection(self::CONN)->transaction(function () use ($id, $validated, $now) {
             $existing = $this->questionnaireRepo->findHeaderById($id);
             if (!$existing) {
-                throw new BusinessException('Kuisioner tidak ditemukan.', 404);
+                throw new BusinessException('Kuesioner tidak ditemukan.', 404);
             }
 
             // KSN-10 — kuesioner yang sudah dijawab tidak boleh disunting lagi.
@@ -157,7 +158,7 @@ class QuestionnaireService
             $responseCount = $this->questionnaireRepo->countResponses($id);
             if ($responseCount > 0) {
                 throw new BusinessException(
-                    "Kuisioner tidak dapat diubah karena sudah memiliki {$responseCount} responden. "
+                    "Kuesioner tidak dapat diubah karena sudah memiliki {$responseCount} responden. "
                     . 'Seluruh isiannya terkunci, termasuk Target Prodi dan judul, bukan '
                     . 'pertanyaannya saja. Buat versi baru bila memang perlu berubah.',
                     422,
@@ -209,15 +210,40 @@ class QuestionnaireService
         $responseCount = $this->questionnaireRepo->countResponses($id);
         if ($responseCount > 0) {
             throw new BusinessException(
-                "Kuisioner tidak dapat dihapus karena sudah memiliki {$responseCount} responden.",
+                "Kuesioner tidak dapat dihapus karena sudah memiliki {$responseCount} responden.",
                 422,
             );
         }
 
-        $deleted = $this->questionnaireRepo->deleteHeader($id);
-        if (!$deleted) {
-            throw new BusinessException('Kuisioner tidak ditemukan.', 404);
-        }
+        // Pemetaan semantik menunjuk ke kuesioner lewat FK tanpa ON DELETE,
+        // sehingga kuesioner yang sudah dipetakan tidak bisa dihapus. Karena
+        // penghapusan hanya diizinkan bila belum ada responden, pemetaan itu
+        // belum pernah dipakai ETL dan ikut dihapus dalam transaksi yang sama.
+        DB::connection('oltp')->transaction(function () use ($id) {
+            DB::connection('oltp')->table('question_semantic_mapping')
+                ->where('questionnaire_id', $id)
+                ->delete();
+
+            $deleted = $this->questionnaireRepo->deleteHeader($id);
+            if (!$deleted) {
+                throw new BusinessException('Kuesioner tidak ditemukan.', 404);
+            }
+
+            // Pengajuan yang masih menunggu atas kuesioner ini (terbitkan atau
+            // hapus) kehilangan sasarannya. Dibiarkan pending, ia tetap muncul
+            // di antrean Ketua Tracer dan bila disetujui hanya "menerbitkan"
+            // kuesioner yang sudah tidak ada. Ditutup di transaksi yang sama.
+            DB::connection('oltp')->table('approval_requests')
+                ->where('status', ApprovalRequest::STATUS_PENDING)
+                ->whereIn('type', [ApprovalRequest::TYPE_ADD_QUESTIONNAIRE, ApprovalRequest::TYPE_DELETE_QUESTIONNAIRE])
+                ->whereRaw("payload->>'questionnaire_id' = ?", [(string) $id])
+                ->update([
+                    'status'      => ApprovalRequest::STATUS_REJECTED,
+                    'note'        => 'Ditutup otomatis: kuesioner sudah dihapus.',
+                    'resolved_at' => now(),
+                    'updated_at'  => now(),
+                ]);
+        });
     }
 
     // ═══════════════════════════════════════════════════════════

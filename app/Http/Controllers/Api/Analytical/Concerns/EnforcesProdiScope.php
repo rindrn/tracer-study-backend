@@ -83,6 +83,11 @@ trait EnforcesProdiScope
             $params['nama_prodi'] = $program->name;
             $params['jenjang']    = $program->degree;
             $params['jurusan']    = $program->jurusan;
+            // Endpoint "bandingkan" menyaring lewat daftar `prodi`, bukan
+            // `nama_prodi`. Tanpa baris ini kaprodi yang membuka halaman
+            // Compare lewat URL melihat seluruh prodi sejurusan-sejenjang
+            // (mis. D-3 Akuntansi ikut melihat D-3 Keuangan & Perbankan).
+            $params['prodi']      = [$program->name];
         } elseif ($user->isKajur()) {
             // Kajur dibatasi ke jurusan yang di-assign admin (FK
             // `users.jurusan_id` → keanggotaan eksplisit lewat
